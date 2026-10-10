@@ -19,10 +19,11 @@ def main():
     # developer's PC; its entire runner/profile must be disposable.
     if os.name != 'nt' or os.environ.get('GITHUB_ACTIONS') != 'true':
         raise RuntimeError('This test requires a disposable GitHub-hosted Windows runner.')
-    scratch = ROOT/'work'; scratch.mkdir(exist_ok=True)
+    scratch = Path(os.environ['RUNNER_TEMP']).resolve()
+    assert scratch.is_absolute() and scratch.is_dir() and not scratch.is_relative_to(ROOT.resolve())
     with tempfile.TemporaryDirectory(prefix='codex-onboarding-', dir=scratch) as directory:
         target = Path(directory).resolve()
-        assert target.is_relative_to(scratch.resolve())
+        assert target.is_relative_to(scratch) and not target.is_relative_to(ROOT.resolve())
         home = target/'state'; home.mkdir()
         local = target/'local'; local.mkdir()
         roaming = target/'roaming'; roaming.mkdir()
