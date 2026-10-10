@@ -32,6 +32,7 @@ static std::string frame(const std::string& rows, const char* provider = "codex"
 static void timestamp_and_ack() {
   aim::ProtoCore core;
   core.tick = [] { return 1234u; };
+  const uint32_t revisionBefore = core.snapshot_revision();
   const std::string payload = frame("[{\"title\":\"Session\",\"usedPercent\":25}]");
   feed(core, "AIM1 " + std::to_string(payload.size()) + " 7\n" + payload);
   CHECK(core.snapshot().views[0].receivedMs == 1234);
@@ -39,6 +40,11 @@ static void timestamp_and_ack() {
   CHECK(core.snapshot().frameCount == 1);
   CHECK(core.snapshot().views[0].rows[0].usedPercent == 25);
   CHECK(core.out().find("\"type\":\"ack\"") != std::string::npos);
+  // A completed frame is a snapshot state change; stray text is not.
+  CHECK(core.snapshot_revision() > revisionBefore);
+  const uint32_t revisionAfterFrame = core.snapshot_revision();
+  feed(core, "not json at all\n");
+  CHECK(core.snapshot_revision() == revisionAfterFrame);
 }
 
 static void invalid_frame_keeps_snapshot() {
@@ -52,6 +58,12 @@ static void invalid_frame_keeps_snapshot() {
       frame("[{\"usedPercent\":101}]"),
       frame("[]"),
       "{\"schemaVersion\":2,\"frameId\":8,\"displayTime\":\"01:00\",\"data\":[]}\n",
+      // windowMinutes identifies a quota window; wrong types must be rejected.
+      frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":\"300\"}]"),
+      frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":300.5}]"),
+      frame("[{\"title\":\"S\",\"usedPercent\":20,\"windowMinutes\":true}]"),
+      "{\"schemaVersion\":1,\"frameId\":9,\"data\":[{\"provider\":\"codex\",\"viewIndex\":0,"
+      "\"usage\":{\"primary\":{\"usedPercent\":20,\"windowMinutes\":\"300\"}}}]}\n",
   };
   for (const auto& text : invalid) {
     core.clear_out();
@@ -73,6 +85,25 @@ static void set_views_clears_old_data_and_rejects_bad_keys() {
   feed(core, "{\"cmd\":\"set_views\",\"views\":[\"co\\\"dex\"]}\n");
   CHECK(core.out().find("\"type\":\"error\"") != std::string::npos);
   CHECK(std::string(core.snapshot().viewKeys[0]) == "zcode");
+  // interval/active must be integers when present, not silent defaults.
+  const char* typed[] = {
+      "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"interval\":\"20\"}",
+      "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"interval\":3.5}",
+      "{\"cmd\":\"set_views\",\"views\":[\"codex\"],\"active\":true}",
+  };
+  for (const auto* text : typed) {
+    core.clear_out();
+    feed(core, std::string(text) + "\n");
+    CHECK(core.out().find("\"type\":\"error\"") != std::string::npos);
+    CHECK(core.snapshot().viewCount == 1);
+    CHECK(std::string(core.snapshot().viewKeys[0]) == "zcode");
+  }
+  core.clear_out();
+  feed(core, "{\"cmd\":\"set_views\",\"views\":[\"codex\",\"zcode\"],\"interval\":20,\"active\":1}\n");
+  CHECK(core.out().find("\"type\":\"ok\"") != std::string::npos);
+  CHECK(core.snapshot().viewCount == 2);
+  CHECK(core.snapshot().viewIntervalSeconds == 20);
+  CHECK(core.snapshot().activeView == 1);
 }
 
 static void brightness_rejects_invalid_values() {
@@ -281,6 +312,16 @@ static void oversized_plain_frame_is_rejected() {
   CHECK(payload.size() == aim::ProtoCore::kAim1MaxPayload + 1);
   feed(core, payload + "\n");
   CHECK(core.snapshot().frameCount == 0);
+  CHECK(core.out().find("line exceeds maxFrameBytes") != std::string::npos);
+  // A line beyond the assembly buffer is also answered, not silently dropped.
+  core.clear_out();
+  feed(core, std::string(aim::ProtoCore::kAim1MaxPayload + 40, 'y') + "\n");
+  CHECK(core.snapshot().frameCount == 0);
+  CHECK(core.out().find("line exceeds maxFrameBytes") != std::string::npos);
+  // Recovery: the very next well-formed command still works.
+  core.clear_out();
+  feed(core, "{\"cmd\":\"get_info\"}\n");
+  CHECK(core.out().find("\"type\":\"info\"") != std::string::npos);
 }
 
 static void rows_beyond_protocol_cap_do_not_invalidate_supported_rows() {

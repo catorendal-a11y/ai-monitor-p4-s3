@@ -5,8 +5,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# Lead bytes produced when UTF-8 text is saved through a Windows-1252 round trip
-# (for example an em dash or middle dot becoming "â€”" or "Â·").
+# Lead code points produced when UTF-8 text is saved through a Windows-1252
+# round trip (an em dash or middle dot doubled through the wrong codec).
+# Written as escapes so this file cannot trip its own detector.
 MOJIBAKE_LEADS = ('\u00c2', '\u00c3', '\u00e2')
 
 

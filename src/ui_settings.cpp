@@ -72,6 +72,14 @@ static lv_obj_t* make_label(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coo
   return label;
 }
 
+// Help texts carry a second line after \n; CLIP would keep them one line tall.
+static lv_obj_t* make_wrap_label(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t width,
+                                 const char* text, const lv_font_t* font, uint32_t color, lv_text_align_t align) {
+  auto* label = make_label(parent, x, y, width, text, font, color, align);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_MODE_WRAP);
+  return label;
+}
+
 static void refresh_brightness();
 
 static void refresh_choices() {
@@ -493,7 +501,7 @@ void ui_settings_init() {
     presetButtons[i] = make_button(card, 24 + i * 130, 104, 118, text, brightness_preset_cb,
                                    reinterpret_cast<void*>(i), &presetLabels[i]);
   }
-  actualBrightnessLabel = make_label(card, 552, 112, 176, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
+  actualBrightnessLabel = make_wrap_label(card, 552, 112, 176, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
   make_label(card, 24, 174, 400, "DIM AFTER", &lv_font_montserrat_16, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
   for (size_t i = 0; i < 4; ++i) {
     dimButtons[i] = make_button(card, 24 + i * 130, 204, 118, kDimNames[i], dim_select_cb,
@@ -573,7 +581,7 @@ void ui_settings_init() {
   lv_obj_set_style_bg_color(nightSlider, lv_color_hex(ui_theme::accent), LV_PART_KNOB);
   lv_obj_add_event_cb(nightSlider, night_slider_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(nightSlider, night_slider_cb, LV_EVENT_RELEASED, nullptr);
-  make_label(nightCard, 24, 286, 480, "HH / MM: tap or hold +/- to adjust.\nTouch restores daytime level for 60 seconds.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_wrap_label(nightCard, 24, 286, 480, "HH / MM: tap or hold +/- to adjust.\nTouch restores daytime level for 60 seconds.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(nightCard, 552, 284, 176, "DONE", close_night, nullptr);
   lv_obj_set_hidden(nightOverlay, true);
   appearanceOverlay = lv_obj_create(lv_layer_top());
@@ -611,7 +619,7 @@ void ui_settings_init() {
   quotaPrev = make_button(quotaCard, 24, 58, 96, "< PREV", quota_provider_cb, reinterpret_cast<void*>(-1));
   quotaNext = make_button(quotaCard, 632, 58, 96, "NEXT >", quota_provider_cb, reinterpret_cast<void*>(1));
   quotaProviderLabel = make_label(quotaCard, 132, 70, 484, "", &lv_font_montserrat_20, ui_theme::text, LV_TEXT_ALIGN_CENTER);
-  quotaProviderHelp = make_label(quotaCard, 24, 116, 704, "", &lv_font_montserrat_16, ui_theme::text, LV_TEXT_ALIGN_LEFT);
+  quotaProviderHelp = make_wrap_label(quotaCard, 24, 116, 704, "", &lv_font_montserrat_16, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   for (size_t i = 0; i < 4; ++i) {
     quotaButtons[i] = make_button(quotaCard, 24 + (i % 2) * 360, 164 + (i / 2) * 72, 344, "",
                                   quota_select_cb, reinterpret_cast<void*>(i), &quotaCaptions[i]);
@@ -623,9 +631,9 @@ void ui_settings_init() {
     quotaDetails[i] = make_label(quotaButtons[i], 4, 36, 336, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
   }
   quotaSelectionLabel = make_label(quotaCard, 24, 314, 704, "", &lv_font_montserrat_18, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
-  quotaSetupHelp = make_label(quotaCard, 24, 340, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_label(quotaCard, 24, 386, 400, "NOVA + ORBIT show quota remaining.\nAlerts still check every window.",
-             &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  quotaSetupHelp = make_wrap_label(quotaCard, 24, 340, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_wrap_label(quotaCard, 24, 386, 400, "NOVA + ORBIT show quota remaining.\nAlerts still check every window.",
+                  &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(quotaCard, 440, 382, 136, "REFRESH", refresh_quota, nullptr);
   make_button(quotaCard, 592, 382, 136, "DONE", close_quota, nullptr);
   lv_obj_set_hidden(quotaOverlay, true);

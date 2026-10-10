@@ -828,11 +828,11 @@ void dashboard_update() {
     lv_obj_set_style_bg_color(hdr.halo, lv_color_hex(dotColor), 0);
   }
   char clockBuf[8] = "--:--";
-  unsigned hour = 0, minute = 0;
-  if (sscanf(snap.displayTime, "%2u:%2u", &hour, &minute) == 2) {
-    const unsigned elapsedMinutes = (snap.displaySeconds + (now - snap.displayTimeMs) / 1000u) / 60u;
-    const unsigned minutes = (hour * 60u + minute + elapsedMinutes) % 1440u;
-    snprintf(clockBuf, sizeof(clockBuf), "%02u:%02u", minutes / 60u, minutes % 60u);
+  uint16_t clockMinutes = 0;
+  // Same freshness policy as every other clock consumer: stop extrapolating
+  // from a host sync older than 12 h instead of presenting a derived clock.
+  if (local_minutes(snap, now, clockMinutes)) {
+    snprintf(clockBuf, sizeof(clockBuf), "%02u:%02u", clockMinutes / 60u, clockMinutes % 60u);
   }
   set_label_cached(hdr.clock, clockCache, sizeof(clockCache), clockBuf);
 

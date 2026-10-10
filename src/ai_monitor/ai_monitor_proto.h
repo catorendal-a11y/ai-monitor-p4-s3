@@ -49,6 +49,8 @@ class ProtoCore {
   static constexpr const char* kReportedVersion = "2.23.0";
 
   const Snapshot& snapshot() const { return snap_; }
+  // Bumped on every snapshot state change; the owner publishes only on change.
+  uint32_t snapshot_revision() const { return revision_; }
   // Bytes to transmit to the host (cleared by the owner after sending).
   const std::string& out() const { return out_; }
   void clear_out() { out_.clear(); }
@@ -59,12 +61,14 @@ class ProtoCore {
       snap_.refreshState = RefreshState::failed;
       snap_.refreshCompletedMs = tick();
       copy_capped(snap_.refreshMessage, sizeof(snap_.refreshMessage), "Start the updated PC host to refresh");
+      touch();
       return;
     }
     if (++snap_.refreshId == 0) ++snap_.refreshId;
     snap_.refreshState = RefreshState::requested;
     snap_.refreshRequestedMs = tick();
     copy_capped(snap_.refreshMessage, sizeof(snap_.refreshMessage), "Refresh requested");
+    touch();
     emitf("{\"type\":\"refresh_request\",\"requestId\":%u}\n", (unsigned)snap_.refreshId);
   }
 
@@ -82,12 +86,14 @@ class ProtoCore {
     if (snap_.hostPresent && now - snap_.hostSeenMs >= timeout) {
       snap_.hostPresent = false;
       changed = true;
+      touch();
     }
     if (refresh_pending() && (!snap_.hostPresent || now - snap_.refreshRequestedMs >= 70000u)) {
       snap_.refreshState = RefreshState::failed;
       snap_.refreshCompletedMs = now;
       copy_capped(snap_.refreshMessage, sizeof(snap_.refreshMessage), "Host did not complete the update");
       changed = true;
+      touch();
     }
     return changed;
   }
@@ -114,7 +120,8 @@ class ProtoCore {
       const bool overflow = lineOverflow_;
       lineLen_ = 0;
       lineOverflow_ = false;
-      if (!overflow) handle_line(line_);
+      if (overflow) reply_error(-1, 0, "line exceeds maxFrameBytes");
+      else handle_line(line_);
       return;
     }
     if (lineLen_ + 1 < sizeof(line_)) {
@@ -128,7 +135,9 @@ class ProtoCore {
   bool refresh_pending() const {
     return snap_.refreshState == RefreshState::requested || snap_.refreshState == RefreshState::waiting || snap_.refreshState == RefreshState::updating;
   }
+  void touch() { ++revision_; }
   Snapshot snap_{};
+  uint32_t revision_ = 0;
   std::string out_;
   char mac_[18] = "00:00:00:00:00:00";
 
@@ -185,6 +194,7 @@ class ProtoCore {
   void note_host_seen() {
     snap_.hostPresent = true;
     snap_.hostSeenMs = tick();
+    touch();
   }
 
   void reply_error(int frameId, int schemaVersion, const char* message) {
@@ -271,6 +281,9 @@ class ProtoCore {
         if (!std::isfinite(r.usedPercent) || r.usedPercent < 0 || r.usedPercent > 100) return false;
         copy_capped(r.title, sizeof(r.title), row["title"] | (const char*)"");
         short_reset(row["resetsAt"] | (const char*)"", r.resetsShort, sizeof(r.resetsShort));
+        // windowMinutes identifies a quota window (matching, NVS rules); reject
+        // wrong types instead of silently coercing them to 0.
+        if (!row["windowMinutes"].isNull() && !row["windowMinutes"].is<uint32_t>()) return false;
         r.windowMinutes = row["windowMinutes"] | 0u;
         if (!row["resetSeconds"].isNull()) {
           if (!row["resetSeconds"].is<uint32_t>()) return false;
@@ -293,6 +306,7 @@ class ProtoCore {
         if (!std::isfinite(r.usedPercent) || r.usedPercent < 0 || r.usedPercent > 100) return false;
         copy_capped(r.title, sizeof(r.title), kBlocks[i]);
         short_reset(block["resetsAt"] | (const char*)"", r.resetsShort, sizeof(r.resetsShort));
+        if (!block["windowMinutes"].isNull() && !block["windowMinutes"].is<uint32_t>()) return false;
         r.windowMinutes = block["windowMinutes"] | 0u;
         if (!block["resetSeconds"].isNull()) {
           if (!block["resetSeconds"].is<uint32_t>()) return false;
@@ -532,7 +546,9 @@ class ProtoCore {
       }
       int interval = doc["interval"] | 10;
       int active = doc["active"] | 0;
-      if (interval < 2 || interval > 3600 || active < 0 || active >= (int)views.size()) {
+      if ((!doc["interval"].isNull() && !doc["interval"].is<int>()) ||
+          (!doc["active"].isNull() && !doc["active"].is<int>()) ||
+          interval < 2 || interval > 3600 || active < 0 || active >= (int)views.size()) {
         reply_error(-1, 0, "set_views: invalid interval or active");
         return;
       }

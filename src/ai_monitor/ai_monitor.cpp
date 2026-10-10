@@ -82,6 +82,8 @@ static void ai_monitor_task(void*) {
   core.set_mac(mac);
 
   uint8_t chunk[128];
+  uint32_t publishedRevision = 0;
+  bool publishedOnce = false;
   for (;;) {
     int n = 0;
     while (n < (int)sizeof(chunk) && Serial.available() > 0) {
@@ -93,7 +95,14 @@ static void ai_monitor_task(void*) {
     const bool refresh = refreshRequested.exchange(false, std::memory_order_acq_rel);
     if (refresh) core.request_refresh();
     const bool changed = core.poll();
-    if (n > 0 || changed || refresh) publish(core.snapshot());
+    // Publish per state change, not per received chunk: one 4 KB frame must
+    // not trigger dozens of full-snapshot copies with interrupts disabled.
+    const uint32_t revision = core.snapshot_revision();
+    if (!publishedOnce || changed || refresh || revision != publishedRevision) {
+      publishedOnce = true;
+      publishedRevision = revision;
+      publish(core.snapshot());
+    }
     const std::string& outBuf = core.out();
     if (!outBuf.empty()) {
       const int available = Serial.availableForWrite();
