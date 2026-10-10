@@ -114,7 +114,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.18.1-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.18.1-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.18.2-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.18.2-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -122,7 +122,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/AI-Monitor-Setup-v1.18.1-windows.exe)** Â· [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/ai-monitor-p4-v1.18.1-windows.zip) Â· [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.1/SHA256SUMS.txt) Â· [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.2/AI-Monitor-Setup-v1.18.2-windows.exe)** Â· [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.2/ai-monitor-p4-v1.18.2-windows.zip) Â· [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.2/SHA256SUMS.txt) Â· [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 
@@ -183,7 +183,7 @@ The display also includes reset countdowns, manual refresh, low/critical quota w
 | --- | --- |
 | **Setup / Save settings** | Choose board, providers and port; preserve saved keys unless explicitly changed. |
 | **Start host / Stop host** | Manage only this folder's independent background companion. |
-| **Provider setup** | Open official Codex onboarding or the optional Claude bridge in its console. |
+| **Provider setup** | Open the AI setup tab and its provider instructions. **Install / sign in Codex** opens the official setup console; Claude has a separate quota-link action. |
 | **Firmware** | Review the selected board, chip and verified image before typing FLASH. |
 | **Activity / Host log** | Read bounded local messages; API keys and control sequences are filtered. |
 | **Help** | Open setup/provider guides. |

@@ -187,6 +187,7 @@ class DesktopWindowTests(unittest.TestCase):
 
     def test_guided_setup_routes_missing_choices_and_blocks_start_until_saved(self):
         self.assertFalse(self.window.start_button.isEnabled())
+        self.assertIn('USB: choose board first', self.window.setup_progress.text())
         self.window.port.setCurrentText('COM9999')
         self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
         self.window.continue_setup()
@@ -225,6 +226,28 @@ class DesktopWindowTests(unittest.TestCase):
                 patch.object(self.window,'start') as start:
             self.window._auto_start_if_needed()
         start.assert_not_called()
+
+    def test_running_host_without_usb_health_routes_to_status_not_a_serial_probe(self):
+        self.window.port.setCurrentText('COM9999')
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['gemini'].setChecked(True); self.window.save()
+        self.window.token_reporter = Mock(last_use=None)
+        self.window.token_reporter.poll.return_value = None
+        with patch.object(control, 'owned_hosts', return_value=[Mock(pid=1234)]), \
+                patch('desktop_window.read_status', return_value=None), \
+                patch.object(desktop, 'check_connection') as probe, \
+                patch.object(self.window, 'start') as start:
+            self.window.refresh_status()
+            self.assertFalse(self.window.live_connected)
+            self.assertIn('Host running:', self.window.setup_next.text())
+            self.assertEqual(self.window.start_button.text(), 'Restart host')
+            self.window.continue_setup()
+        self.assertEqual(self.window.tabs.currentIndex(), 2)
+        probe.assert_not_called(); start.assert_not_called()
+        with patch.object(control, 'owned_hosts', return_value=[]):
+            self.window.refresh_status()
+        self.assertEqual(self.window.start_button.text(), 'Start host')
+        self.assertIn('check the display connection', self.window.setup_next.text())
 
     def test_claude_link_controls_require_saved_selection_and_confirmation(self):
         self.assertTrue(self.window.claude_link_button.isHidden())

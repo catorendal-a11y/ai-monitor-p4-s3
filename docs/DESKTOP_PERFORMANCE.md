@@ -22,3 +22,13 @@ python scripts/benchmark_desktop.py --seconds 10 --output work/desktop-performan
 ```
 
 This measures GUI work, not network/provider latency or physical display rendering. It must not generate model requests or use real credentials. Runtime measurements on a user's PC should retain logs and identifiers locally, not include them in public exports.
+
+## Packaged Windows check
+
+The downloaded v1.18.1 installer was checked against its release hashes and installed over v1.17.2. Ten-second native GUI samples used existing numeric activity sources. GUI RSS was approximately 102 MiB visible and 107 MiB hidden; the hidden sample recorded 0.16% of one core. No GUI TCP listener was present. The same independent host processes remained connected through minimize, restore and Quit, with both selected providers reporting fresh quota health. These are short operational samples, not a controlled CPU/startup comparison, and they do not measure a long-term memory leak.
+
+## Numeric-query execution budget
+
+Codex and ZCode reads now use SQLite's progress handler with a 100 ms execution budget, matching the existing bounded OpenCode adapter. The row limit alone did not bound an unindexed sort. A finite synthetic one-million-row recursive numeric projection took 433–453 ms in three reads with the v1.18.1 adapter; the bounded adapter interrupted it in 106–111 ms. The database bytes were unchanged. Normal numeric queries remained readable; timeout reports an unavailable source rather than partial or fabricated usage.
+
+The budget limits SQLite execution, not all filesystem access or lock waiting. Connection lock waiting retains its separate 150 ms timeout. Progress callbacks are periodic, so 100 ms is not a hard wall-clock guarantee. This stress fixture establishes bounded handling of a slow source, not a speedup for normal provider databases. Synthetic regression tests cover interruption, later successful reads and unchanged database contents.

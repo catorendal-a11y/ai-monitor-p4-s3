@@ -85,6 +85,25 @@ class TokenActivityTests(unittest.TestCase):
                 aim_host.LOG("background host started")
             self.assertIn("background host started", path.read_text(encoding="utf-8"))
 
+    def test_expensive_numeric_query_is_interrupted_without_changing_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'large.sqlite'
+            for provider, table, count_column, time_column in (
+                    ('codex', 'threads', 'tokens_used', 'updated_at_ms'),
+                    ('zcode', 'model_usage', 'computed_total_tokens', 'started_at')):
+                with self.subTest(provider=provider):
+                    with sqlite3.connect(path) as db:
+                        db.execute(f'CREATE TABLE {table}(id TEXT,{count_column} INTEGER,{time_column} INTEGER)')
+                        db.executemany(f'INSERT INTO {table} VALUES (?,?,?)',
+                                       [(str(i), i, i) for i in range(1000)])
+                    db.close()
+                    before = path.read_bytes()
+                    # Simulate an exhausted execution budget during a real unindexed sort.
+                    with patch('token_activity.time.monotonic', side_effect=[0.0, 1.0]):
+                        self.assertIsNone(TokenReporter.read_counts(provider, path))
+                    self.assertEqual(path.read_bytes(), before)
+                    self.assertIsNotNone(TokenReporter.read_counts(provider, path))
+
 
 if __name__ == "__main__":
     unittest.main()

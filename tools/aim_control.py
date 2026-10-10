@@ -330,10 +330,11 @@ def status(root=ROOT):
     print(f"Host: {'running' if owned_hosts(root) else 'stopped'} / USB port: {config['port']}")
     print('Selected providers: ' + (', '.join(PROVIDERS[key][0] for key in providers) or 'none - open First-time setup'))
     if 'codex' in providers:
-        print(f"Official Codex CLI: {'found' if codex_command() else 'missing - run First-time setup'}")
+        print(f"Official Codex CLI: {'found' if codex_command() else 'missing - use Provider integration help (menu 7)'}")
         print('Quota uses the CLI account interface; legacy file login is a fallback when the CLI is absent.')
     if 'zcode' in providers:
-        print(f"ZCode quota key: {'configured' if os.environ.get('ZAI_API_KEY') or config.get('zai_key') else 'optional, not configured'}")
+        key = host.credential(os.environ.get('ZAI_API_KEY', config.get('zai_key', '')), optional=True)
+        print(f"ZCode quota key: {'configured' if key else 'optional, not configured'}")
     counters = host.TokenReporter(providers=providers, activity_dir=root / 'tools/activity').poll()
     mask = counters["sources"]
     print('Readable token counters: ' + (' + '.join(PROVIDERS[key][0] for key in providers if mask & PROVIDERS[key][1]) or 'none'))

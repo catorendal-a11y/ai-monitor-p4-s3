@@ -826,7 +826,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 panel.collect_requests()
                 panel.cycle_active = False
                 panel.activity("updated" if panel.last_poll_success is True else "failed",
-                               "Latest quota received" if panel.last_poll_success is True else "Check provider details")
+                               "Usage status updated" if panel.last_poll_success is True else "Check provider details")
                 request_id = panel.active_refresh_id
                 if type(request_id) is not int: request_id = None
                 if request_id is not None:
@@ -866,7 +866,11 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         informational = False
         deferred = panel.retries.remaining(provider) > 0
         fetcher = getattr(panel, "fetcher", None)
-        if deferred:
+        if provider == 'zcode' and not zai_key:
+            rows, notice = None, 'Local token activity; add a Z.AI key for quota'
+            informational = True
+            panel.retries.succeeded(provider)
+        elif deferred:
             rows, notice = None, panel.retries.deferred_notice(provider)
         elif provider == "codex":
             rows, notice = fetcher.fetch(provider, fetch_codex, panel) if isinstance(fetcher, FetchPool) else fetch_codex()

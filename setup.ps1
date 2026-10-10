@@ -41,5 +41,5 @@ $taskLocalConfig = Join-Path $taskProjectRoot 'tools\aim_host.json'
 if (-not (Test-Path -LiteralPath $taskLocalConfig)) {
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'tools\aim_host.example.json') -Destination $taskLocalConfig
 }
-Write-Output 'Setup complete. Double-click AI-Monitor.bat to open the setup/start menu.'
+Write-Output 'Setup complete. Double-click AI-Monitor.bat to open the graphical AI Monitor app.'
 Write-Output 'Local settings and keys were preserved. No hardware was flashed.'

@@ -38,6 +38,9 @@ class TokenReporter:
         try:
             with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=0.15)) as database:
                 database.execute("PRAGMA query_only=ON")
+                database.execute("PRAGMA trusted_schema=OFF")
+                deadline = time.monotonic() + 0.1
+                database.set_progress_handler(lambda: time.monotonic() > deadline, 1000)
                 return {str(key): count for key, count in database.execute(query)
                         if type(count) is int and 0 <= count <= 0xffffffffffffffff}
         except (sqlite3.Error, OSError):

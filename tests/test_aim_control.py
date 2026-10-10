@@ -137,6 +137,26 @@ class SetupTests(unittest.TestCase):
             network.assert_not_called()
             self.assertNotIn('fixture-status-key', output.getvalue())
 
+    def test_status_uses_the_same_environment_key_precedence_as_the_host(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            control.save_config(dict(control.host.DEFAULT_CONFIG, board='guition-p4',
+                providers=['zcode'], zai_key='fixture-saved-key'), root)
+            for environment, configured in (({}, True), ({'ZAI_API_KEY':''}, False),
+                    ({'ZAI_API_KEY':'   '}, False), ({'ZAI_API_KEY':'fixture-env-key'}, True)):
+                with self.subTest(environment_present=bool(environment), configured=configured):
+                    output = io.StringIO()
+                    with patch.dict(control.os.environ, environment, clear=True), \
+                            contextlib.redirect_stdout(output), \
+                            patch.object(control, 'owned_hosts', return_value=[]), \
+                            patch.object(control.host, 'TokenReporter', return_value=Mock(poll=Mock(return_value={'sources':0}))), \
+                            patch.object(control.host.urllib.request, 'urlopen') as network:
+                        control.status(root)
+                    network.assert_not_called()
+                    self.assertIn('ZCode quota key: ' + ('configured' if configured else 'optional, not configured'), output.getvalue())
+                    self.assertNotIn('fixture-saved-key', output.getvalue())
+                    self.assertNotIn('fixture-env-key', output.getvalue())
+
 
 if __name__ == '__main__':
     unittest.main()

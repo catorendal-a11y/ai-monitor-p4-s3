@@ -112,6 +112,23 @@ class HostSettingsTests(unittest.TestCase):
         self.assertFalse(panel.last_poll_success)
         self.assertEqual(read_status(self.root, {os.getpid()})['providers']['codex'], 'unavailable')
 
+    def test_keyless_zcode_is_activity_only_and_clears_old_quota_backoff(self):
+        panel = Mock(); panel.health = HostStatus(self.root/'tools')
+        panel.health.update('connected', 'COM6')
+        panel.retries = host.ProviderRetries(240)
+        panel.retries.failed('zcode', 'old invalid key')
+        panel.fetcher = Mock(spec=host.FetchPool)
+        with patch.object(host, 'fetch_zcode') as fetch, patch.object(host, 'LOG'):
+            host.poll_cycle(host.DEFAULT_CONFIG, '', ['zcode'], 100, panel)
+        fetch.assert_not_called(); panel.fetcher.fetch.assert_not_called()
+        self.assertTrue(panel.last_poll_success)
+        self.assertEqual(panel.retries.remaining('zcode'), 0)
+        self.assertEqual(read_status(self.root, {os.getpid()})['providers']['zcode'], 'activity_only')
+        data = json.loads(panel.send_frame.call_args.args[0])['data'][0]
+        self.assertTrue(data['informational']); self.assertNotIn('usage', data)
+        self.assertIn('add a Z.AI key for quota', data['notice'])
+        panel.wait_for.assert_called_once_with('ack', seconds=2, frame_id=101)
+
     def test_invalid_start_preferences_cannot_replace_working_host(self):
         control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['gemini'], port='COM9999', token_poll_s=False), self.root)
         with patch.object(control, 'stop_host') as stop, patch.object(control.subprocess, 'Popen') as spawn:

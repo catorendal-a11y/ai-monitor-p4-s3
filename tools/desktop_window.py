@@ -26,7 +26,7 @@ from host_security import safe_text, serial_port
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 from host_status import read_status
 
-APP_VERSION = 'v1.18.1'
+APP_VERSION = 'v1.18.2'
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''
@@ -187,6 +187,7 @@ class MonitorWindow(QMainWindow):
         self.connection_failed = False
         self.current_action = None
         self.live_connected = False
+        self.host_running = False
         try:
             self.config = desktop.load_settings(root)
         except (ValueError, OSError):
@@ -692,7 +693,7 @@ class MonitorWindow(QMainWindow):
         board_ready = self.board.currentData() in BOARDS
         issue = self._usb_setup_issue()
         self.setup_progress.setText('Display: ' + ('chosen' if board_ready else 'choose your board') +
-            ' • USB: ' + ('needs selection' if issue else 'selected') +
+            ' • USB: ' + ('choose board first' if not board_ready else 'needs selection' if issue else 'selected') +
             ' • AI providers: ' + str(len(chosen)) + ' selected • Settings: ' +
             ('not saved' if self.unsaved or not board_ready or not chosen else 'saved'))
         if self.config_error: caption = 'Recover settings in Host settings'
@@ -701,10 +702,12 @@ class MonitorWindow(QMainWindow):
         elif not chosen: caption = 'Next: choose and set up my AIs'
         elif self.unsaved: caption = 'Next: save settings'
         elif self.live_connected: caption = 'Connected: view host and AI status'
+        elif self.host_running: caption = 'Host running: view connection and AI status'
         elif self.connection_checked: caption = 'Next: start host'
         elif self.connection_failed: caption = 'Next: firmware and USB help'
         else: caption = 'Next: check the display connection'
         self.setup_next.setText(caption)
+        self.start_button.setText('Restart host' if self.host_running else 'Start host')
         self.setup_next.setEnabled(not self.busy)
         self.start_button.setEnabled(not self.busy and not self.config_error and
             not self.unsaved and board_ready and bool(chosen) and not issue)
@@ -720,7 +723,7 @@ class MonitorWindow(QMainWindow):
         if not any(box.isChecked() for box in self.providers.values()):
             self.tabs.setCurrentIndex(1); return
         if self.unsaved: self.save(); self._update_setup_progress(); return
-        if self.live_connected: self.tabs.setCurrentIndex(2); return
+        if self.live_connected or self.host_running: self.tabs.setCurrentIndex(2); return
         if self.connection_checked: self.start()
         elif self.connection_failed:
             self.tabs.setCurrentIndex(3)
@@ -985,6 +988,7 @@ class MonitorWindow(QMainWindow):
         try:
             processes = control.owned_hosts(self.root)
             running = bool(processes)
+            self.host_running = running
             self.host_state.setText(desktop.connection_summary(self.root, processes))
             health = read_status(self.root, {process.pid for process in processes})
             states = health.get('providers', {}) if health else {}
