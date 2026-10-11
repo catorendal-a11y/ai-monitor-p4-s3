@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QThread
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 import desktop_support as desktop
@@ -114,6 +114,7 @@ class BackgroundFlowTests(unittest.TestCase):
         self.assertEqual(len(children), 1)
         self.assertIsNotNone(children[0].poll())
         self.assertIn('timed out', self.window.notice.text())
+        self.assertEqual(self.window.thread(), self.application.thread())
         self.assertGreater(len(self.ticks), 3)
         # A second real worker can finish after the timed-out child has exited.
         self.window._run('Next synthetic action', lambda emit: emit('safe to retry'))

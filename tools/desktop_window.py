@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import time
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, QSignalBlocker, QEvent
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, Slot, QSignalBlocker, QEvent
 from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap, QShortcut, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
@@ -97,9 +97,10 @@ class ReadWorker(QRunnable):
         self.signals = ResultSignals()
 
     def run(self):
+        signals = self.signals  # Retain the emitter until run returns, even when the receiver releases the worker.
         try: result = self.read()
         except Exception: result = None  # Never expose private paths, input or tracebacks.
-        self.signals.finished.emit(result)
+        signals.finished.emit(result)
 
 
 def collect_status(root, config, secrets, reporter, tokens):
@@ -125,15 +126,16 @@ class ActionWorker(QRunnable):
         self.signals = WorkerSignals()
 
     def run(self):
+        signals = self.signals
         try:
-            self.action(self.signals.output.emit)
-            self.signals.finished.emit(True, self.name + ' complete.')
+            self.action(signals.output.emit)
+            signals.finished.emit(True, self.name + ' complete.')
         except control.SetupError as error:
-            self.signals.finished.emit(False, safe_text(str(error)))
+            signals.finished.emit(False, safe_text(str(error)))
         except Exception:
             # Exceptions from credentials, subprocesses or APIs may contain
             # private input. Never forward their raw text or traceback.
-            self.signals.finished.emit(False, self.name + ' failed. Check settings and the action log.')
+            signals.finished.emit(False, self.name + ' failed. Check settings and the action log.')
 
 
 class FirmwareDialog(QDialog):
@@ -814,13 +816,14 @@ class MonitorWindow(QMainWindow):
             self.usb_help.setText('Scanning USB ports in the background. Your selected port is preserved.')
             self.rescan_button.setEnabled(False)
             self.scan_worker = ReadWorker(lambda: sorted(control.list_ports.comports(), key=lambda p: p.device))
-            self.scan_worker.signals.finished.connect(self._scanned)
+            self.scan_worker.signals.finished.connect(self._scanned, Qt.ConnectionType.QueuedConnection)
             self.scan_pool.start(self.scan_worker)
         else:
             try: ports = sorted(control.list_ports.comports(), key=lambda p: p.device)
             except OSError: ports = None
             self._scanned(ports)
 
+    @Slot(object)
     def _scanned(self, ports):
         self.scan_worker = None
         if self.closed: return
@@ -912,10 +915,11 @@ class MonitorWindow(QMainWindow):
         self.notice.setText(name + '…')
         self.refresh_tray()
         self.worker = ActionWorker(action, name)
-        self.worker.signals.output.connect(self.append_output)
-        self.worker.signals.finished.connect(self._finished)
+        self.worker.signals.output.connect(self.append_output, Qt.ConnectionType.QueuedConnection)
+        self.worker.signals.finished.connect(self._finished, Qt.ConnectionType.QueuedConnection)
         self.pool.start(self.worker)
 
+    @Slot(bool, str)
     def _finished(self, success, message):
         action_name = self.current_action
         if self.current_action == 'Checking USB identity':
@@ -1041,6 +1045,7 @@ class MonitorWindow(QMainWindow):
                       'Your Host settings stop the host when this window closes.'))
         self._run('Writing firmware', install)
 
+    @Slot(str)
     def append_output(self, text: str):
         for secret in self.secrets:
             text = text.replace(secret, '[REDACTED]')
@@ -1065,9 +1070,10 @@ class MonitorWindow(QMainWindow):
             self._status_finished(result)
             return
         self.status_worker = ReadWorker(read)
-        self.status_worker.signals.finished.connect(self._status_finished)
+        self.status_worker.signals.finished.connect(self._status_finished, Qt.ConnectionType.QueuedConnection)
         self.status_pool.start(self.status_worker)
 
+    @Slot(object)
     def _status_finished(self, result):
         self.status_worker = None
         if self.closed: return
