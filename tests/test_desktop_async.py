@@ -11,11 +11,32 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
-from PySide6.QtCore import QTimer, QThread
+from PySide6.QtCore import QTimer, QThread, Slot
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox
 import desktop_support as desktop
 import desktop_window as ui
+
+
+class ObservedWindow(ui.MonitorWindow):
+    def __init__(self, *args, **kwargs):
+        self.callback_threads = []
+        super().__init__(*args, **kwargs)
+
+    @Slot(bool, str)
+    def _finished(self, success, message):
+        self.callback_threads.append(QThread.currentThread())
+        super()._finished(success, message)
+
+    @Slot(object)
+    def _status_finished(self, result):
+        self.callback_threads.append(QThread.currentThread())
+        super()._status_finished(result)
+
+    @Slot(object)
+    def _scanned(self, result):
+        self.callback_threads.append(QThread.currentThread())
+        super()._scanned(result)
 
 
 class BackgroundFlowTests(unittest.TestCase):
@@ -27,7 +48,10 @@ class BackgroundFlowTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         with patch.object(ui.control.list_ports, 'comports', return_value=[]):
-            self.window = ui.MonitorWindow(self.root, monitor=False)
+            self.window = ObservedWindow(self.root, monitor=False)
+        self.window.callback_threads = []
+        warnings = patch.object(QMessageBox, 'warning')
+        warnings.start(); self.addCleanup(warnings.stop)
         self.window.monitor_enabled = True
         self.window.show()
         self.application.processEvents()
@@ -38,9 +62,12 @@ class BackgroundFlowTests(unittest.TestCase):
 
     def tearDown(self):
         self.timer.stop()
+        self.window.monitor_enabled = False
+        self.window.closed = True
         for pool in (self.window.pool, self.window.status_pool, self.window.scan_pool):
             self.assertTrue(pool.waitForDone(3000), 'A worker was left running')
-        self.window.monitor_enabled = False
+        self.application.processEvents()  # Drain queued results before destroying their receiver.
+        self.assertTrue(all(thread == self.application.thread() for thread in self.window.callback_threads))
         self.window.unsaved = False
         self.window.config['keep_host_on_close'] = True
         self.window.close(); self.window.deleteLater()
@@ -49,7 +76,9 @@ class BackgroundFlowTests(unittest.TestCase):
 
     def wait_until(self, condition, seconds=3):
         deadline = time.monotonic() + seconds
-        while not condition() and time.monotonic() < deadline: QTest.qWait(10)
+        while not condition() and time.monotonic() < deadline:
+            QTest.qWait(10)
+            time.sleep(0.002)  # qWait can retain the Python GIL on Linux; let Python workers run.
         self.assertTrue(condition())
 
     @staticmethod
@@ -114,7 +143,7 @@ class BackgroundFlowTests(unittest.TestCase):
         self.assertEqual(len(children), 1)
         self.assertIsNotNone(children[0].poll())
         self.assertIn('timed out', self.window.notice.text())
-        self.assertEqual(self.window.thread(), self.application.thread())
+        self.assertTrue(self.window.callback_threads)
         self.assertGreater(len(self.ticks), 3)
         # A second real worker can finish after the timed-out child has exited.
         self.window._run('Next synthetic action', lambda emit: emit('safe to retry'))
