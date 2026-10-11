@@ -32,3 +32,21 @@ The downloaded v1.18.1 installer was checked against its release hashes and inst
 Codex and ZCode reads now use SQLite's progress handler with a 100 ms execution budget, matching the existing bounded OpenCode adapter. The row limit alone did not bound an unindexed sort. A finite synthetic one-million-row recursive numeric projection took 433–453 ms in three reads with the v1.18.1 adapter; the bounded adapter interrupted it in 106–111 ms. The database bytes were unchanged. Normal numeric queries remained readable; timeout reports an unavailable source rather than partial or fabricated usage.
 
 The budget limits SQLite execution, not all filesystem access or lock waiting. Connection lock waiting retains its separate 150 ms timeout. Progress callbacks are periodic, so 100 ms is not a hard wall-clock guarantee. This stress fixture establishes bounded handling of a slow source, not a speedup for normal provider databases. Synthetic regression tests cover interruption, later successful reads and unchanged database contents.
+
+## Background desktop observations
+
+On October 11, 2026, a controlled Windows comparison against commit `38ce6b1` injected a 300 ms delay into token polling. Each version used the same offscreen Copilot/COM9999 fixture, six-second visible and hidden phases, and a 20 ms event-loop probe. No provider requests, real records or USB writes were used.
+
+| Measurement | Before | Background observations |
+| --- | --- | --- |
+| Maximum visible event-loop delay | 284.3 ms | 2.5 ms |
+| Visible event-loop delay p95 | 2.04 ms | 2.05 ms |
+| Visible RSS | 69.5 MiB | 69.1 MiB |
+| Visible CPU, one core | 0.52% | 0.52% |
+| GUI token refreshes while hidden | 0 | 0 |
+
+The maximum delay exposes occasional stalls that the p95 percentile misses. These short samples establish responsiveness under the injected delay; they do not establish a general memory, CPU or startup improvement. Repeat using `--io-delay-ms 300` with the benchmark above. USB scans and host/status/token/log reads run off the Qt thread; only one status observation and one USB scan can be pending. Results from an earlier saved setup or tray state are discarded. Hidden windows read lightweight host status only and do not poll token sources.
+
+Real Qt worker regressions also cover delayed USB scans, preserving a port edited during a scan, repeated refresh requests, child-process timeout/reaping, and a later successful action. Firmware preparation runs in the action worker before confirmation; writing revalidates the selection and files afterward. The flasher has a ten-minute total limit and a two-minute silent-output limit. A timeout reports a possibly incomplete write, stops the exact child process tree and waits for exit before reporting completion; retry requires the normal board/port review and FLASH confirmation.
+
+Token history accommodates the full bounded local-file snapshot. Evicted IDs receive fixed-size conservative tombstones so an old record cannot masquerade as new consumption. Tombstone hash collisions can suppress a first observation; subsequent increases in retained counters are still reported. These are activity indicators, not billing totals.

@@ -1,5 +1,6 @@
 """Read selected local usage metrics; retain no conversation content."""
 import sqlite3
+import hashlib
 from contextlib import closing
 from collections import OrderedDict
 import time
@@ -9,8 +10,23 @@ from provider_catalog import PROVIDERS
 from codex_support import codex_home
 
 
+class RetiredIds:
+    """Bounded conservative tombstones: a false positive baselines, never invents use."""
+    def __init__(self): self.bits = bytearray(65536)
+
+    def positions(self, key):
+        digest = hashlib.sha256(key.encode()).digest()
+        return [int.from_bytes(digest[i:i+4], 'little') % (len(self.bits)*8) for i in (0, 4, 8, 12)]
+
+    def add(self, key):
+        for position in self.positions(key): self.bits[position//8] |= 1 << (position%8)
+
+    def contains(self, key):
+        return all(self.bits[position//8] & (1 << (position%8)) for position in self.positions(key))
+
+
 class TokenReporter:
-    MAX_TRACKED = 8192  # Keep recent IDs across temporarily missing/evicted query rows.
+    MAX_TRACKED = 16384  # Accommodate all 16 x 1024 bounded local-file records.
     def __init__(self, home=None, clock=None, providers=None, activity_dir=None):
         default_home = home is None
         home = Path.home() if default_home else Path(home)
@@ -25,6 +41,7 @@ class TokenReporter:
         self.clock = time.monotonic if clock is None else clock
         self.started = None
         self.previous = {}
+        self.retired = {}
         self.last_use = None
         self.last_poll = None
         self.poll_seconds = 2
@@ -77,7 +94,8 @@ class TokenReporter:
             if previous is not None:
                 for key, value in counts.items():
                     # Codex forks/imports can contain history on first sight. Baseline new thread IDs.
-                    baseline_new = provider == 'codex' or (provider == 'opencode' and key.startswith('session:'))
+                    baseline_new = (provider == 'codex' or (provider == 'opencode' and key.startswith('session:')) or
+                                    (key not in previous and provider in self.retired and self.retired[provider].contains(key)))
                     old = previous.get(key, value if baseline_new else 0)
                     delta += max(0, value - old)
             history = previous if previous is not None else OrderedDict()
@@ -85,7 +103,9 @@ class TokenReporter:
                 history[key] = value
                 history.move_to_end(key)
             while len(history) > self.MAX_TRACKED:
-                history.popitem(last=False)
+                key, _value = history.popitem(last=False)
+                if provider not in self.retired: self.retired[provider] = RetiredIds()
+                self.retired[provider].add(key)
             self.previous[provider] = history
         if delta:
             self.last_use = now

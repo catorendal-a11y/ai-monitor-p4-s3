@@ -1,8 +1,10 @@
 """Validated native-desktop actions; no model turns or network listener."""
 from pathlib import Path
 import os
+import queue
 import subprocess
 import sys
+import threading
 import time
 
 import aim_control as control
@@ -21,7 +23,7 @@ def load_settings(root: Path) -> dict:
     return config
 
 
-def reset_invalid_settings(root: Path) -> None:
+def reset_invalid_settings(root: Path, emit=print) -> None:
     """Explicit recovery only: keep the original private bytes in a local backup."""
     try:
         load_settings(root)
@@ -36,7 +38,7 @@ def reset_invalid_settings(root: Path) -> None:
     backup = source.with_name('aim_host.invalid-' + str(time.time_ns()) + '.json')
     with backup.open('xb') as stream:
         stream.write(raw)
-    control.stop_host(root)
+    control.stop_host(root, emit=emit)
     control.save_config(dict(control.host.DEFAULT_CONFIG), root)
 
 
@@ -161,13 +163,70 @@ def prepare_flash(root: Path, board_id: str, kind: str) -> tuple[str, list[str]]
     return port, control.flash_command(kind, port, root, board.id)
 
 
+def run_firmware_command(command, root, environment, emit, timeout_s=600, idle_s=120):
+    """Bound the child lifetime, including a blocked stdout pipe. Never free the UI early."""
+    lines = queue.Queue(maxsize=128)
+    completed = threading.Event()
+    process = subprocess.Popen(command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, text=True, errors='replace', env=environment,
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+    def read_output():
+        try:
+            for line in iter(lambda: process.stdout.readline(512), ''):
+                try: lines.put_nowait(safe_text(line).rstrip())
+                except queue.Full: pass  # Bounded diagnostics; never stall the actual flasher.
+        except (OSError, ValueError):
+            pass
+        finally: completed.set()
+    reader = threading.Thread(target=read_output, daemon=True)
+    reader.start()
+    started = last_output = time.monotonic()
+    try:
+        while True:
+            now = time.monotonic()
+            if now - started >= timeout_s or now - last_output >= idle_s:
+                raise control.SetupError('Firmware tool timed out and was stopped. The write may be incomplete. '
+                    'Keep the display powered, check USB, then retry the same firmware operation.')
+            try:
+                line = lines.get(timeout=0.05)
+                last_output = time.monotonic()
+                emit(line)
+            except queue.Empty: pass
+            if completed.is_set() and lines.empty() and process.poll() is not None: break
+        if process.wait(timeout=3) != 0:
+            raise control.SetupError('Firmware tool failed. Check the USB port and device connection.')
+    finally:
+        # PyInstaller can have a bootloader and a child. Scope cleanup to this
+        # exact process tree, wait for exit, and only then let the action finish.
+        children = []
+        if process.poll() is None:
+            try: children = control.psutil.Process(process.pid).children(recursive=True)
+            except control.psutil.Error: pass
+            for child in children:
+                try: child.terminate()
+                except control.psutil.Error: pass
+            process.terminate()
+            try: process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill(); process.wait(timeout=3)
+        _, alive = control.psutil.wait_procs(children, timeout=3)
+        for child in alive:
+            try: child.kill()
+            except control.psutil.NoSuchProcess: pass
+        _, alive = control.psutil.wait_procs(alive, timeout=3)
+        if alive:
+            raise control.SetupError('Firmware tool cleanup could not be confirmed. Close the flasher before retrying.')
+        reader.join(timeout=1)
+        if completed.is_set(): process.stdout.close()
+
+
 def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> None:
     # Revalidate the current files and configuration after the dialog, before
     # stopping the host or invoking any tool. Do not trust a prepared command.
     current_port, command = prepare_flash(root, board_id, kind)
     if current_port != port:
         raise control.SetupError('USB selection changed. Prepare firmware again.')
-    control.stop_host(root)
+    control.stop_host(root, emit=emit)
     if kind == 'update':
         # Application-only updates require this project's existing layout.
         panel = None
@@ -185,13 +244,7 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
                 panel.close()
     environment = dict(os.environ)
     environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
-    with subprocess.Popen(command, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT, text=True, errors='replace', env=environment,
-                          creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0) as process:
-        for line in iter(lambda: process.stdout.readline(512), ''):
-            emit(safe_text(line))
-        if process.wait() != 0:
-            raise control.SetupError('Firmware tool failed. Check the USB port and device connection.')
+    run_firmware_command(command, root, environment, emit)
     emit('Firmware written. The display will reboot; reconnect if needed.')
 
 

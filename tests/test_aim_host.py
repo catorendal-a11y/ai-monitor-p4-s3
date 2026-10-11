@@ -587,14 +587,22 @@ class ProviderTests(unittest.TestCase):
     def test_missing_duration_is_unknown_and_daily_secondary_is_not_called_week(self):
         context = self.response({"rate_limit": {"primary_window": {"used_percent": 12},
             "secondary_window": {"used_percent": 25, "limit_window_seconds": 86400}}})
-        auth = Mock()
-        auth.read_text.return_value = '{"tokens":{"access_token":"test-token"}}'
-        with patch.object(host, "CODEX_AUTH", auth), patch.object(host, "open_provider_request", return_value=context):
+        with patch.object(host, 'read_local_json', return_value={'tokens': {'access_token': 'test-token'}}), \
+                patch.object(host, "open_provider_request", return_value=context):
             rows, notice = host.fetch_codex()
         self.assertIsNone(notice)
         self.assertEqual(rows[0]["windowMinutes"], 0)
         self.assertEqual(rows[1]["windowMinutes"], 1440)
         self.assertEqual(rows[1]["title"], "Secondary")
+
+    def test_oversized_codex_auth_is_rejected_before_network(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'auth.json'
+            path.write_bytes(b'x' * 65537)
+            with patch.object(host, 'CODEX_AUTH', path), patch.object(host, 'open_provider_request') as request:
+                rows, notice = host.fetch_codex()
+            self.assertIsNone(rows); self.assertTrue(notice)
+            request.assert_not_called()
 
     def test_invalid_key_never_reaches_network(self):
         with patch.object(host, "open_provider_request") as request:
@@ -602,6 +610,19 @@ class ProviderTests(unittest.TestCase):
         request.assert_not_called()
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
+
+    def test_key_format_error_identifies_source_without_echoing_value(self):
+        bad = 'fixture-private-key\ninvalid'
+        with patch.dict(host.os.environ, {'ZAI_API_KEY': bad}):
+            with self.assertRaisesRegex(ValueError, 'ZAI_API_KEY environment variable') as error:
+                host.zcode_key({'zai_key': 'fixture-valid'})
+            self.assertNotIn('fixture-private-key', str(error.exception))
+        with patch.dict(host.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, 'saved zai_key') as error:
+                host.zcode_key({'zai_key': bad})
+            self.assertNotIn('fixture-private-key', str(error.exception))
+        with patch.dict(host.os.environ, {'ZAI_API_KEY': ''}):
+            self.assertEqual(host.zcode_key({'zai_key': 'fixture-valid'}), '')
 
     def response(self, data):
         response = Mock()

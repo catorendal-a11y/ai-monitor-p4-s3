@@ -222,8 +222,8 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertEqual(self.window.tabs.currentIndex(),3); write.assert_not_called()
 
     def test_automatic_start_reuses_existing_host_without_restart(self):
-        with patch.object(control,'owned_hosts',return_value=[Mock()]), \
-                patch.object(self.window,'start') as start:
+        self.window.host_running = True
+        with patch.object(self.window,'refresh_status'), patch.object(self.window,'start') as start:
             self.window._auto_start_if_needed()
         start.assert_not_called()
 
@@ -329,8 +329,14 @@ class DesktopWindowTests(unittest.TestCase):
                 patch.object(desktop, 'write_firmware') as write, patch.object(control, 'start_host') as start, \
                 patch.object(self.window, '_run') as action:
             self.window.flash()
-            callback=action.call_args.args[1]; callback(Mock())
-            write.assert_called_once(); start.assert_called_once_with(self.root)
+            self.assertEqual(action.call_args.args[0], 'Verifying firmware')
+            action.call_args.args[1](Mock())
+            write.assert_not_called(); start.assert_not_called()
+            self.window.current_action = 'Verifying firmware'
+            self.window._finished(True, 'Verifying firmware complete.')
+            self.assertEqual(action.call_args.args[0], 'Writing firmware')
+            callback=action.call_args.args[1]; emit=Mock(); callback(emit)
+            write.assert_called_once(); start.assert_called_once_with(self.root, emit=emit)
             write.side_effect=control.SetupError('synthetic USB failure'); start.reset_mock()
             with self.assertRaises(control.SetupError): callback(Mock())
             start.assert_not_called()

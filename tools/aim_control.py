@@ -179,7 +179,7 @@ def owned_hosts(root=ROOT):
     return found
 
 
-def stop_host(root=ROOT):
+def stop_host(root=ROOT, emit=print):
     processes = owned_hosts(root)
     for process in processes:
         try:
@@ -188,11 +188,11 @@ def stop_host(root=ROOT):
             pass
     _, alive = psutil.wait_procs(processes, timeout=5)
     if alive:
-        raise SetupError("Host could not stop. Close it before flashing.")
-    print("Host stopped." if processes else "Host is already stopped.")
+        raise SetupError("Host could not stop. Close this installation's host and retry. No new host or firmware write was started.")
+    emit("Host stopped." if processes else "Host is already stopped.")
 
 
-def start_host(root=ROOT):
+def start_host(root=ROOT, emit=print):
     # Validate before replacing the running host. Never echo configuration/keys.
     config = local_config(root)
     if not config['providers']:
@@ -203,7 +203,7 @@ def start_host(root=ROOT):
     validate_options(config)
     if type(config['interval_s']) is not int or not 15 <= config['interval_s'] <= 240:
         raise SetupError('Quota refresh must be between 15 and 240 seconds. Save settings before starting.')
-    host.credential(os.environ.get('ZAI_API_KEY', config['zai_key']), optional=True)
+    host.zcode_key(config)
     if config['port'] == 'auto':
         try:
             candidates = sorted({serial_port(port.device) for port in list_ports.comports()
@@ -214,7 +214,7 @@ def start_host(root=ROOT):
             raise SetupError('More than one matching USB port was found: ' + ', '.join(candidates) +
                 '. Select your display\'s explicit USB port in Setup, click Save settings, then Start host. '
                   'Any existing host was left unchanged; no new host was started.')
-    stop_host(root)
+    stop_host(root, emit=emit)
     if getattr(sys, "frozen", False):
         helper = root / 'AI-Monitor-Console.exe'
         command = [str(helper) if helper.is_file() else sys.executable, "--host"]
@@ -231,7 +231,7 @@ def start_host(root=ROOT):
     time.sleep(1)
     if process.poll() is not None:
         raise SetupError("Host exited during startup. Use Status and View log.")
-    print("Host process started in the background. Check USB and provider status in the app; a running process does not confirm a connection.")
+    emit("Host process started in the background. Check USB and provider status in the app; a running process does not confirm a connection.")
 
 
 def firmware_file(kind, root=ROOT, board_id='guition-p4'):
@@ -333,7 +333,7 @@ def status(root=ROOT):
         print(f"Official Codex CLI: {'found' if codex_command() else 'missing - use Provider integration help (menu 7)'}")
         print('Quota uses the CLI account interface; legacy file login is a fallback when the CLI is absent.')
     if 'zcode' in providers:
-        key = host.credential(os.environ.get('ZAI_API_KEY', config.get('zai_key', '')), optional=True)
+        key = host.zcode_key(config)
         print(f"ZCode quota key: {'configured' if key else 'optional, not configured'}")
     counters = host.TokenReporter(providers=providers, activity_dir=root / 'tools/activity').poll()
     mask = counters["sources"]

@@ -65,7 +65,7 @@ class HostSettingsTests(unittest.TestCase):
         source = self.root/'tools/aim_host.json'; original = b'{"broken":"fixture-key",'
         source.write_bytes(original)
         with patch.object(control, 'stop_host') as stop: desktop.reset_invalid_settings(self.root)
-        stop.assert_called_once_with(self.root)
+        stop.assert_called_once_with(self.root, emit=print)
         backup = list(source.parent.glob('aim_host.invalid-*.json'))
         self.assertEqual(len(backup), 1); self.assertEqual(backup[0].read_bytes(), original)
         self.assertEqual(control.local_config(self.root)['providers'], [])

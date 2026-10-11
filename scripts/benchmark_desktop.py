@@ -13,8 +13,10 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--source', type=Path, default=Path(__file__).resolve().parents[1])
 parser.add_argument('--seconds', type=int, default=10)
 parser.add_argument('--output', type=Path, required=True)
+parser.add_argument('--io-delay-ms', type=int, default=0, help='Synthetic slow token read, without real records')
 args = parser.parse_args()
 if not 3 <= args.seconds <= 30: parser.error('Use a phase duration of 3–30 seconds')
+if not 0 <= args.io_delay_ms <= 1000: parser.error('Use an I/O delay of 0–1000 ms')
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 sys.path.insert(0, str(args.source.resolve()/'tools'))
 import psutil
@@ -51,8 +53,11 @@ def phase():
 with tempfile.TemporaryDirectory(prefix='ai-monitor-benchmark-') as directory:
     root=Path(directory)
     control.save_config(dict(control.host.DEFAULT_CONFIG,board='guition-p4',providers=['copilot'],port='COM9999'),root)
+    def slow_read():
+        if args.io_delay_ms: time.sleep(args.io_delay_ms/1000)
+        return None
     with patch.object(control,'owned_hosts',return_value=[]), \
-            patch.object(control.host.TokenReporter,'poll',return_value=None), \
+            patch.object(control.host.TokenReporter,'poll',side_effect=slow_read), \
             patch.object(QSystemTrayIcon,'isSystemTrayAvailable',return_value=True):
         window=MonitorWindow(root,monitor=False)
         original=window.refresh_status
@@ -72,8 +77,11 @@ with tempfile.TemporaryDirectory(prefix='ai-monitor-benchmark-') as directory:
         window.monitor_enabled=False; window.unsaved=False
         if hasattr(window,'quit_requested'): window.quit_requested=True
         window.config['keep_host_on_close']=True
-        window.close(); window.deleteLater()
+        window.close()
+        if hasattr(window, 'status_pool'): window.status_pool.waitForDone(3000)
+        window.deleteLater()
 report=dict(version=APP_VERSION,mode='controlled offscreen; token polling mocked; no API/USB',
+            synthetic_io_delay_ms=args.io_delay_ms,
             startup_to_widgets_ms=round(startup_ms,2),visible=visible,minimized=minimized)
 args.output.parent.mkdir(parents=True,exist_ok=True)
 args.output.write_text(json.dumps(report,indent=2))

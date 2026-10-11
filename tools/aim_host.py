@@ -165,6 +165,14 @@ def release_lock():
     # Keep the file: unlinking it could let another process lock a different inode.
 
 
+def zcode_key(config):
+    source = 'ZAI_API_KEY environment variable' if 'ZAI_API_KEY' in os.environ else 'saved zai_key in tools/aim_host.json'
+    try:
+        return credential(os.environ.get('ZAI_API_KEY', config.get('zai_key', '')), optional=True)
+    except ValueError:
+        raise ValueError('Invalid ZCode credential format in ' + source + '. Use a single printable API key.') from None
+
+
 def load_config():
     if CONFIG_PATH.exists():
         try:
@@ -189,7 +197,7 @@ def load_config():
         raise ValueError("zai_provider must be 'zcode'")
     if not isinstance(out["zai_key"], str):
         raise ValueError("zai_key must be a string")
-    out["zai_key"] = credential(os.environ.get("ZAI_API_KEY", out["zai_key"]), optional=True)
+    out["zai_key"] = zcode_key(out)
     # Keep existing configuration and credentials untouched at startup.
     if not CONFIG_PATH.exists():
         CONFIG_PATH.write_text(json.dumps(DEFAULT_CONFIG, indent=2), encoding="utf-8")
@@ -341,7 +349,7 @@ def fetch_codex():
         except Exception:
             return None, 'Codex: quota unavailable; retry setup or update the official CLI'
     try:
-        auth = json.loads(CODEX_AUTH.read_text(encoding="utf-8-sig"))
+        auth = read_local_json(CODEX_AUTH)
         access = (auth.get("tokens") or {}).get("access_token")
         if not access:
             return None, "Codex: no access_token in auth.json"

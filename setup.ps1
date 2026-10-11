@@ -3,6 +3,16 @@ $ErrorActionPreference = 'Stop'
 $taskProjectRoot = $PSScriptRoot
 $taskVenv = Join-Path $taskProjectRoot '.venv'
 $taskVenvPython = Join-Path $taskVenv 'Scripts\python.exe'
+if (Test-Path -LiteralPath $taskVenvPython) {
+    $taskVenvValid = $false
+    try {
+        & $taskVenvPython -c 'import sys, pathlib, pip; assert sys.version_info >= (3, 10); assert pathlib.Path(sys.prefix).resolve() == pathlib.Path(sys.argv[1]).resolve()' $taskVenv 1>$null 2>$null
+        $taskVenvValid = $LASTEXITCODE -eq 0
+    } catch { }
+    if (-not $taskVenvValid) {
+        throw 'The existing .venv is unusable or belongs to another folder. Rename .venv to keep a backup, then run setup.ps1 again, or use the Windows release. Local settings were preserved.'
+    }
+}
 if (-not (Test-Path -LiteralPath $taskVenvPython)) {
     $taskCandidates = @()
     if ($Python) { $taskCandidates += $Python }

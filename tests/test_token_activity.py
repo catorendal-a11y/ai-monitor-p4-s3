@@ -11,6 +11,35 @@ import aim_host
 
 
 class TokenActivityTests(unittest.TestCase):
+    def test_evicted_old_request_is_baselined_without_faking_activity(self):
+        clock = {'now': 100.0}
+        reporter = TokenReporter(home=Path('unused'), providers=['zcode'], clock=lambda: clock['now'])
+        reporter.MAX_TRACKED = 2
+        data = {'old': 1000, 'b': 2000}
+        with patch.object(reporter, 'read_counts', side_effect=lambda *_args: data):
+            reporter.poll()
+            clock['now'] += 2; data = {'b': 2000, 'new': 50}
+            self.assertEqual(reporter.poll()['delta'], 50)
+            clock['now'] += 30; data = {'old': 1000}
+            result = reporter.poll()
+            self.assertEqual(result['delta'], 0)
+            self.assertEqual(result['idleSeconds'], 30)
+            clock['now'] += 2; data['old'] = 1020
+            self.assertEqual(reporter.poll()['delta'], 20)
+        self.assertLessEqual(len(reporter.previous['zcode']), 2)
+        self.assertEqual(len(reporter.retired['zcode'].bits), 65536)
+
+    def test_large_unchanged_claude_snapshot_does_not_repeat_historical_tokens(self):
+        clock = {'now': 100.0}
+        reporter = TokenReporter(home=Path('unused'), providers=['claude'], clock=lambda: clock['now'])
+        records = {f'fixture-{index}': 1000 for index in range(10000)}
+        with patch.object(reporter.local, 'read', return_value=records):
+            self.assertEqual(reporter.poll()['delta'], 0)
+            clock['now'] += 2
+            self.assertEqual(reporter.poll()['delta'], 0)
+            records['fixture-9999'] += 50; clock['now'] += 2
+            self.assertEqual(reporter.poll()['delta'], 50)
+
     def test_temporarily_absent_request_is_not_counted_twice(self):
         clock = {"now": 100.0}
         reporter = TokenReporter(home=Path("unused"), clock=lambda: clock["now"])

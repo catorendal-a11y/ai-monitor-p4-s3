@@ -66,6 +66,15 @@ class InstanceTests(unittest.TestCase):
         replacement=DesktopInstance(self.root); self.addCleanup(replacement.close)
         self.assertTrue(replacement.claim())
 
+    def test_fragmented_show_command_waits_for_complete_line(self):
+        socket = QLocalSocket(); socket.connectToServer(self.owner.name)
+        self.assertTrue(socket.waitForConnected(1000))
+        socket.write(b'sho'); socket.flush(); QTest.qWait(35)
+        self.assertEqual(self.commands, [])
+        socket.write(b'w\n'); socket.flush(); QTest.qWait(35)
+        self.assertEqual(self.commands, ['show'])
+        socket.abort(); QTest.qWait(10)
+
     def test_separate_installations_do_not_share_window_ownership(self):
         other=self.root/'other'; other.mkdir()
         second=DesktopInstance(other); self.addCleanup(second.close)
