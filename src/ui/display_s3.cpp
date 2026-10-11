@@ -5,7 +5,6 @@
 #include "display.h"
 #include "../app_settings.h"
 #include <Arduino.h>
-#include <Preferences.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -30,14 +29,12 @@ constexpr uint8_t backlight_mask = 1u << 2;
 constexpr uint8_t lcd_reset_mask = 1u << 3;
 constexpr uint8_t touch_reset_mask = 1u << 1;
 constexpr std::array<int, 16> rgb_pins{14, 38, 18, 17, 10, 39, 0, 45, 48, 47, 21, 1, 2, 42, 41, 40};
-constexpr char nvs_namespace[] = "aimon";
 i2c_master_bus_handle_t bus = nullptr;
 i2c_master_dev_handle_t system_device = nullptr, output_device = nullptr;
 esp_lcd_panel_io_handle_t touch_io = nullptr;
 uint8_t outputs = 0xdb;  // Backlight off; USB selector EXIO5 low; SD select high.
 std::atomic<uint8_t> selected_brightness{DISPLAY_DEFAULT_BRIGHTNESS};
 uint16_t applied_brightness = 256;
-uint8_t saved_brightness = DISPLAY_DEFAULT_BRIGHTNESS;
 
 void add_device(uint8_t address, i2c_master_dev_handle_t* handle) {
   i2c_device_config_t config{};
@@ -81,15 +78,7 @@ uint8_t display_get_brightness() { return selected_brightness.load(std::memory_o
 uint8_t display_get_applied_brightness() { return applied_brightness <= 255 ? static_cast<uint8_t>(applied_brightness) : 0; }
 void display_remember_brightness(uint8_t brightness) {
   selected_brightness = brightness;
-  if (brightness == saved_brightness) { app_settings::report_save(true); return; }
-  Preferences prefs;
-  bool saved = false;
-  if (prefs.begin(nvs_namespace, false)) {
-    saved = prefs.putUChar("brightness", brightness) == sizeof(brightness);
-    prefs.end();
-  }
-  if (saved) saved_brightness = brightness;
-  app_settings::report_save(saved);
+  app_settings::set_brightness(brightness);
 }
 void display_apply_brightness(uint8_t brightness, bool persist) {
   selected_brightness = brightness;
@@ -105,12 +94,7 @@ void display_fill_black() {
 }
 
 void display_init() {
-  Preferences prefs;
-  if (prefs.begin(nvs_namespace, true)) {
-    selected_brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
-    saved_brightness = display_get_brightness();
-    prefs.end();
-  }
+  selected_brightness = app_settings::brightness();
   // Arduino's getPsramSize reports heap capacity after XIP reservations, not
   // physical size. Inspect the chip capacity so valid XIP builds can boot.
   if (!psramFound() || esp_psram_get_size() < 8u * 1024u * 1024u) fatal_halt("S3 needs 8MB OPI PSRAM");

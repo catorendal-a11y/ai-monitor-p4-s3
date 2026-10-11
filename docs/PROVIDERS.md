@@ -51,7 +51,7 @@ Primary references: [official database location](https://docs.opencode.ai/docs/c
 
 ## External numeric bridge
 
-Cursor, Copilot, Antigravity and OpenCode can be selected, but need an external integration that reports usage. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the portable executable, for example:
+Cursor, Copilot and Antigravity need an external integration that reports usage. OpenCode automatically reads its supported local numeric database; an external bridge is an optional alternative. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the portable executable, for example:
 
 ```text
 AI-Monitor-Console.exe --ingest copilot

@@ -98,6 +98,45 @@ class SetupTests(unittest.TestCase):
             with patch.object(control.psutil, 'process_iter', return_value=[ours, other, reused]):
                 self.assertEqual(control.owned_hosts(root), [ours])
 
+    def test_host_control_rejects_script_paths_used_as_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = str(root / 'tools/aim_host.py')
+            commands = [(['editor.exe', script], str(root/'editor.exe')),
+                        (['python', 'reader.py', script], sys.executable),
+                        (['python', '-c', 'pass', script], sys.executable),
+                        (['python', '-m', 'reader', script], sys.executable),
+                        (['python', script, '--arbitrary'], sys.executable)]
+            processes = [Mock(pid=900000+i, info={'exe':exe, 'cmdline':args}) for i, (args, exe) in enumerate(commands)]
+            ours = Mock(pid=900010, info={'exe':sys.executable, 'cmdline':['python', '-u', '-B', script]})
+            with patch.object(control.psutil, 'process_iter', return_value=processes+[ours]):
+                self.assertEqual(control.owned_hosts(root), [ours])
+
+    def test_confirmed_console_flash_uses_shared_guarded_backend(self):
+        import desktop_support as desktop
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            replies = iter(['1', '2', 'COM6', 'FLASH'])
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    patch.object(control, 'flash_command', return_value=['synthetic-flasher']), \
+                    patch.object(desktop, 'write_firmware', side_effect=control.SetupError('synthetic wrong identity')) as write, \
+                    patch.object(control.subprocess, 'run') as run:
+                with self.assertRaises(control.SetupError): control.flash(root, ask=lambda _:next(replies))
+            write.assert_called_once_with(root, 'guition-p4', 'update', 'COM6', print)
+            run.assert_not_called()
+
+    def test_failed_noninteractive_diagnostics_and_setup_return_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(control, 'ROOT', Path(directory)), \
+                    patch.object(control, 'status', side_effect=control.SetupError('synthetic invalid config')), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(control.main(['--check']), 1)
+            with patch.object(control, 'ROOT', Path(directory)), \
+                    patch.object(control, 'local_config', return_value={'providers':['codex']}), \
+                    patch.object(control, 'setup_codex', side_effect=RuntimeError('synthetic failure')), \
+                    patch('builtins.input', return_value=''), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(control.main(['--setup-codex']), 1)
+
     def test_firmware_hash_and_offsets_are_checked_before_flash(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); (root / 'firmware').mkdir()

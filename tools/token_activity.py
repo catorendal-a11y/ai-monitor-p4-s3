@@ -4,10 +4,75 @@ import hashlib
 from contextlib import closing
 from collections import OrderedDict
 import time
+import threading
 from pathlib import Path
 from local_activity import LocalActivity
 from provider_catalog import PROVIDERS
 from codex_support import codex_home
+
+
+class TokenSampler:
+    """One coalesced read worker; local I/O never owns or blocks USB.
+
+    A stuck local source makes its signal expire, rather than creating more
+    threads or delaying the heartbeat. Configuration changes discard old work.
+    """
+    def __init__(self, **options):
+        self.options = options
+        self.condition = threading.Condition()
+        self.reporter = TokenReporter(**options)
+        self.generation = 0
+        self.result = None
+        self.requested = self.busy = self.closed = False
+        self.next_poll = 0
+        self.worker = threading.Thread(target=self._read, daemon=True, name='aim-local-counts')
+        self.worker.start()
+
+    @property
+    def poll_seconds(self):
+        with self.condition: return self.reporter.poll_seconds
+
+    @poll_seconds.setter
+    def poll_seconds(self, value):
+        with self.condition: self.reporter.poll_seconds = value
+
+    def configure(self, providers):
+        with self.condition:
+            self.reporter = TokenReporter(**dict(self.options, providers=list(providers)))
+            self.generation += 1
+            self.result = None
+            self.next_poll = 0
+
+    def poll(self):
+        with self.condition:
+            result, self.result = self.result, None
+            now = time.monotonic()
+            if not self.closed and not self.busy and not self.requested and now >= self.next_poll:
+                self.next_poll = now + self.reporter.poll_seconds
+                self.requested = True
+                self.condition.notify()
+            return result
+
+    def _read(self):
+        while True:
+            with self.condition:
+                self.condition.wait_for(lambda: self.requested or self.closed)
+                if self.closed: return
+                self.requested = False
+                self.busy = True
+                reporter, generation = self.reporter, self.generation
+            try: value = reporter.poll()
+            except Exception: value = None  # No source content or exceptions are exported.
+            with self.condition:
+                self.busy = False
+                if self.closed: return
+                if generation == self.generation and value is not None: self.result = value
+
+    def close(self):
+        with self.condition:
+            self.closed = True
+            self.result = None
+            self.condition.notify()
 
 
 class RetiredIds:
@@ -73,18 +138,22 @@ class TokenReporter:
         delta, sources = 0, 0
         for provider in self.providers:
             bit = PROVIDERS[provider][1]
-            if provider in ('codex', 'zcode'):
-                counts = self.read_counts(provider, self.paths[provider])
-            elif provider in ('claude', 'gemini'):
-                counts = self.local.read(provider, self.paths[provider])
-            elif provider == 'opencode':
-                from opencode_activity import read_counts
-                counts = read_counts(self.paths[provider])
-            else:
-                counts = None
+            try:
+                if provider in ('codex', 'zcode'):
+                    counts = self.read_counts(provider, self.paths[provider])
+                elif provider in ('claude', 'gemini'):
+                    counts = self.local.read(provider, self.paths[provider])
+                elif provider == 'opencode':
+                    from opencode_activity import read_counts
+                    counts = read_counts(self.paths[provider])
+                else:
+                    counts = None
+            except (OSError, ValueError, RecursionError):
+                counts = None  # One failed source must not interrupt the other AIs or USB.
             if self.activity_dir is not None:
                 from telemetry_bridge import read_counters
-                bridge = read_counters(self.activity_dir, provider)
+                try: bridge = read_counters(self.activity_dir, provider)
+                except (OSError, ValueError, RecursionError): bridge = None
                 if bridge is not None:
                     counts = dict(counts or {}, **bridge)
             if counts is None:
@@ -107,6 +176,7 @@ class TokenReporter:
                 if provider not in self.retired: self.retired[provider] = RetiredIds()
                 self.retired[provider].add(key)
             self.previous[provider] = history
+        now = self.clock()  # Record observation time after local reads finish.
         if delta:
             self.last_use = now
         idle = max(0, int(now - (self.last_use if self.last_use is not None else self.started)))

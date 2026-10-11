@@ -252,6 +252,12 @@ class PayloadTests(unittest.TestCase):
 
 
 class LoopTests(unittest.TestCase):
+    def setUp(self):
+        # Loop fixtures stay in-process and synthetic; production quota uses
+        # the independently tested bounded subprocess below.
+        worker = patch.object(host.FetchPool, 'fetch', side_effect=lambda provider, key, _panel:
+                             host.fetch_codex() if provider == 'codex' else host.fetch_zcode(key))
+        worker.start(); self.addCleanup(worker.stop)
     def test_poll_interval_includes_fetch_duration(self):
         panel = Mock()
         with patch.object(host, "find_port", return_value="COM_TEST"), \
@@ -371,6 +377,8 @@ class ResponsiveFetchTests(unittest.TestCase):
                 patch.object(host, "connect_panel", return_value=panel), \
                 patch.object(host, "fetch_codex", return_value=([{"usedPercent": 25}], None)) as codex, \
                 patch.object(host, "fetch_zcode", return_value=([{"usedPercent": 25}], None)) as zcode, \
+                patch.object(host.FetchPool, 'fetch', side_effect=lambda provider, key, _panel:
+                             host.fetch_codex() if provider == 'codex' else host.fetch_zcode(key)), \
                 patch.object(panel, "wait_for", side_effect=ack), \
                 patch.object(host, "wait_connected", side_effect=KeyboardInterrupt), patch.object(host, "LOG"):
             with self.assertRaises(KeyboardInterrupt):
@@ -389,84 +397,86 @@ class ResponsiveFetchTests(unittest.TestCase):
         self.assertTrue(serial.closed)
 
     def test_request_during_fetch_joins_current_cycle_without_another_poll(self):
-        entered, release = threading.Event(), threading.Event()
         serial = FakeSerial([b'{"type":"refresh_request","requestId":7}\n'])
         panel = panel_with(serial)
         panel.cycle_active = True
-        collect = panel.collect_requests
-        def fetch():
-            entered.set()
-            if not release.wait(2):
-                raise AssertionError("USB was not handled while fetching")
-            return ([{"usedPercent": 25}], None)
-        def pump():
-            collect()
-            release.set()
         pool = host.FetchPool()
+        code = "import sys,time; sys.stdin.read(); time.sleep(.35); print('{\"rows\":[{\"usedPercent\":25}],\"notice\":null,\"retry_after\":0}')"
         try:
-            with patch.object(panel, "collect_requests", side_effect=pump):
-                rows, notice = pool.fetch("codex", fetch, panel)
-            self.assertTrue(entered.is_set())
+            with patch.object(pool, 'command', return_value=[sys.executable, '-u', '-c', code]):
+                rows, notice = pool.fetch("codex", '', panel)
             self.assertIsNone(notice)
             self.assertEqual(rows[0]["usedPercent"], 25)
             self.assertEqual(panel.active_refresh_id, 7)
             self.assertIsNone(panel.take_refresh_request())
             self.assertIn(b'"state": "updating"', bytes(serial.written))
         finally:
-            release.set()
             pool.close()
 
     def test_heartbeat_continues_and_api_wait_has_deadline(self):
-        future, executor, panel = Mock(), Mock(), Mock()
-        future.done.return_value = False
-        executor.submit.return_value = future
-        future.result.side_effect = [host.FutureTimeout(), host.FutureTimeout(), ([{"usedPercent": 25}], None)]
-        with patch.object(host, "ThreadPoolExecutor", return_value=executor), \
-                patch.object(host.time, "monotonic", side_effect=[0, 11, 22]):
-            pool = host.FetchPool()
-            pool.fetch("codex", lambda: None, panel)
-        self.assertEqual(panel.heartbeat.call_count, 2)
-        self.assertEqual(panel.collect_requests.call_count, 2)
-        pool.close()
-        future.result.side_effect = host.FutureTimeout()
-        with patch.object(host, "ThreadPoolExecutor", return_value=executor), \
-                patch.object(host.time, "monotonic", side_effect=[0, 26]):
-            pool = host.FetchPool()
-            rows, notice = pool.fetch("codex", lambda: None, panel)
-            self.assertIsNone(rows)
-            self.assertIn("timed out", notice)
-            future.cancel.assert_called()
-            calls = executor.submit.call_count
-            rows, notice = pool.fetch("codex", lambda: None, panel)
-            self.assertIn("still running", notice)
-            self.assertEqual(executor.submit.call_count, calls)
-        pool.close()
+        pool, panel = host.FetchPool(), Mock()
+        pool.request_seconds = .35
+        command = [sys.executable, '-u', '-c', 'import sys,time; sys.stdin.read(); time.sleep(60)']
+        with patch.object(pool, 'command', return_value=command), patch.object(host, 'HEARTBEAT_SECONDS', .05), \
+                patch.object(host.subprocess, 'Popen', wraps=subprocess.Popen) as spawn:
+            rows, notice = pool.fetch('codex', '', panel)
+        self.assertIsNone(rows); self.assertIn('timed out', notice)
+        self.assertGreater(panel.heartbeat.call_count, 0)
+        self.assertGreater(panel.collect_requests.call_count, 0)
+        self.assertIsNone(pool.process)
+        self.assertTrue(spawn.called)
+        # A subsequent request can recover; there is no stuck future.
+        code = "print('{\"rows\":[{\"usedPercent\":25}],\"notice\":null,\"retry_after\":0}')"
+        pool.request_seconds = 3
+        with patch.object(pool, 'command', return_value=[sys.executable, '-u', '-c', code]):
+            rows, notice = pool.fetch('codex', '', panel)
+        self.assertIsNone(notice); self.assertEqual(rows[0]['usedPercent'], 25)
 
     def test_unexpected_worker_exception_never_echoes_secret(self):
-        future, executor = Mock(), Mock()
-        executor.submit.return_value = future
-        future.result.side_effect = ValueError("private-key")
-        with patch.object(host, "ThreadPoolExecutor", return_value=executor):
-            pool = host.FetchPool()
-            rows, notice = pool.fetch("codex", lambda: None, Mock())
+        pool = host.FetchPool()
+        command = [sys.executable, '-u', '-c', "import sys; sys.stdin.read(); print('private-key')"]
+        with patch.object(pool, 'command', return_value=command):
+            rows, notice = pool.fetch("codex", '', Mock())
         self.assertIsNone(rows)
         self.assertNotIn("private-key", notice)
         pool.close()
 
     def test_second_provider_cannot_exceed_total_cycle_budget(self):
-        future, executor, panel = Mock(), Mock(), Mock()
-        future.done.return_value = False
-        future.result.side_effect = host.FutureTimeout()
-        executor.submit.return_value = future
-        panel.cycle_deadline = 45
-        with patch.object(host, "ThreadPoolExecutor", return_value=executor), \
-                patch.object(host.time, "monotonic", side_effect=[30, 46]):
-            pool = host.FetchPool()
-            rows, notice = pool.fetch("zcode", lambda: None, panel)
+        pool, panel = host.FetchPool(), Mock(cycle_deadline=host.time.monotonic()-1)
+        with patch.object(host.subprocess, 'Popen') as spawn:
+            rows, notice = pool.fetch("zcode", '', panel)
         self.assertIsNone(rows)
         self.assertIn("timed out", notice)
-        future.cancel.assert_called_once()
+        spawn.assert_not_called()
         pool.close()
+
+    def test_worker_that_never_reads_stdin_cannot_block_a_long_credential(self):
+        pool = host.FetchPool(); pool.request_seconds = .35
+        command = [sys.executable, '-u', '-c', 'import time; time.sleep(60)']
+        with patch.object(pool, 'command', return_value=command):
+            started = host.time.monotonic()
+            rows, notice = pool.fetch('zcode', 'synthetic-'+'x'*20000, Mock())
+        self.assertIsNone(rows); self.assertIn('timed out', notice)
+        self.assertLess(host.time.monotonic()-started, 2)
+        self.assertIsNone(pool.process)
+
+    def test_timeout_reaps_launched_worker_descendants_and_hides_key_arguments(self):
+        import psutil
+        with tempfile.TemporaryDirectory() as directory:
+            pid_file = Path(directory)/'synthetic-child.pid'
+            code = ("import subprocess,sys,time,pathlib; sys.stdin.read(); "
+                    "child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
+                    "pathlib.Path(sys.argv[1]).write_text(str(child.pid)); time.sleep(60)")
+            pool = host.FetchPool(); pool.request_seconds = 1
+            command = [sys.executable, '-u', '-c', code, str(pid_file)]
+            with patch.object(pool, 'command', return_value=command), \
+                    patch.object(host.subprocess, 'Popen', wraps=subprocess.Popen) as spawn:
+                rows, notice = pool.fetch('zcode', 'synthetic-private-key', Mock())
+            self.assertIsNone(rows); self.assertIn('timed out', notice)
+            self.assertNotIn('synthetic-private-key', str(spawn.call_args))
+            self.assertTrue(pid_file.is_file())
+            self.assertFalse(psutil.pid_exists(int(pid_file.read_text())))
+            self.assertIsNone(pool.process)
 
     def test_small_positive_remaining_is_not_rounded_to_zero_by_host(self):
         usage = json.loads(host.frame_payload("codex", 0, [{"usedPercent": 99.96}]))["data"][0]
@@ -476,6 +486,24 @@ class ResponsiveFetchTests(unittest.TestCase):
 
 
 class ConfigReloadTests(unittest.TestCase):
+    def test_changed_key_invalidates_the_previous_quota_success(self):
+        previous = dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['zcode'],
+                        port='COM_TEST', zai_key='synthetic-old-key')
+        changed = dict(previous, zai_key='synthetic-new-key')
+        health = Mock(data={'providers':{'zcode':'ready'}})
+        watcher = Mock(); watcher.take.return_value = changed
+        panel = Mock()
+        observed = []
+        def poll(*_args):
+            observed.append(dict(health.data['providers']))
+            raise KeyboardInterrupt
+        with patch.object(host, 'HostStatus', return_value=health), \
+                patch.object(host, 'ConfigWatcher', return_value=watcher), \
+                patch.object(host, 'find_port', return_value='COM_TEST'), \
+                patch.object(host, 'connect_panel', return_value=panel), \
+                patch.object(host, 'poll_cycle', side_effect=poll), patch.object(host, 'LOG'):
+            with self.assertRaises(KeyboardInterrupt): host._run_loop(previous, 240, previous['zai_key'], ['zcode'])
+        self.assertEqual(observed, [{}])
     def test_valid_edit_is_loaded_and_invalid_edit_keeps_last_configuration(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(host.os.environ, {}, clear=True):
             path = Path(directory) / "aim_host.json"

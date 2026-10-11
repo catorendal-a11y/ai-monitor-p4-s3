@@ -1,11 +1,13 @@
 #pragma once
 // AI Monitor P4 - device settings (NVS-backed, owned by the UI task).
-// Brightness persistence lives in display.cpp (same NVS namespace); this
-// module holds the remaining on-device settings.
+// Display backends apply brightness; this module owns confirmed persistence
+// for brightness and the remaining on-device settings.
 
 #include <cstdint>
 
 namespace app_settings {
+uint8_t brightness();
+void set_brightness(uint8_t value);
 
 constexpr uint8_t normalize_dim_minutes(uint8_t minutes) {
   return minutes == 0 || minutes == 1 || minutes == 5 || minutes == 10 ? minutes : 5;

@@ -125,6 +125,24 @@ class BackgroundFlowTests(unittest.TestCase):
         self.assertEqual(self.window.port.currentText(), 'COM9999')
         self.assertIn('COM9998', self.window.usb_help.text())
 
+    def test_old_failed_read_cannot_clear_a_new_verified_observation(self):
+        release = threading.Event(); entered = threading.Event()
+        def fail(*args):
+            entered.set(); release.wait(2)
+            raise OSError('synthetic private observation failure')
+        with patch.object(ui, 'collect_status', side_effect=fail):
+            self.window.refresh_status(); self.wait_until(entered.is_set)
+            try:
+                self.window.status_epoch += 1
+                self.window.live_connected = self.window.status_known = True
+                self.window.host_state.setText('NEW VERIFIED OBSERVATION')
+            finally: release.set()
+            self.wait_until(lambda: self.window.status_worker is None)
+        self.assertTrue(self.window.live_connected)
+        self.assertTrue(self.window.status_known)
+        self.assertEqual(self.window.host_state.text(), 'NEW VERIFIED OBSERVATION')
+        self.assertNotIn('synthetic private', self.window.activity.toPlainText())
+
     def test_real_hung_child_is_reaped_before_worker_releases_busy(self):
         children = []; spawn = subprocess.Popen
         def child(*args, **kwargs):

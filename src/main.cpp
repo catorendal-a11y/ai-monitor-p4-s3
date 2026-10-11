@@ -47,6 +47,10 @@ static void uiTask(void*) {
     const uint32_t now = millis();
     if (now - lastUpdate >= board_profile::ui_update_ms) {
       lastUpdate = now;
+      // A transient first NVS read can recover after the screens exist.
+      // Bring their palette into sync with the recovered stored selection.
+      const auto theme = app_settings::appearance().theme;
+      if (ui_theme::selectedTheme != theme) ui_theme::apply(theme);
       idle_dim_update();  // every screen, independent of USB freshness
       ui_settings_update();
       dashboard_update();
@@ -86,4 +90,10 @@ void setup() {
   LOG_I("All tasks started");
 }
 
-void loop() { vTaskDelay(portMAX_DELAY); }
+void loop() {
+  // Arduino runs setup() on this task, so retain its full startup stack.
+  // UI, USB and timers now have their own tasks; release the unused loop
+  // task/stack rather than guessing a smaller startup allocation.
+  disableLoopWDT();
+  vTaskDelete(nullptr);
+}

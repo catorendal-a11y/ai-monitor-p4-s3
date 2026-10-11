@@ -18,9 +18,11 @@ Release: **v1.16.1**. The interface, code comments and documentation are in Engl
 
 The target has a ST7701S 480 x 800 MIPI-DSI panel, GT911 touch, 16 MB flash and 32 MB PSRAM. LVGL presents an 800 x 480 landscape interface. Touch uses GPIO 7/8; backlight PWM uses GPIO 23. Other boards require review of their display initialization and pin assignments.
 
-[platformio.ini](../platformio.ini) pins pioarduino to `55.03.312-1`, LVGL to `v9.6.0`, and ArduinoJson to `7.4.3`. Use Python 3.10 or later. Initial builds need internet access to download dependencies.
+[platformio.ini](../platformio.ini) pins pioarduino P4 `55.03.312-1` to commit `2959e98a2750832bca32fd2f849c0c274a4cdd63`, LVGL `v9.6.0` to commit `80ca777e37a2b176770726a02e07a6fb79ef0b39`, and ArduinoJson to `7.4.3`. Use Python 3.10 or later. Initial builds need internet access to download dependencies.
 
-S3 uses its own `esp32s3-waveshare-43-release` environment, pinned pioarduino `54.03.20`, Arduino 3.2.0 and Espressif's matching high-performance SDK. It requires 8 MB OPI PSRAM and PSRAM XIP, uses native RGB/GT911/CH422G drivers and UART0 on GPIO44/43. Build it with `python -m platformio run -e esp32s3-waveshare-43-release`. Replace the environment in upload commands when working on S3, and use USB TO UART. Native tests run protocol/UI checks under both board profiles; hardware drivers still need a physical board test.
+S3 uses its own `esp32s3-waveshare-43-release` environment, pioarduino `54.03.20` pinned to commit `c6f1f4164d16dae8fda13221eb0f2722429175c6`, Arduino 3.2.0 and Espressif's matching high-performance SDK. It requires 8 MB OPI PSRAM and PSRAM XIP, uses native RGB/GT911/CH422G drivers and UART0 on GPIO44/43. Build it with `python -m platformio run -e esp32s3-waveshare-43-release`. Replace the environment in upload commands when working on S3, and use USB TO UART. Native tests run protocol/UI checks under both board profiles; hardware drivers still need a physical board test.
+
+The 32 KiB Arduino startup stack still covers display/touch/USB initialization. After setup completes, loop() unregisters its own loop-task watchdog and deletes that unused task, releasing its stack. UI and USB continue in their dedicated tasks; no watchdog for those tasks is disabled. Do not reduce the startup allocation without measuring its high-water mark on both physical targets.
 
 ## Windows quick start
 
@@ -78,7 +80,7 @@ Use [tools/aim_host.example.json](../tools/aim_host.example.json) as the shareab
 | `zai_provider` | Keep `zcode`. |
 | `zai_key` | Optional local coding-plan credential; empty in the example. Prefer environment variable `ZAI_API_KEY`, which takes precedence. |
 
-Codex authentication is read at runtime from `~/.codex/auth.json`, using the CLI's `tokens.access_token`. The host does not copy, embed, refresh or modify the login. Sign in through the CLI when it expires. Z.AI requires a coding-plan credential supplied by you. The host does **not** load `.env` files automatically; `.env.example` documents the optional variable only.
+Codex quota is read through the official CLI's account RPC when the CLI is available. This read does not start model turns. If no CLI is found, the host has a legacy read-only `auth.json` fallback under `CODEX_HOME` or `~/.codex`. It does not copy, embed or modify that login. Sign in through the official client when needed. Z.AI requires your own coding-plan credential. The host does **not** load `.env` files automatically; `.env.example` documents the optional variable only.
 
 No credentials are needed to build or test. Local configuration, auth files, environment files, databases, logs and build output are excluded by `.gitignore`. Never put real credentials in examples, issue reports or screenshots. Provider endpoints and local database schemas can change; unsupported responses produce an error instead of invented values. This is an independent project, not an official integration.
 
@@ -93,7 +95,11 @@ The companion uses read-only SQLite queries for Codex/ZCode. Claude/Gemini log a
 
 NOVA's TRACKING line names the currently readable sources, not which application generated the last increase. The robot caption shows elapsed time since the last increase. Large increments use compact units (K/M/B and higher, truncated to one decimal); the USB info response retains the exact count. Unavailable or stale signals are shown explicitly. Quota cards distinguish updates in progress from stale measurements.
 
-The host retains up to 8,192 recently observed IDs per source so temporarily absent query rows do not immediately count as new consumption on their return. This bounded cache is session-local; IDs evicted from it cannot retain that protection. Changes to local database schemas may require adapter updates.
+The host retains up to 16,384 recently observed IDs per source. A bounded conservative tombstone filter baselines retired IDs when they reappear, preventing historical totals from becoming invented new consumption. A filter collision can omit a first increment rather than invent one. Both caches are session-local. Changes to local database schemas may require adapter updates.
+
+Quota requests run in an allowlisted helper process with a 25-second request budget and a 45-second total-cycle budget. Credentials travel through stdin, never command arguments. Timeout cleanup must reap the helper and its descendants before another request starts; USB heartbeats continue while it is working. Local token polling permits 2–15 seconds, and firmware allows 35 seconds of signal age to accommodate scheduling and I/O delay. Loss of the USB host immediately invalidates the signal.
+
+One coalesced local-count worker performs database/file reads independently of the USB owner. A blocked read cannot delay heartbeats or create replacement threads; its old signal expires. Changing providers discards results from the previous configuration. The worker retains only numeric records and never sends USB frames itself.
 
 Observed token consumption takes priority over NOVA's low-quota expression; quota bars and warning banners still report low/critical limits. After 90 seconds without a new registered increase, NOVA briefly celebrates the pause and becomes ready; after five minutes it may rest. Dimming does not prove inactivity. Missing or stale activity signals do not prove rest.
 

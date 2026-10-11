@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame,
     QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
-    QTabWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu,
+    QTabWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu, QSizePolicy, QStackedWidget,
 )
 
 import aim_control as control
@@ -42,13 +42,13 @@ QLabel#warning { color: #ffcf86; }
 QPushButton { background: #273c47; border: 1px solid #41606d; border-radius: 8px;
               padding: 10px 16px; font-weight: 600; min-height: 20px; }
 QPushButton:hover { background: #324f5c; border-color: #7ab8cf; }
-QPushButton:focus { border: 2px solid #c8fff0; }
+QPushButton:focus { border-color: #c8fff0; }
 QPushButton#primary { background: #35c987; color: #071c12; border-color: #35c987; }
 QPushButton#primary:hover { background: #72e6b0; }
 QPushButton:disabled, QPushButton#primary:disabled { color: #a5b5bd; background: #20303a; border-color: #30444e; }
 QLineEdit, QComboBox, QSpinBox { background: #0c161d; border: 1px solid #4b6875;
                               border-radius: 7px; padding: 8px; min-height: 22px; }
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 2px solid #70e6ae; }
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #70e6ae; }
 QSpinBox::up-button, QSpinBox::down-button { background: #294451; width: 24px; border-left: 1px solid #4b6875; }
 QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: #426372; }
 QSpinBox::up-arrow { image: url(SPIN_UP_IMAGE); width: 10px; height: 6px; }
@@ -78,6 +78,46 @@ def label(text: str, style: str = '', wrap: bool = False) -> QLabel:
     widget.setObjectName(style)
     widget.setWordWrap(wrap)
     return widget
+
+
+class InformationPanel(QPlainTextEdit):
+    """A stable text slot: long observations scroll instead of moving actions."""
+    def __init__(self, text: str = '', lines: int = 3, name: str = 'Status information'):
+        super().__init__()
+        self.lines = lines
+        self.setReadOnly(True)
+        self.setAccessibleName(name)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setStyleSheet('QPlainTextEdit { background: transparent; color: #b3c4cd; '
+                          'border: none; border-radius: 0; padding: 0; } '
+                          'QPlainTextEdit#warning { color: #ffcf86; }')
+        self.document().setDocumentMargin(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self._fit_lines()
+        self.setText(text)
+
+    def setText(self, text: str):
+        if text == self.toPlainText(): return
+        self.setPlainText(text)
+        self.verticalScrollBar().setValue(0)
+
+    def text(self) -> str:
+        return self.toPlainText()
+
+    def _fit_lines(self):
+        self.setFixedHeight(self.fontMetrics().lineSpacing() * self.lines + 8)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.FontChange and hasattr(self, 'lines'):
+            self._fit_lines()
+
+
+def reserve_hidden_space(widget):
+    policy = widget.sizePolicy()
+    policy.setRetainSizeWhenHidden(True)
+    widget.setSizePolicy(policy)
 
 
 class WorkerSignals(QObject):
@@ -208,8 +248,11 @@ class MonitorWindow(QMainWindow):
         self.tray = None
         self.quit_requested = False
         self.hidden_to_tray = False
+        self.visibility_generation = 0
+        self.restoring_window = False
         self.restore_state = Qt.WindowState.WindowNoState
         self.restore_geometry = None
+        self.restore_size = None
         self.usb_ports = []
         self.connection_checked = False
         self.connection_failed = False
@@ -224,6 +267,7 @@ class MonitorWindow(QMainWindow):
         self.status_known = False
         self.auto_start_pending = False
         self.pending_flash = None
+        self.deferred_observations = {}
         try:
             self.config = desktop.load_settings(root)
         except (ValueError, OSError):
@@ -254,10 +298,10 @@ class MonitorWindow(QMainWindow):
             self.notice.setText('Local settings could not be loaded. Your file was preserved. Use Recover invalid settings in Host settings.')
         self.append_output('Welcome. Choose your board and AI providers, then save settings.')
         self.append_output('The monitor reads usage records and quota status. It does not generate AI requests.')
-        shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
-        shortcut.activated.connect(self.save)
-        quit_shortcut = QShortcut(QKeySequence('Ctrl+Q'), self)
-        quit_shortcut.activated.connect(self.request_quit)
+        self.save_shortcut = QShortcut(QKeySequence.StandardKey.Save, self)
+        self.save_shortcut.activated.connect(self.save)
+        self.quit_shortcut = QShortcut(QKeySequence('Ctrl+Q'), self)
+        self.quit_shortcut.activated.connect(self.request_quit)
         self.timer = QTimer(self)
         self.timer.setInterval(2500)
         self.timer.timeout.connect(self.refresh_status)
@@ -279,9 +323,13 @@ class MonitorWindow(QMainWindow):
             self.start()
 
     def _create_tray(self):
-        if not QSystemTrayIcon.isSystemTrayAvailable() or self.windowIcon().isNull(): return
+        if self.closed or self.windowIcon().isNull(): return
+        if self.tray is not None:
+            self.tray.show()
+            self.refresh_tray(poll=False)
+            return
         self.tray = QSystemTrayIcon(self.windowIcon(), self)
-        menu = QMenu(self)
+        menu = self.tray_menu = QMenu(self)
         menu.addAction('Open AI Monitor', self.restore_from_tray)
         menu.addSeparator()
         self.tray_start = menu.addAction('Start host', self.start)
@@ -299,10 +347,11 @@ class MonitorWindow(QMainWindow):
         return self.tray is not None and self.tray.isVisible() and QSystemTrayIcon.isSystemTrayAvailable()
 
     def refresh_tray(self, poll=True):
-        if self.tray is None: return
-        if self.hidden_to_tray and not QSystemTrayIcon.isSystemTrayAvailable():
+        if self.tray is None or self.closed: return
+        if self.hidden_to_tray and not self._tray_available():
             self.restore_from_tray()
-            self.notice.setText('The system tray is unavailable. AI Monitor has reopened.')
+            self.notice.setText('The NOVA tray icon is unavailable. AI Monitor has reopened; use the taskbar or desktop shortcut.')
+        if not self.tray.isVisible(): self.tray.show()
         if poll and self.hidden_to_tray and self.monitor_enabled: self.refresh_status()
         self.tray.setToolTip('AI Monitor • ' + self.cached_summary)
         self.tray_start.setEnabled(self.status_known and not self.busy and not self.host_running and not self.unsaved and
@@ -312,8 +361,11 @@ class MonitorWindow(QMainWindow):
         self.tray_quit.setText('Quit AI Monitor — ' + ('keep host running' if self.config['keep_host_on_close'] else 'stop host'))
 
     def hide_to_tray(self):
+        if self.closed or self.restoring_window: return False
         if not self._tray_available(): return False
-        if not self.isMinimized(): self.restore_geometry = self.saveGeometry()
+        if self.hidden_to_tray: return True  # Keep the original state and geometry on duplicate hide requests.
+        self.visibility_generation += 1
+        if not self.isMinimized(): self._remember_geometry()
         self.restore_state = self.windowState() & ~Qt.WindowState.WindowMinimized
         self.hidden_to_tray = True
         self.status_epoch += 1
@@ -323,16 +375,38 @@ class MonitorWindow(QMainWindow):
         return True
 
     def restore_from_tray(self):
-        state = self.restore_state if self.hidden_to_tray else self.windowState() & ~Qt.WindowState.WindowMinimized
-        if self.hidden_to_tray and self.restore_geometry is not None:
-            self.restoreGeometry(self.restore_geometry)
-        self.setWindowState(state)
-        self.show(); self.raise_(); self.activateWindow()
-        self.hidden_to_tray = False
+        if self.closed or self.restoring_window: return
+        self.visibility_generation += 1  # Invalidate every deferred hide from an older minimize gesture.
+        was_hidden = self.hidden_to_tray or self.isMinimized() or not self.isVisible()
+        state = self.restore_state if self.hidden_to_tray else self.windowState()
+        normal_size = self.restore_size
+        self.restoring_window = True
+        try:
+            if self.hidden_to_tray and self.restore_geometry is not None:
+                self.restoreGeometry(self.restore_geometry)
+            # restoreGeometry can restore a minimized flag on Windows. Explicit
+            # normal/maximized display commands always remove that flag.
+            if state & Qt.WindowState.WindowFullScreen: self.showFullScreen()
+            elif state & Qt.WindowState.WindowMaximized: self.showMaximized()
+            else:
+                self.showNormal()
+                if was_hidden and normal_size is not None: self.resize(normal_size)
+            self.hidden_to_tray = False
+            self.raise_(); self.activateWindow()
+        finally:
+            self.restoring_window = False
+        self._remember_geometry()
         if self.monitor_enabled:
-            self.status_epoch += 1
-            self.token_reporter = None  # Resume with a baseline, not an accumulated hidden-window activity burst.
-            self.refresh_status(); self.timer.start()
+            if was_hidden:
+                self.status_epoch += 1
+                self.token_reporter = None  # Resume with a baseline, not an accumulated hidden-window activity burst.
+                self.refresh_status()
+            self.timer.start()
+
+    def activate_requested(self, page='show'):
+        """Desktop shortcut/single-instance handoff uses the same visible restore path."""
+        if page == 'firmware': self.tabs.setCurrentIndex(3)
+        self.restore_from_tray()
 
     def _tray_activated(self, reason):
         if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
@@ -350,15 +424,21 @@ class MonitorWindow(QMainWindow):
     def changeEvent(self, event):
         super().changeEvent(event)
         if (event.type() == QEvent.Type.WindowStateChange and self.isMinimized() and
-                hasattr(self, 'config') and self.config.get('minimize_to_tray') and self._tray_available()):
-            QTimer.singleShot(0, self._hide_minimized)
+                hasattr(self, 'config') and not self.restoring_window and not self.closed and
+                not self.hidden_to_tray and self.config.get('minimize_to_tray') and self._tray_available()):
+            self.visibility_generation += 1
+            generation = self.visibility_generation
+            QTimer.singleShot(0, lambda: self._hide_minimized(generation))
 
-    def _hide_minimized(self):
-        if self.isMinimized(): self.hide_to_tray()
+    def _hide_minimized(self, generation=None):
+        if generation is not None and generation != self.visibility_generation: return
+        if self.isMinimized() and not self.closed and not self.restoring_window and not self.hidden_to_tray:
+            self.hide_to_tray()
 
     def _remember_geometry(self):
-        if self.isVisible() and not self.isMinimized() and not self.hidden_to_tray:
+        if self.isVisible() and not self.isMinimized() and not self.hidden_to_tray and not self.restoring_window:
             self.restore_geometry = self.saveGeometry()
+            self.restore_size = self.normalGeometry().size() if self.isMaximized() or self.isFullScreen() else self.size()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -392,16 +472,16 @@ class MonitorWindow(QMainWindow):
         self.nova = QLabel()
         self.nova.setAccessibleName('NOVA robot companion')
         self.nova.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.nova.setMinimumHeight(174)
+        self.nova.setFixedHeight(174)
         left.addWidget(self.nova)
         left.addWidget(label('NOVA', 'headline'))
         left.addWidget(label('A little companion for the work\nhappening on your PC.', 'muted', True))
-        self.host_state = label('HOST STOPPED', 'eyebrow')
+        self.host_state = InformationPanel('HOST STOPPED', 2, 'Host connection status')
         left.addWidget(self.host_state)
-        self.token_state = label('Waiting for selected token sources.', 'muted', True)
+        self.token_state = InformationPanel('Waiting for selected token sources.', 3, 'Local token activity status')
         left.addWidget(self.token_state)
         left.addStretch(2)
-        self.close_hint = label('', 'muted', True)
+        self.close_hint = InformationPanel('', 4, 'Close and tray behavior')
         left.addWidget(self.close_hint)
         left.addWidget(label(APP_VERSION, 'eyebrow'))
         layout.addWidget(sidebar)
@@ -422,13 +502,15 @@ class MonitorWindow(QMainWindow):
         self.start_button = self._button('&Start host', self.start, primary=True)
         self.stop_button = self._button('S&top host', self.stop)
         self.integration_button = self._button('Provider set&up', self.integrations)
-        actions.addWidget(self.save_button)
-        actions.addWidget(self.start_button)
-        actions.addWidget(self.stop_button)
-        actions.addWidget(self.integration_button)
+        actions.addWidget(self.save_button, 1)
+        actions.addWidget(self.start_button, 1)
+        actions.addWidget(self.stop_button, 1)
+        actions.addWidget(self.integration_button, 1)
         right.addLayout(actions)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
+        self.progress.setFixedHeight(5)
+        reserve_hidden_space(self.progress)
         self.progress.hide()
         right.addWidget(self.progress)
         self.tabs = QTabWidget()
@@ -451,16 +533,31 @@ class MonitorWindow(QMainWindow):
         self.console_tabs.setMinimumHeight(145)
         self.console_tabs.setMaximumHeight(180)
         right.addWidget(self.console_tabs)
-        self.notice = label('Ready to configure. Nothing starts automatically.', 'muted', True)
+        self.notice = InformationPanel('Ready to configure. Nothing starts automatically.', 2, 'Action result and next step')
         right.addWidget(self.notice)
         self._show_robot(False)
 
     def _button(self, text, callback, primary=False):
         button = QPushButton(text)
+        button.setFixedHeight(44)
+        button.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        button.setAutoDefault(False)
         if primary:
             button.setObjectName('primary')
         button.clicked.connect(callback)
+        button.released.connect(lambda: QTimer.singleShot(0, self._flush_observations))
         return button
+
+    def _button_pressed(self):
+        return any(button.isDown() for button in self.findChildren(QPushButton))
+
+    def _flush_observations(self):
+        # clicked runs before this queued flush. Finish the action the user saw
+        # before applying observations that could change its route or caption.
+        if self.closed or self._button_pressed(): return
+        pending, self.deferred_observations = self.deferred_observations, {}
+        if 'ports' in pending: self._scanned(pending['ports'])
+        if 'status' in pending: self._status_finished(pending['status'])
 
     def _console(self, name: str):
         box = QPlainTextEdit()
@@ -480,7 +577,7 @@ class MonitorWindow(QMainWindow):
         form.addWidget(label('Choose your display and USB connection here. Choose your AIs in AI setup, '
                              'save settings, then install display firmware if needed and start the host.', 'muted', True))
         form.addWidget(label('SETUP PROGRESS', 'eyebrow'))
-        self.setup_progress = label('', 'muted', True)
+        self.setup_progress = InformationPanel('', 2, 'Setup progress')
         form.addWidget(self.setup_progress)
         self.setup_next = self._button('Continue setup', self.continue_setup, primary=True)
         form.addWidget(self.setup_next)
@@ -501,6 +598,7 @@ class MonitorWindow(QMainWindow):
         self.port.setMinimumContentsLength(7)
         self.port.setAccessibleName('USB serial port')
         self.rescan_button = self._button('Rescan USB', self.rescan)
+        self.rescan_button.setFixedWidth(126)
         self.check_usb_button = self._button('Check connection', self.check_connection)
         fields.addWidget(label('Display board'), 0, 0)
         fields.addWidget(label('USB port'), 0, 1)
@@ -512,10 +610,10 @@ class MonitorWindow(QMainWindow):
         fields.setColumnStretch(0, 3)
         fields.setColumnStretch(1, 2)
         form.addLayout(fields)
-        self.usb_help = label('', 'muted', True)
+        self.usb_help = InformationPanel('', 4, 'Available USB ports and connection help')
         form.addWidget(self.usb_help)
         form.addWidget(self.check_usb_button)
-        self.board_help = label('', 'muted', True)
+        self.board_help = InformationPanel('', 2, 'Selected display guidance')
         form.addWidget(self.board_help)
         form.addWidget(self._button('Choose and set up my AIs', lambda: self.tabs.setCurrentIndex(1), primary=True))
         form.addStretch()
@@ -542,7 +640,14 @@ class MonitorWindow(QMainWindow):
         form.addWidget(label('Codex, ZCode, Claude Code, Gemini CLI and OpenCode have built-in local readers. '
                              'Copilot, Cursor and Antigravity require an advanced numeric bridge; selecting them alone cannot import editor usage.', 'warning', True))
         self.check_ai_button = self._button('Check AI setup', self.check_ai_setup)
-        form.addWidget(self.check_ai_button)
+        self.read_ai_button = self._button('Read AI instructions', self.read_ai_instructions)
+        self.enter_key_button = self._button('Enter Z.AI key', self.enter_zai_key)
+        self.enter_key_button.setToolTip('Select ZCode to enter or change its optional quota API key')
+        setup_actions = QHBoxLayout()
+        setup_actions.addWidget(self.check_ai_button, 1)
+        setup_actions.addWidget(self.read_ai_button, 1)
+        setup_actions.addWidget(self.enter_key_button, 1)
+        form.addLayout(setup_actions)
         form.addWidget(label('SETUP INSTRUCTIONS FOR EACH AI', 'eyebrow'))
         self.provider_guide = QComboBox()
         self.provider_guide.setAccessibleName('AI provider setup instructions')
@@ -550,7 +655,8 @@ class MonitorWindow(QMainWindow):
             self.provider_guide.addItem(name, key)
         self.provider_guide.setCurrentIndex(-1)
         self.provider_guide.setPlaceholderText('Choose an AI to read its setup instructions')
-        self.provider_instructions = label('Choose an AI above to see what it needs. No AI is preselected.', 'muted', True)
+        self.provider_instructions = InformationPanel(
+            'Choose an AI above to see what it needs. No AI is preselected.', 6, 'Selected AI setup instructions')
         self.provider_link = self._button('Open official setup guide', self._open_provider_guide)
         self.provider_link.setEnabled(False)
         self.provider_guide.currentIndexChanged.connect(self._show_provider_guide)
@@ -558,12 +664,23 @@ class MonitorWindow(QMainWindow):
         form.addWidget(self.provider_instructions)
         form.addWidget(self.provider_link)
         self.codex_setup_button = self._button('Install / sign in Codex…', self._codex_setup)
-        self.codex_setup_button.hide(); form.addWidget(self.codex_setup_button)
         self.claude_link_button = self._button('Link Claude quota…', lambda: self.claude_quota(False))
-        self.claude_unlink_button = self._button('Remove Claude quota link…', lambda: self.claude_quota(True))
-        self.claude_link_button.hide(); self.claude_unlink_button.hide()
+        self.claude_unlink_button = self._button('Remove quota link…', lambda: self.claude_quota(True))
+        self.claude_unlink_button.setToolTip('Remove only this installation\'s Claude quota link')
+        # Two permanent action slots keep the guide, key and refresh controls
+        # in the same place for every provider. Inactive actions remain hidden.
+        self.provider_action_slot = QStackedWidget()
+        self.provider_action_slot.addWidget(QWidget())
+        self.provider_action_slot.addWidget(self.codex_setup_button)
+        self.provider_action_slot.addWidget(self.claude_link_button)
+        self.provider_remove_slot = QStackedWidget()
+        self.provider_remove_slot.addWidget(QWidget())
+        self.provider_remove_slot.addWidget(self.claude_unlink_button)
         bridge_row = QHBoxLayout()
-        bridge_row.addWidget(self.claude_link_button); bridge_row.addWidget(self.claude_unlink_button)
+        bridge_row.addWidget(self.provider_action_slot, 1)
+        bridge_row.addWidget(self.provider_remove_slot, 1)
+        self.provider_action_slot.setFixedHeight(44)
+        self.provider_remove_slot.setFixedHeight(44)
         form.addLayout(bridge_row)
         self.key_row = QWidget()
         key_layout = QHBoxLayout(self.key_row)
@@ -576,17 +693,20 @@ class MonitorWindow(QMainWindow):
         key_layout.addWidget(self.key, 1)
         key_layout.addWidget(self.clear_key)
         form.addWidget(self.key_row)
+        self.key_row.setFixedHeight(44)
+        reserve_hidden_space(self.key_row)
         form.addWidget(label('By default you can close this app after starting the host; it keeps running invisibly. '
                              'Change this in Host settings, or use Stop host.', 'muted', True))
         bottom = QHBoxLayout()
         bottom.addWidget(label('Quota refresh'))
         self.interval = QSpinBox()
         self.interval.setRange(15, 240)
+        self.interval.setFixedWidth(118)
         self.interval.setSuffix(' sec')
         self.interval.setAccessibleName('Quota refresh interval in seconds')
         bottom.addWidget(self.interval)
         bottom.addStretch()
-        bottom.addWidget(label('Status reads only — no model requests', 'muted'))
+        bottom.addWidget(label('Status reads only — no model requests', 'muted', True), 1)
         form.addLayout(bottom)
         form.addStretch()
         self.key.textChanged.connect(self._changed)
@@ -631,10 +751,12 @@ class MonitorWindow(QMainWindow):
                                'If a system tray is unavailable, the window uses normal minimize/close behavior.', 'muted', True))
         layout.addWidget(label('Automatic start is opt-in and applies when you open AI Monitor. It does not install a Windows service '
                                'or add a sign-in task. USB choices are still validated before starting.', 'muted', True))
-        self.provider_health = label('Start the host to see provider health. Token activity and account quota are separate.', 'muted', True)
+        self.provider_health = InformationPanel(
+            'Start the host to see provider health. Token activity and account quota are separate.', 8, 'Live provider health')
         layout.addWidget(label('LIVE PROVIDER HEALTH', 'eyebrow'))
         layout.addWidget(self.provider_health)
         self.recover_button = self._button('Recover invalid settings…', self.recover_settings)
+        reserve_hidden_space(self.recover_button)
         self.recover_button.setVisible(self.config_error)
         layout.addWidget(self.recover_button)
         layout.addWidget(label('Private settings stay in this installation folder. Updating this installer preserves them; '
@@ -659,7 +781,8 @@ class MonitorWindow(QMainWindow):
         layout.addWidget(label('Keep this window open while writing. Progress and errors stay in the Activity panel below. '
                                'firmware-flasher.exe is a command-line helper; use this button for normal installation.', 'muted', True))
         layout.addStretch()
-        return widget
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(widget)
+        return scroll
 
     def _help_tab(self):
         widget = QWidget()
@@ -676,7 +799,8 @@ class MonitorWindow(QMainWindow):
         layout.addWidget(self._button('Open setup guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/QUICK_START.md'))))
         layout.addWidget(self._button('Open provider guide', lambda: QDesktopServices.openUrl(QUrl('https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md'))))
         layout.addStretch()
-        return widget
+        scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(widget)
+        return scroll
 
     def _load_fields(self):
         self.board.setCurrentIndex(max(0, self.board.findData(self.config.get('board', ''))))
@@ -701,6 +825,7 @@ class MonitorWindow(QMainWindow):
 
     def _changed(self, *_args, mark=True):
         self.key_row.setVisible(self.providers['zcode'].isChecked())
+        self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
         board_id = self.board.currentData()
         if board_id == 'waveshare-s3-43':
             self.board_help.setText('EXPERIMENTAL S3 • original CH422G model • use USB TO UART • visual dimming')
@@ -711,6 +836,8 @@ class MonitorWindow(QMainWindow):
         else:
             self.board_help.setText('Choose your display. Use a USB data cable and an explicit port when several devices are connected.')
             self.board_help.setObjectName('muted')
+        self.board_help.style().unpolish(self.board_help)
+        self.board_help.style().polish(self.board_help)
         if mark:
             self.unsaved = True
             self.connection_checked = False
@@ -752,6 +879,13 @@ class MonitorWindow(QMainWindow):
         self.setup_next.setEnabled(not self.busy)
         self.start_button.setEnabled(not self.busy and not self.config_error and
             not self.unsaved and board_ready and bool(chosen) and not issue)
+        ready = not self.busy and not self.config_error and not self.unsaved and board_ready and bool(chosen)
+        for button in (self.check_usb_button, self.check_ai_button, self.flash_button):
+            button.setEnabled(ready and (button is self.check_ai_button or not issue))
+        self.codex_setup_button.setEnabled(ready and 'codex' in self.config['providers'])
+        self.claude_link_button.setEnabled(ready and 'claude' in self.config['providers'])
+        self.claude_unlink_button.setEnabled(ready and 'claude' in self.config['providers'])
+        self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
 
     def continue_setup(self):
         if self.busy: return
@@ -779,17 +913,33 @@ class MonitorWindow(QMainWindow):
 
     def _show_provider_guide(self):
         key = self.provider_guide.currentData()
-        self.codex_setup_button.setVisible(key == 'codex')
-        self.claude_link_button.setVisible(key == 'claude')
-        self.claude_unlink_button.setVisible(key == 'claude')
+        self.provider_action_slot.setCurrentIndex(1 if key == 'codex' else 2 if key == 'claude' else 0)
+        self.provider_remove_slot.setCurrentIndex(1 if key == 'claude' else 0)
         if key in PROVIDER_SETUP:
             self.provider_instructions.setText(PROVIDER_SETUP[key][0])
             self.provider_link.setEnabled(True)
+        else:
+            self.provider_instructions.setText('Choose an AI above to see what it needs. No AI is preselected.')
+            self.provider_link.setEnabled(False)
 
     def _open_provider_guide(self):
         key = self.provider_guide.currentData()
         if key in PROVIDER_SETUP:
             QDesktopServices.openUrl(QUrl(PROVIDER_SETUP[key][1]))
+
+    def read_ai_instructions(self):
+        self.tabs.setCurrentIndex(1)
+        scroll = self.tabs.widget(1)
+        # Explicit navigation only: changing live status or provider choices
+        # never scrolls the form or moves controls underneath the pointer.
+        self.provider_guide.setFocus()
+        scroll.verticalScrollBar().setValue(max(0, self.provider_guide.y() - 8))
+
+    def enter_zai_key(self):
+        if self.busy or not self.providers['zcode'].isChecked(): return
+        self.tabs.setCurrentIndex(1)
+        self.key.setFocus()
+        self.tabs.widget(1).ensureWidgetVisible(self.key_row, 0, 0)
 
     def check_ai_setup(self):
         if self._ready():
@@ -827,6 +977,10 @@ class MonitorWindow(QMainWindow):
     def _scanned(self, ports):
         self.scan_worker = None
         if self.closed: return
+        if self._button_pressed():
+            self.deferred_observations['ports'] = ports
+            return
+        self.deferred_observations.pop('ports', None)
         self.rescan_button.setEnabled(not self.busy)
         # Preserve the current edit, even when it changed during the scan.
         current = self.port.currentText() or self.config['port']
@@ -910,6 +1064,7 @@ class MonitorWindow(QMainWindow):
                        self.flash_button, self.integration_button, self.rescan_button, self.check_usb_button):
             button.setEnabled(False)
         self.tabs.setEnabled(False)
+        self.setup_next.setEnabled(False)
         self.progress.show()
         self.console_tabs.setCurrentIndex(0)
         self.notice.setText(name + '…')
@@ -1062,7 +1217,12 @@ class MonitorWindow(QMainWindow):
         config = dict(self.config, providers=list(self.config['providers']))
         root, secrets, reporter = self.root, tuple(self.secrets), self.token_reporter
         tokens = not self.hidden_to_tray
-        read = lambda: (epoch, collect_status(root, config, secrets, reporter, tokens))
+        def read():
+            try: data = collect_status(root, config, secrets, reporter, tokens)
+            except Exception: data = None
+            # Failed reads belong to the same generation as successful reads.
+            # An old failure must not clear a new setup's verified connection.
+            return epoch, data
         if not self.monitor_enabled:
             # Explicit synchronous mode for offscreen fixtures and benchmarks.
             try: result = read()
@@ -1077,14 +1237,26 @@ class MonitorWindow(QMainWindow):
     def _status_finished(self, result):
         self.status_worker = None
         if self.closed: return
+        if self._button_pressed():
+            self.deferred_observations['status'] = result
+            return
+        self.deferred_observations.pop('status', None)
         if result is None:
+            data = None
+        else:
+            epoch, data = result
+            if epoch != self.status_epoch: return
+        if data is None:
             self.status_known = False
+            self.live_connected = False
             self.cached_summary = 'STATUS UNAVAILABLE — OPEN AI MONITOR'
+            self.host_state.setText(self.cached_summary)
+            self.provider_health.setText('Provider status unconfirmed. Check the host log or retry the status read.')
             self.token_state.setText('Local status unavailable; check the host log.')
+            self._show_robot(False)
+            self._update_setup_progress()
             self.refresh_tray(poll=False)
             return
-        epoch, data = result
-        if epoch != self.status_epoch: return  # Saved settings/hide/restore invalidate old observations.
         running = data['running']
         self.status_known = True
         self.host_running = running
@@ -1154,6 +1326,7 @@ class MonitorWindow(QMainWindow):
 
 def run_desktop(firmware: bool = False) -> int:
     application = QApplication.instance() or QApplication(sys.argv[:1])
+    application.setQuitOnLastWindowClosed(False)  # Tray lifetime ends only through the explicit, validated Quit path.
     application.setApplicationName('AI Monitor')
     application.setOrganizationName('AI Monitor contributors')
     application.setStyle('Fusion')
@@ -1167,10 +1340,7 @@ def run_desktop(firmware: bool = False) -> int:
             'AI Monitor could not open. If it is already running, use the NOVA tray icon. '
             'Otherwise use a writable folder and check the local settings. Your file was not changed.')
         return 1
-    def reopen(page):
-        if page == 'firmware': window.tabs.setCurrentIndex(3)
-        window.restore_from_tray()
-    instance.requested.connect(reopen)
+    instance.requested.connect(window.activate_requested)
     if firmware:
         window.tabs.setCurrentIndex(3)
     window.show()

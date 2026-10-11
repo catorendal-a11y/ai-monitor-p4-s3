@@ -4,7 +4,9 @@
 #include "../ai_monitor/ai_monitor.h"
 
 inline bool token_signal_fresh(const aim::Snapshot& snapshot, uint32_t now) {
-  return snapshot.hostPresent && snapshot.tokenUsageKnown && now - snapshot.tokenActivityMs < 15000u;
+  // The host allows a 15-second poll interval. Budget another full interval
+  // for scheduling and local I/O; USB loss still invalidates immediately.
+  return snapshot.hostPresent && snapshot.tokenUsageKnown && now - snapshot.tokenActivityMs < 35000u;
 }
 
 inline const char* token_tracking_label(const aim::Snapshot& snapshot, uint32_t now) {

@@ -141,14 +141,75 @@ static void brightness_honors_persistence_and_queue_failure() {
   CHECK(core.out().find("\"type\":\"ok\"") != std::string::npos);
   feed(core, "{\"cmd\":\"set_brightness\",\"value\":50,\"persist\":true}\n");
   CHECK(calls == 2 && persisted);
+  for (const char* invalid : {"1", "0", "0.5", "\"true\"", "\"false\"", "null", "[]", "{}"}) {
+    core.clear_out();
+    feed(core, std::string("{\"cmd\":\"set_brightness\",\"value\":50,\"persist\":") + invalid + "}\n");
+    CHECK(calls == 2 && persisted);
+    CHECK(core.out().find("set_brightness: invalid persist") != std::string::npos);
+    CHECK(core.out().find("\"type\":\"ok\"") == std::string::npos);
+  }
+  core.clear_out();
+  feed(core, "{\"cmd\":\"set_brightness\",\"value\":50}\n");
+  CHECK(calls == 3 && !persisted);  // omission remains non-persistent
   core.clear_out();
   feed(core, "{\"cmd\":\"set_brightness\",\"value\":\"50\"}\n");
-  CHECK(calls == 2);
+  CHECK(calls == 3);
   CHECK(core.out().find("\"type\":\"error\"") != std::string::npos);
   core.apply_brightness = [](uint8_t, bool) { return false; };
   core.clear_out();
   feed(core, "{\"cmd\":\"set_brightness\",\"value\":50}\n");
   CHECK(core.out().find("\"type\":\"error\"") != std::string::npos);
+}
+
+static void text_sanitization_collapses_utf8_and_bounds_malformed_input() {
+  struct Case { std::string input, expected; };
+  const Case cases[] = {
+      {"ASCII 50%", "ASCII 50%"},
+      {"caf\xC3\xA9", "caf?"},             // two-byte scalar
+      {"A\xE2\x82\xAC" "B", "A?B"},    // three-byte scalar
+      {"A\xF0\x9F\xA4\x96" "B", "A?B"}, // four-byte scalar
+      {"\xC2\x80\xDF\xBF\xE0\xA0\x80\xED\x9F\xBF\xEE\x80\x80\xF0\x90\x80\x80\xF4\x8F\xBF\xBF", "???????"},
+      {std::string("A\tB\x7F", 4), "A?B?"},
+      {"\xC0\xAF", "??"},              // overlong two-byte encoding
+      {"\xE0\x80\x80", "???"},        // overlong three-byte encoding
+      {"\xED\xA0\x80", "???"},        // UTF-16 surrogate, not a scalar
+      {"\xF0\x80\x80\x80", "????"},  // overlong four-byte encoding
+      {"\xF4\x90\x80\x80", "????"},  // beyond U+10FFFF
+      {"\xF5\x80\x80\x80", "????"},  // invalid leading byte
+      {"\xC3", "?"}, {"\xE2\x82", "??"}, {"\xF0\x9F\xA4", "???"},
+      {"\xE2" "AB", "?AB"}, {"\x80\xBF" "Z", "??Z"},
+      {std::string(34, 'a') + "\xF0\x9F\xA4\x96" + "tail", std::string(34, 'a') + "?"},
+      {std::string(35, 'a') + "\xC3\xA9", std::string(35, 'a')},
+  };
+  for (const auto& test : cases) {
+    aim::ProtoCore core;
+    JsonDocument document;
+    document["provider"] = "codex";
+    auto row = document["usage"]["rows"].to<JsonArray>().add<JsonObject>();
+    row["title"] = test.input; row["usedPercent"] = 45;
+    JsonDocument wrapper;
+    wrapper["data"].to<JsonArray>().add(document.as<JsonObject>());
+    std::string payload; serializeJson(wrapper, payload); payload += '\n';
+    feed(core, payload);
+    CHECK(core.snapshot().frameCount == 1);
+    CHECK(std::string(core.snapshot().views[0].rows[0].title) == test.expected);
+    CHECK(core.snapshot().views[0].rows[0].usedPercent == 45);
+    CHECK(core.snapshot().views[0].rows[0].title[35] == '\0');
+  }
+  // Sanitizing while copying keeps bounded ASCII output after many Unicode
+  // characters, rather than byte-truncating the source before conversion.
+  std::string message;
+  for (size_t i = 0; i < 158; ++i) message += "\xF0\x9F\xA4\x96";
+  message += "AB";
+  aim::ProtoCore core;
+  JsonDocument notice;
+  notice["data"][0]["provider"] = "codex"; notice["data"][0]["notice"] = message;
+  std::string payload; serializeJson(notice, payload); payload += '\n'; feed(core, payload);
+  CHECK(std::string(core.snapshot().views[0].message) == std::string(158, '?') + "A");
+  CHECK(core.snapshot().views[0].message[159] == '\0');
+  aim::ProtoCore resetCore;
+  feed(resetCore, frame("[{\"usedPercent\":40,\"resetsAt\":\"2026-04-10T\xE2\x82\xAC" "AB\"}]"));
+  CHECK(std::string(resetCore.snapshot().views[0].rows[0].resetsShort) == "?AB");
 }
 
 static void notices_and_clock_sync() {
@@ -635,7 +696,7 @@ static void nova_follows_tokens_not_screen_dimming_or_fetching() {
   snapshot.tokenIdleSeconds = 100; CHECK(state.evaluate(snapshot, now, true, warning) == NovaMood::ready);
   snapshot.tokenIdleSeconds = 300; CHECK(state.evaluate(snapshot, now, false, warning) == NovaMood::resting);
   snapshot.tokenUsageKnown = false; CHECK(state.evaluate(snapshot, now, true, warning) == NovaMood::ready);
-  snapshot.tokenUsageKnown = true; CHECK(state.evaluate(snapshot, 15100, true, warning) == NovaMood::ready);  // old activity is unknown
+  snapshot.tokenUsageKnown = true; CHECK(state.evaluate(snapshot, 35100, true, warning) == NovaMood::ready);  // old activity is unknown
   snapshot.tokenActivityMs = 0xfffffff0u; snapshot.tokenIdleSeconds = 0;
   CHECK(state.evaluate(snapshot, 16, true, warning) == NovaMood::working);
   feed(core, "{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":3,\"idleSeconds\":-1,\"delta\":500}\n");
@@ -650,7 +711,8 @@ static void token_presentation_handles_stale_sources_large_counts_and_wraparound
   CHECK(std::string(token_tracking_label(snapshot, 16)) == "TRACKING / Codex + ZCode");
   token_activity_hint(snapshot, 1016, value, sizeof(value));
   CHECK(std::string(value).find("Last increase: 3 s ago") == 0);
-  CHECK(std::string(token_tracking_label(snapshot, 15000)) == "TRACKING / signal lost");
+  CHECK(token_signal_fresh(snapshot, 16000));  // max poll interval plus jitter
+  CHECK(std::string(token_tracking_label(snapshot, 35000)) == "TRACKING / signal lost");
   snapshot.tokenUsageKnown = false;
   CHECK(std::string(token_tracking_label(snapshot, 16)) == "TRACKING / no counters");
   snapshot.hostPresent = false;
@@ -662,7 +724,34 @@ static void token_presentation_handles_stale_sources_large_counts_and_wraparound
   char small[4]; format_token_count(UINT64_MAX, small, sizeof(small)); CHECK(small[3] == '\0');
 }
 
+static void nova_uses_selected_provider_token_sources() {
+  aim::Snapshot snapshot{};
+  snapshot.hostPresent = snapshot.viewsConfigured = true;
+  snapshot.viewCount = 1; snapshot.tokenUsageKnown = snapshot.tokenUsageSeen = true;
+  snapshot.tokenActivityMs = 100; snapshot.tokenIdleSeconds = 0;
+  std::strcpy(snapshot.viewKeys[0], "copilot");
+  auto& view = snapshot.views[0]; view.valid = view.notice = view.informational = true;
+  std::strcpy(view.providerKey, "copilot");
+  NovaState state; const auto warning = [](const char*, const aim::Row&) { return uint8_t{25}; };
+  snapshot.tokenSourceMask = 1;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::waiting);
+  snapshot.tokenIdleSeconds = 100;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::waiting);
+  snapshot.tokenSourceMask = 16;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::ready);
+  snapshot.tokenIdleSeconds = 0;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::working);
+  snapshot.viewCount = 0;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::waiting);
+  snapshot.viewsConfigured = false;
+  CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::working);  // legacy aggregate signal
+}
+
 int main() {
+  text_sanitization_collapses_utf8_and_bounds_malformed_input();
+  nova_uses_selected_provider_token_sources();
+  const char* activityKeys[] = {"codex", "zcode", "claude", "gemini", "copilot", "cursor", "antigravity", "opencode"};
+  for (unsigned i = 0; i < 8; ++i) CHECK(aim::provider_style(activityKeys[i])->activityMask == (1u << i));
   {
     aim::ProtoCore core; core.tick = [] { return 100u; };
     feed(core, "{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":255,\"idleSeconds\":0,\"delta\":45}\n");
@@ -708,5 +797,5 @@ int main() {
   nova_follows_tokens_not_screen_dimming_or_fetching();
   token_presentation_handles_stale_sources_large_counts_and_wraparound();
   if (failures) { std::cerr << failures << " failed checks\n"; return EXIT_FAILURE; }
-  std::cout << "29 protocol, token-driven NOVA, quota notification, dimming, precision, night and history scenarios passed\n";
+  std::cout << "Protocol, token-driven NOVA, quota notification, dimming, precision, night and history scenarios passed\n";
 }

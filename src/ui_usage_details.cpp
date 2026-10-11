@@ -8,6 +8,7 @@
 #include "ui/usage_format.h"
 #include "ui/usage_history.h"
 #include "ui/quota_alert.h"
+#include "ui/interaction.h"
 
 namespace {
 lv_obj_t *screen = nullptr, *dashboard = nullptr, *title = nullptr, *status = nullptr;
@@ -31,6 +32,7 @@ uint32_t graphNow = 0;
 unsigned historyEdges = 0;
 uint32_t drawnHistoryRevision = UINT32_MAX;
 uint8_t drawnHistoryView = 255;
+uint32_t historyThemeRevision = UINT32_MAX;
 
 lv_obj_t* detail_label(lv_obj_t* parent, int x, int y, int width, const char* text, const lv_font_t* font, uint32_t color) {
   auto* label = lv_label_create(parent);
@@ -113,10 +115,15 @@ lv_obj_t* detail_button(lv_obj_t* parent, int x, int y, int width, const char* t
   lv_obj_set_pos(button, x, y); lv_obj_set_size(button, width, 48);
   lv_obj_set_style_bg_color(button, lv_color_hex(ui_theme::button), 0);
   lv_obj_set_style_bg_color(button, lv_color_hex(ui_theme::pressed), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(button, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
+  lv_obj_set_style_opa(button, LV_OPA_50, LV_STATE_DISABLED);
+  lv_obj_set_style_recolor_opa(button, LV_OPA_TRANSP, LV_STATE_DISABLED);
   lv_obj_set_style_radius(button, 12, 0); lv_obj_set_style_shadow_width(button, 0, 0);
+  lv_obj_set_style_pad_all(button, 0, 0);
   auto* label = detail_label(button, 0, 0, width - 12, text, &lv_font_montserrat_16, ui_theme::text);
   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0); lv_obj_center(label);
   lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, eventData);
+  ui_interaction::keep_target(button);
   if (labelOut) *labelOut = label;
   return button;
 }
@@ -136,7 +143,8 @@ void ui_details_init() {
   detail_button(screen, 474, 16, 150, "HISTORY", toggle_history, &historyToggleLabel);
   for (size_t i = 0; i < aim::kMaxRows; ++i) {
     auto& row = rows[i];
-    row.card = lv_obj_create(screen); lv_obj_set_pos(row.card, 24, 94 + i * 106); lv_obj_set_size(row.card, 752, 96);
+    // Reserve an error-summary strip permanently; rows never jump on failure.
+    row.card = lv_obj_create(screen); lv_obj_set_pos(row.card, 24, 118 + i * 96); lv_obj_set_size(row.card, 752, 90);
     lv_obj_set_style_bg_color(row.card, lv_color_hex(ui_theme::surface), 0);
     lv_obj_set_style_border_color(row.card, lv_color_hex(ui_theme::border), 0);
     lv_obj_set_style_border_width(row.card, 1, 0); lv_obj_set_style_radius(row.card, 14, 0);
@@ -153,7 +161,8 @@ void ui_details_init() {
   notice = detail_label(screen, 40, 142, 720, "", &lv_font_montserrat_20, ui_theme::text);
   lv_label_set_long_mode(notice, LV_LABEL_LONG_MODE_WRAP);
   errorBanner = detail_label(screen, 24, 78, 752, "", &lv_font_montserrat_14, 0xFFAA00);
-  lv_label_set_long_mode(errorBanner, LV_LABEL_LONG_MODE_WRAP);
+  lv_label_set_long_mode(errorBanner, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_height(errorBanner, 34);
   lv_obj_set_hidden(errorBanner, true);
   historyPanel = lv_obj_create(screen);
   lv_obj_set_pos(historyPanel, 24, 94); lv_obj_set_size(historyPanel, 752, 310);
@@ -207,6 +216,14 @@ void ui_details_update() {
   const auto snapshot = aim::read();
   history.capture(snapshot, millis());
   if (!screen || lv_screen_active() != screen) return;
+  if (historyThemeRevision != ui_theme::revision) {
+    historyThemeRevision = ui_theme::revision;
+    // Fixed series colors may equal a palette color. Restore their semantic
+    // identity after generic recoloring so legends still match the plot.
+    for (size_t r = 0; r < aim::kMaxRows; ++r)
+      lv_obj_set_style_text_color(historyLegends[r], lv_color_hex(historyColors[r]), 0);
+    drawnHistoryRevision = UINT32_MAX;
+  }
   const auto& view = snapshot.views[selected]; const uint32_t now = millis();
   const char* key = snapshot.viewsConfigured ? snapshot.viewKeys[selected] : view.providerKey;
   const bool changed = (snapshot.viewsConfigured && selected >= snapshot.viewCount) || strcmp(key, expectedKey) != 0;
@@ -218,6 +235,7 @@ void ui_details_update() {
            static_cast<unsigned long>((now - view.quotaReceivedMs) / 60000));
   if (!view.hasUsage) snprintf(text, sizeof(text), "%s / No successful measurement yet", snapshot.hostPresent ? "CONNECTED" : "OFFLINE");
   if (view.informational) snprintf(text, sizeof(text), "%s / ACTIVITY ONLY / Quota not available", snapshot.hostPresent ? "CONNECTED" : "OFFLINE");
+  if (changed) snprintf(text, sizeof(text), "Provider selection changed / return or choose PREV / NEXT");
   detail_text(status, text);
   const bool retained = !changed && view.notice && view.hasUsage;
   lv_obj_set_hidden(errorBanner, !retained || historyMode);
@@ -231,10 +249,6 @@ void ui_details_update() {
   for (size_t i = 0; i < aim::kMaxRows; ++i) {
     auto& widgets = rows[i]; lv_obj_set_hidden(widgets.card, historyMode || showNotice || i >= view.rowCount);
     if (showNotice || i >= view.rowCount) continue;
-    const int rowY = retained ? 118 + i * 96 : 94 + i * 106;
-    if (lv_obj_get_y(widgets.card) != rowY) lv_obj_set_y(widgets.card, rowY);
-    const int rowHeight = retained ? 90 : 96;
-    if (lv_obj_get_height(widgets.card) != rowHeight) lv_obj_set_height(widgets.card, rowHeight);
     const auto& row = view.rows[i]; detail_text(widgets.name, row.title);
     format_percent(row.usedPercent, view.showsRemaining, text, sizeof(text)); detail_text(widgets.percent, text);
     const bool widePercent = strlen(text) >= 5;

@@ -84,18 +84,19 @@ struct ProviderStyle {
   const char* key;
   const char* label;
   uint32_t color;
+  uint8_t activityMask;
 };
 
 inline const ProviderStyle* provider_style(const char* key) {
   static const ProviderStyle kTable[] = {
-      {"codex", "CODEX", 0x10A37Fu},
-      {"zcode", "Z CODE", 0x14B8A6u},
-      {"claude", "CLAUDE", 0xD97757u},
-      {"antigravity", "ANTIGRAVITY", 0x4E8CFFu},
-      {"gemini", "GEMINI", 0x4285F4u},
-      {"copilot", "COPILOT", 0xA371F7u},
-      {"cursor", "CURSOR", 0x9AD1D4u},
-      {"opencode", "OPENCODE", 0xB9B9C7u},
+      {"codex", "CODEX", 0x10A37Fu, 1},
+      {"zcode", "Z CODE", 0x14B8A6u, 2},
+      {"claude", "CLAUDE", 0xD97757u, 4},
+      {"antigravity", "ANTIGRAVITY", 0x4E8CFFu, 64},
+      {"gemini", "GEMINI", 0x4285F4u, 8},
+      {"copilot", "COPILOT", 0xA371F7u, 16},
+      {"cursor", "CURSOR", 0x9AD1D4u, 32},
+      {"opencode", "OPENCODE", 0xB9B9C7u, 128},
   };
   for (const auto& entry : kTable) {
     if (key && std::strcmp(entry.key, key) == 0) return &entry;

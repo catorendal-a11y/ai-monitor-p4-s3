@@ -149,10 +149,22 @@ class ProtoCore {
     dst[i] = '\0';
   }
 
-  static void sanitize(char* buf, size_t len) {
-    for (size_t i = 0; i < len && buf[i]; ++i) {
-      if (buf[i] < 0x20 || buf[i] > 0x7E) buf[i] = '?';
-    }
+  // Unsupported Unicode is one display character, not one replacement per
+  // UTF-8 byte. Validate scalar encodings; malformed bytes consume one byte.
+  // Short-circuiting at each NUL prevents reads beyond a truncated C string.
+  static size_t utf8_span(const unsigned char* src) {
+    const unsigned char first = src[0];
+    if (first < 0xC2 || first > 0xF4) return 1;
+    const unsigned char second = src[1];
+    if (second < 0x80 || second > 0xBF) return 1;
+    if (first <= 0xDF) return 2;
+    if ((first == 0xE0 && second < 0xA0) || (first == 0xED && second > 0x9F) ||
+        (first == 0xF0 && second < 0x90) || (first == 0xF4 && second > 0x8F)) return 1;
+    const unsigned char third = src[2];
+    if (third < 0x80 || third > 0xBF) return 1;
+    if (first <= 0xEF) return 3;
+    const unsigned char fourth = src[3];
+    return fourth >= 0x80 && fourth <= 0xBF ? 4 : 1;
   }
 
   char line_[kAim1MaxPayload + 8] = {0};
@@ -246,16 +258,25 @@ class ProtoCore {
   // FRAME PARSING
   // ─────────────────────────────────────────────────────────────────────────────
   static void copy_capped(char* dst, size_t cap, const char* src) {
+    if (!dst || cap == 0) return;
     if (!src) {
       dst[0] = '\0';
       return;
     }
-    strlcpy_local(dst, src, cap);
-    sanitize(dst, cap);
+    const auto* input = reinterpret_cast<const unsigned char*>(src);
+    size_t output = 0;
+    while (*input && output + 1 < cap) {
+      const unsigned char value = *input;
+      const size_t consumed = value < 0x80 ? 1 : utf8_span(input);
+      dst[output++] = value >= 0x20 && value <= 0x7E ? static_cast<char>(value) : '?';
+      input += consumed;
+    }
+    dst[output] = '\0';
   }
 
   // "2026-04-10T15:00:00Z" -> "15:00"; other formats are kept as-is (capped).
   static void short_reset(const char* iso, char* outBuf, size_t cap) {
+    if (!outBuf || cap == 0) return;
     outBuf[0] = '\0';
     if (!iso || !iso[0]) return;
     const char* t = strlen(iso) >= 16 && iso[4] == '-' && iso[7] == '-' && iso[10] == 'T' ? iso + 10 : nullptr;
@@ -263,6 +284,7 @@ class ProtoCore {
       size_t n = 0;
       for (const char* p = t + 1; *p && n < 5 && n < cap - 1; ++p, ++n) outBuf[n] = *p;
       outBuf[n] = '\0';
+      copy_capped(outBuf, cap, outBuf);  // malformed ISO text still stays ASCII
       return;
     }
     copy_capped(outBuf, cap, iso);
@@ -576,6 +598,10 @@ class ProtoCore {
       const bool persist = doc["persist"] | false;
       if (!doc["value"].is<long>() || value < 0 || value > 100) {
         reply_error(-1, 0, "set_brightness: invalid value");
+        return;
+      }
+      if (!doc["persist"].isUnbound() && !doc["persist"].is<bool>()) {
+        reply_error(-1, 0, "set_brightness: invalid persist");
         return;
       }
       if (!apply_brightness || !apply_brightness(static_cast<uint8_t>(value), persist)) {

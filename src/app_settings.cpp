@@ -7,13 +7,17 @@
 #include <cstring>
 #include <cstdio>
 #include "ai_monitor/ai_monitor.h"
+#include "config.h"
 
 namespace app_settings {
 
 static const char* NVS_NAMESPACE = "aimon";
 static const char* KEY_DIM_MIN = "dim_min";
 static uint8_t s_dimMinutes = 5;  // default: dim after 5 idle minutes
+static uint8_t s_brightness = DISPLAY_DEFAULT_BRIGHTNESS, s_savedBrightness = DISPLAY_DEFAULT_BRIGHTNESS;
 static bool s_loaded = false;
+static bool s_loadFailed = false;
+static uint32_t s_loadAttemptMs = 0;
 static uint8_t s_warningPercent = 25;
 static NightSettings s_night;
 static uint8_t s_savedDim = 5, s_savedWarning = 25;
@@ -58,10 +62,16 @@ static void night_bytes(const NightSettings& value, uint8_t (&bytes)[6]) {
   bytes[3] = value.end & 255; bytes[4] = value.end >> 8; bytes[5] = value.percent;
 }
 
-static void ensure_loaded() {
-  if (s_loaded) return;
+static bool ensure_loaded(bool retry = false) {
+  if (s_loaded) return true;
+  const uint32_t now = millis();
+  if (s_loadFailed && !retry && now - s_loadAttemptMs < 1000u) return false;
+  s_loadAttemptMs = now;
   Preferences prefs;
-  if (prefs.begin(NVS_NAMESPACE, true)) {
+  // A fresh device may have no namespace yet. Opening it writable creates
+  // that namespace, but does not replace existing values on a read failure.
+  if (prefs.begin(NVS_NAMESPACE, true) || prefs.begin(NVS_NAMESPACE, false)) {
+    s_brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
     s_dimMinutes = normalize_dim_minutes(prefs.getUChar(KEY_DIM_MIN, 5));
     s_warningPercent = normalize_warning_percent(prefs.getUChar("warn_pct", 25));
     uint8_t look[2] = {};
@@ -94,17 +104,38 @@ static void ensure_loaded() {
       }
     }
     prefs.end();
+  } else {
+    if (!s_loadFailed) report_save(false);
+    s_loadFailed = true;
+    return false;  // Unread defaults are not confirmed persisted settings.
   }
+  s_loadFailed = false;
   s_loaded = true;
+  s_savedBrightness = s_brightness;
   s_savedDim = s_dimMinutes; s_savedWarning = s_warningPercent; s_savedNight = s_night;
   s_savedAppearance = s_appearance;
   memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
   memcpy(s_savedRules, s_rules, sizeof(s_rules));
+  return true;
 }
 
 uint8_t dim_minutes() {
   ensure_loaded();
   return s_dimMinutes;
+}
+
+uint8_t brightness() { ensure_loaded(); return s_brightness; }
+void set_brightness(uint8_t value) {
+  if (!ensure_loaded(true)) { report_save(false); return; }
+  s_brightness = value;
+  if (value == s_savedBrightness) { report_save(true); return; }
+  Preferences prefs;
+  bool saved = false;
+  if (prefs.begin(NVS_NAMESPACE, false)) {
+    saved = prefs.putUChar("brightness", value) == sizeof(value); prefs.end();
+  }
+  if (saved) s_savedBrightness = value;
+  report_save(saved);
 }
 
 Appearance appearance() { ensure_loaded(); return s_appearance; }
@@ -113,7 +144,8 @@ NovaWindow nova_window(const char* provider) {
   return index >= 0 ? s_novaWindows[index] : NovaWindow{};
 }
 void set_nova_window(const char* provider, NovaWindow value) {
-  ensure_loaded(); const int index = nova_provider_index(provider);
+  if (!ensure_loaded(true)) { report_save(false); return; }
+  const int index = nova_provider_index(provider);
   if (index < 0 || !valid_nova_window(value)) { report_save(false); return; }
   if (value.automatic) value = NovaWindow{};
   s_novaWindows[index] = value;
@@ -128,7 +160,8 @@ void set_nova_window(const char* provider, NovaWindow value) {
   report_save(saved);
 }
 void set_appearance(Appearance value) {
-  ensure_loaded(); value = normalize_appearance(value); s_appearance = value;
+  if (!ensure_loaded(true)) { report_save(false); return; }
+  value = normalize_appearance(value); s_appearance = value;
   if (value.companion == s_savedAppearance.companion && value.theme == s_savedAppearance.theme) { report_save(true); return; }
   const uint8_t bytes[] = {static_cast<uint8_t>(value.companion), static_cast<uint8_t>(value.theme)};
   Preferences prefs; bool saved = false;
@@ -138,7 +171,7 @@ void set_appearance(Appearance value) {
 }
 
 void set_dim_minutes(uint8_t minutes) {
-  ensure_loaded();
+  if (!ensure_loaded(true)) { report_save(false); return; }
   minutes = normalize_dim_minutes(minutes);
   s_dimMinutes = minutes;
   if (minutes == s_savedDim) { report_save(true); return; }
@@ -155,7 +188,7 @@ uint8_t warning_percent() {
 }
 
 void set_warning_percent(uint8_t value) {
-  ensure_loaded();
+  if (!ensure_loaded(true)) { report_save(false); return; }
   value = normalize_warning_percent(value);
   s_warningPercent = value;
   if (value == s_savedWarning) { report_save(true); return; }
@@ -168,7 +201,8 @@ void set_warning_percent(uint8_t value) {
 
 NightSettings night() { ensure_loaded(); return s_night; }
 void set_night(NightSettings value) {
-  ensure_loaded(); value = normalize_night(value);
+  if (!ensure_loaded(true)) { report_save(false); return; }
+  value = normalize_night(value);
   s_night = value;
   uint8_t bytes[6], previous[6]; night_bytes(value, bytes); night_bytes(s_savedNight, previous);
   if (memcmp(bytes, previous, sizeof(bytes)) == 0) { report_save(true); return; }
@@ -192,7 +226,7 @@ uint8_t warning_for(const char* provider, const char* title, uint32_t windowMinu
   return value ? value : warning_percent();
 }
 void set_warning_for(const char* provider, const char* title, uint32_t windowMinutes, uint8_t percent) {
-  ensure_loaded();
+  if (!ensure_loaded(true)) { report_save(false); return; }
   if (!provider || !title || !aim::provider_style(provider) || strlen(title) >= 36 || (percent && (percent < 5 || percent > 50))) {
     report_save(false); return;
   }

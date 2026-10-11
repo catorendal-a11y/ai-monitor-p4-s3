@@ -3,6 +3,7 @@ from collections import OrderedDict
 import hashlib
 import json
 from pathlib import Path
+from host_security import read_local_json
 
 MAX_FILES = 16
 MAX_BYTES = 4 * 1024 * 1024
@@ -63,7 +64,7 @@ class LocalActivity:
                     if path.suffix == '.json':
                         if stat.st_size > MAX_BYTES:
                             continue
-                        document = json.loads(path.read_text(encoding='utf-8-sig'))
+                        document = read_local_json(path, MAX_BYTES)
                         if not isinstance(document, dict) or not isinstance(document.get('messages'), list):
                             continue
                         state['counts'].clear()
@@ -85,7 +86,7 @@ class LocalActivity:
                                 if not line.endswith(b'\n'):
                                     data.seek(position); break  # an incomplete write is retried next poll
                                 try: item = self.usage(provider, json.loads(line))
-                                except (ValueError, UnicodeError): continue
+                                except (ValueError, UnicodeError, RecursionError): continue
                                 if item: state['counts'][item[0]] = item[1]
                             state['offset'] = data.tell()
                     state['mtime'] = stat.st_mtime_ns
@@ -94,7 +95,7 @@ class LocalActivity:
                 readable = True
                 prefix = hashlib.sha256(str(path).encode()).hexdigest()[:16]
                 counts.update({prefix + ':' + key: value for key, value in state['counts'].items()})
-            except (OSError, ValueError, UnicodeError):
+            except (OSError, ValueError, UnicodeError, RecursionError):
                 continue
         while len(self.files) > MAX_FILES: self.files.popitem(last=False)
         return counts if readable else None

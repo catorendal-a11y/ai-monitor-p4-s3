@@ -3,6 +3,7 @@
 #include "lvgl_hal.h"
 #include "display.h"
 #include "idle_dim.h"
+#include "touch_input.h"
 #include "visual_dimmer.h"
 #include <Arduino.h>
 #include "esp_heap_caps.h"
@@ -13,6 +14,7 @@ constexpr size_t draw_bytes = DISPLAY_H_RES * 20u * sizeof(uint16_t);
 uint8_t* draw_buffer = nullptr;
 lv_obj_t* dimmer = nullptr;
 esp_timer_handle_t tick_timer = nullptr;
+TouchInputGuard touchInputGuard;
 void tick_callback(void*) { lv_tick_inc(1); }
 }  // namespace
 
@@ -34,18 +36,24 @@ void lvgl_flush_cb(lv_display_t* display, const lv_area_t* area, uint8_t* pixels
   lv_display_flush_ready(display);
 }
 
-void lvgl_touchpad_read_cb(lv_indev_t*, lv_indev_data_t* data) {
+void lvgl_touchpad_read_cb(lv_indev_t* input, lv_indev_data_t* data) {
   data->state = LV_INDEV_STATE_RELEASED;
-  if (!display_touch || esp_lcd_touch_read_data(display_touch) != ESP_OK) return;
+  if (!display_touch || esp_lcd_touch_read_data(display_touch) != ESP_OK) {
+    touchInputGuard.failed(input, data); return;
+  }
   esp_lcd_touch_point_data_t point{};
   uint8_t count = 0;
-  if (esp_lcd_touch_get_data(display_touch, &point, &count, 1) != ESP_OK) return;
+  if (esp_lcd_touch_get_data(display_touch, &point, &count, 1) != ESP_OK) {
+    touchInputGuard.failed(input, data); return;
+  }
   if (count == 1) {
     data->point.x = static_cast<lv_coord_t>(point.x < DISPLAY_H_RES ? point.x : DISPLAY_H_RES - 1);
     data->point.y = static_cast<lv_coord_t>(point.y < DISPLAY_V_RES ? point.y : DISPLAY_V_RES - 1);
     data->state = LV_INDEV_STATE_PRESSED;
   }
-  if (!idle_dim_touch(data->state == LV_INDEV_STATE_PRESSED)) data->state = LV_INDEV_STATE_RELEASED;
+  const bool pressed = data->state == LV_INDEV_STATE_PRESSED;
+  const bool awake = idle_dim_touch(pressed);
+  if (!touchInputGuard.accept(pressed) || !awake) data->state = LV_INDEV_STATE_RELEASED;
 }
 
 void lvgl_hal_init() {

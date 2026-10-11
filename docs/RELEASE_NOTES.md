@@ -1,3 +1,20 @@
+# AI Monitor v1.18.5
+
+This release improves desktop and display interactions, setup failure handling and background-host isolation.
+
+- Keep desktop action positions stable across long messages, busy states, USB scans and provider changes. Separate navigation to AI instructions and the masked Z.AI key; preserve readable scrolling at smaller windows and Windows scaling.
+- Keep device button/card slots stable, preserve the provider visible at press start, cancel dragged or failed touch gestures, and restore cancelled setting previews. Align SET and DONE controls across screens and prevent overlapping settings overlays.
+- Show healthy local activity accurately, preserve small quota percentages, wrap longer alerts, and distinguish missing host/source signals. Retain provider colors and graph legend colors across themes.
+- Share guarded firmware installation between console and GUI. Scope host control to actual program entry points and return accurate setup/diagnostic exit codes.
+- Bound quota helpers and their input/output pipes, reap timed-out children before retrying, and move numeric token reads away from the USB owner. Malformed usage cannot disrupt other selected AIs; replaced keys invalidate previous quota verification.
+- Retry failed first settings loads and share brightness persistence between boards. Check P4 LVGL timer startup and refuse unverified executable reuse during release packaging.
+- Retry bounded identity timeouts when opening USB reboots a slow-starting board. An unavailable or mismatched identity still prevents an application write.
+- Require explicit acceptance before installing or signing in to Codex. Identify the legacy quota fallback honestly and clamp over-limit percentages without hiding usage.
+- Validate brightness persistence as a boolean, replace complete UTF-8 characters safely, and release the unused Arduino loop task after startup. Pin LVGL and board platforms to immutable commits.
+- Generate GitHub build provenance for verified release artifacts in the isolated publisher. This provides build-origin evidence; Windows executables remain unsigned.
+
+Windows binaries remain unsigned. Original Waveshare S3 hardware remains experimental pending physical verification. Interrupted nonbooting applications require First installation, which resets display preferences; PC configuration is retained.
+
 # AI Monitor v1.18.4
 
 Desktop observations and USB scans run in the background so slow local records do not freeze the window. Status refreshes are coalesced; results from an older setup or tray state are discarded. NOVA images are scaled once and changed only when their state changes. Tray Start host now guides ambiguous USB selection through Display setup.

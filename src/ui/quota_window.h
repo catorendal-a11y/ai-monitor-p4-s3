@@ -9,8 +9,8 @@ inline void quota_window_label(uint32_t minutes, const char* title, char* text, 
   if (minutes == 300) snprintf(text, size, "5 HOURS");
   else if (minutes == 10080) snprintf(text, size, "7 DAYS");
   else if (minutes >= 40320 && minutes <= 44640) snprintf(text, size, "%s", title && strstr(title, "MCP") ? "MONTHLY MCP" : "MONTHLY");
-  else if (minutes && minutes % 1440 == 0) snprintf(text, size, "%lu DAYS", static_cast<unsigned long>(minutes / 1440));
-  else if (minutes && minutes % 60 == 0) snprintf(text, size, "%lu HOURS", static_cast<unsigned long>(minutes / 60));
+  else if (minutes && minutes % 1440 == 0) snprintf(text, size, "%lu DAY%s", static_cast<unsigned long>(minutes / 1440), minutes == 1440 ? "" : "S");
+  else if (minutes && minutes % 60 == 0) snprintf(text, size, "%lu HOUR%s", static_cast<unsigned long>(minutes / 60), minutes == 60 ? "" : "S");
   else snprintf(text, size, "%s", title && title[0] ? title : "Quota");
 }
 

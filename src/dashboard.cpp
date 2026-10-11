@@ -20,6 +20,8 @@
 #include "ui/backlight.h"
 #include "ui/theme.h"
 #include "ui/usage_format.h"
+#include "ui/token_status.h"
+#include "ui/interaction.h"
 #include "ui/quota_alert.h"
 #include "ui_usage_details.h"
 #include "ui_nova.h"
@@ -87,6 +89,7 @@ static const V2Style* v2_style(const char* key) {
       {"antigravity", 0x4E8CFF, 0x8AB4F8, 0x14202E, 0x1D3050, 0x8AB4F8, "GOOGLE"},
       {"copilot", 0xA371F7, 0xC9ACFB, 0x201A2E, 0x32264A, 0xC9ACFB, "GITHUB"},
       {"cursor", 0x9AD1D4, 0xC4E8EA, 0x1A2628, 0x27393B, 0xC4E8EA, "CURSOR"},
+      {"opencode", 0xB9B9C7, 0xDADAE5, 0x202028, 0x34343F, 0xDADAE5, "OPENCODE"},
   };
   for (const auto& s : kTable) {
     if (key && strcmp(s.key, key) == 0) return &s;
@@ -119,6 +122,7 @@ struct RowWidgets {
 
 struct CardWidgets {
   uint8_t viewIndex = 0;
+  char providerKey[16] = {};
   bool compact = false;
   uint8_t layoutRows = 0;
   bool layoutNotice = false;
@@ -211,7 +215,7 @@ static float g_barValue[kBigCards + kCompactCards][aim::kMaxRows];
 static uint32_t g_barColor[kBigCards + kCompactCards][aim::kMaxRows];
 
 static void set_label_cached(lv_obj_t* lbl, char* cache, size_t cap, const char* text) {
-  if (!lbl || strncmp(cache, text, cap) == 0) return;
+  if (!lbl || (strncmp(cache, text, cap) == 0 && strcmp(lv_label_get_text(lbl), cache) == 0)) return;
   const size_t length = std::min(strlen(text), cap - 1);
   memcpy(cache, text, length);
   cache[length] = '\0';
@@ -441,7 +445,15 @@ static void next_page_cb(lv_event_t*) {
 
 static void open_card_cb(lv_event_t* event) {
   const auto* card = static_cast<CardWidgets*>(lv_event_get_user_data(event));
-  if (card) ui_details_show(card->viewIndex);
+  if (!card || !card->providerKey[0]) return;
+  // A configuration frame may arrive between the last draw and release.
+  // Follow the identity the user saw, never a newly rebound numeric slot.
+  const auto snapshot = aim::read();
+  for (size_t i = 0; i < aim::kMaxViews; ++i) {
+    if (snapshot.viewsConfigured && i >= snapshot.viewCount) break;
+    const auto* key = snapshot.viewsConfigured ? snapshot.viewKeys[i] : snapshot.views[i].providerKey;
+    if (strcmp(key, card->providerKey) == 0) { ui_details_show(static_cast<uint8_t>(i)); return; }
+  }
 }
 static void refresh_cb(lv_event_t*) {
   const auto snapshot = aim::read();
@@ -469,13 +481,19 @@ void dashboard_init() {
   lv_obj_set_scrollable(header, false);
   make_line(header, 0, 77, 800, C_LINE);
 
-  hdr.eyebrow = make_label(header, 24, 13, 300, F_EYEBROW, C_EYEBROW, LV_TEXT_ALIGN_LEFT, "AI MONITOR / P4");
+#if defined(AIM_BOARD_WAVESHARE_S3)
+  const char* boardCaption = "AI MONITOR / S3";
+#else
+  const char* boardCaption = "AI MONITOR / P4";
+#endif
+  hdr.eyebrow = make_label(header, 24, 13, 300, F_EYEBROW, C_EYEBROW, LV_TEXT_ALIGN_LEFT, boardCaption);
   lv_obj_set_style_text_letter_space(hdr.eyebrow, 2, 0);
   hdr.title = make_label(header, 24, 31, 306, F_PROVIDER, C_TITLE, LV_TEXT_ALIGN_LEFT, "Usage Dashboard");
   novaButton = lv_btn_create(header); lv_obj_set_pos(novaButton, 344, 14); lv_obj_set_size(novaButton, 104, 48);
   lv_obj_set_style_bg_color(novaButton, lv_color_hex(ui_theme::button), 0);
   lv_obj_set_style_shadow_width(novaButton, 0, 0); lv_obj_set_style_radius(novaButton, 12, 0);
   lv_obj_add_event_cb(novaButton, nova_open_cb, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(novaButton);
   auto* novaCaption = make_label(novaButton, 0, 0, 90, F_META, C_TITLE, LV_TEXT_ALIGN_CENTER, "NOVA"); lv_obj_center(novaCaption);
 
   // live dot + halo + label (SVG: dot center (475,30) r4, halo r8)
@@ -500,6 +518,7 @@ void dashboard_init() {
   lv_obj_set_style_pad_all(setBtn, 0, 0);
   lv_obj_set_style_bg_color(setBtn, lv_color_hex(ui_theme::pressed), LV_STATE_PRESSED);
   lv_obj_add_event_cb(setBtn, settings_open_cb, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(setBtn);
 
   // gear: outline ring + hub + 8 spokes (icon center at (20,20) in the button)
   lv_obj_t* gearRing = make_dot(setBtn, 13, 13, 14, C_SET_BG);
@@ -526,6 +545,7 @@ void dashboard_init() {
   for (auto& card : big) {
     lv_obj_set_clickable(card.card, true);
     lv_obj_add_event_cb(card.card, open_card_cb, LV_EVENT_CLICKED, &card);
+    ui_interaction::keep_target(card.card);
     for (auto& row : card.rows) lv_obj_set_clickable(row.bar, false);
   }
   static const lv_coord_t kX[kCompactCards] = {20, 408, 20, 408};
@@ -534,6 +554,7 @@ void dashboard_init() {
   for (auto& card : compact) {
     lv_obj_set_clickable(card.card, true);
     lv_obj_add_event_cb(card.card, open_card_cb, LV_EVENT_CLICKED, &card);
+    ui_interaction::keep_target(card.card);
     for (auto& row : card.rows) lv_obj_set_clickable(row.bar, false);
   }
 
@@ -557,8 +578,12 @@ void dashboard_init() {
   refreshButton = lv_btn_create(footer);
   lv_obj_set_pos(refreshButton, 336, 2); lv_obj_set_size(refreshButton, 104, 44);
   lv_obj_set_style_bg_color(refreshButton, lv_color_hex(ui_theme::button), 0);
+  lv_obj_set_style_bg_color(refreshButton, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
+  lv_obj_set_style_opa(refreshButton, LV_OPA_50, LV_STATE_DISABLED);
+  lv_obj_set_style_recolor_opa(refreshButton, LV_OPA_TRANSP, LV_STATE_DISABLED);
   lv_obj_set_style_shadow_width(refreshButton, 0, 0); lv_obj_set_style_radius(refreshButton, 8, 0);
   lv_obj_add_event_cb(refreshButton, refresh_cb, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(refreshButton);
   refreshLabel = make_label(refreshButton, 0, 0, 94, &lv_font_montserrat_14, C_TITLE, LV_TEXT_ALIGN_CENTER, "UPDATE");
   lv_obj_center(refreshLabel);
   footServices = make_label(footer, 552, 16, 224, &lv_font_montserrat_14, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
@@ -571,10 +596,14 @@ void dashboard_init() {
   lv_obj_set_style_border_width(pageButton, 1, 0);
   lv_obj_set_style_border_color(pageButton, lv_color_hex(C_SET_BORDER), 0);
   lv_obj_set_style_bg_color(pageButton, lv_color_hex(ui_theme::pressed), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(pageButton, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
+  lv_obj_set_style_opa(pageButton, LV_OPA_50, LV_STATE_DISABLED);
+  lv_obj_set_style_recolor_opa(pageButton, LV_OPA_TRANSP, LV_STATE_DISABLED);
   lv_obj_add_event_cb(pageButton, next_page_cb, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(pageButton);
   pageLabel = make_label(pageButton, 0, 0, 70, F_META, C_TITLE, LV_TEXT_ALIGN_CENTER, "1 / 2 >");
   lv_obj_center(pageLabel);
-  lv_obj_set_hidden(pageButton, true);
+  lv_obj_set_state(pageButton, LV_STATE_DISABLED, true);
 
   for (auto& cache : bigCache) cache = CardCaches{};
   for (auto& cache : compactCache) cache = CardCaches{};
@@ -697,7 +726,8 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
 
   char remBuf[12];
   const bool hasQuota = view && view->hasUsage && view->rowCount > 0;
-  snprintf(remBuf, sizeof(remBuf), "%s", hasQuota ? (view->showsRemaining ? "REMAINING" : "USED") : "");
+  snprintf(remBuf, sizeof(remBuf), "%s", view && view->informational ? "LOCAL" :
+           hasQuota ? (view->showsRemaining ? "REMAINING" : "USED") : "");
   set_label_cached(c.remaining, cache.remaining, sizeof(cache.remaining), remBuf);
 
   for (size_t r = 0; r < aim::kMaxRows; ++r) {
@@ -781,6 +811,11 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
 
 void dashboard_update() {
   if (!dashboard_is_active()) return;  // settings screen visible
+  // Do not move, hide or rebind an active touch target. Release activation
+  // resolves the saved provider identity against the newest snapshot.
+  for (const auto& card : big) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
+  for (const auto& card : compact) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
+  if (lv_obj_has_state(pageButton, LV_STATE_PRESSED)) return;
   const char* name = app_settings::companion_name(app_settings::appearance().companion);
   auto* caption = lv_obj_get_child(novaButton, 0);
   if (strcmp(lv_label_get_text(caption), name) != 0) lv_label_set_text(caption, name);
@@ -798,8 +833,13 @@ void dashboard_update() {
     if (!view.valid && !(snap.viewsConfigured && snap.viewKeys[i][0])) continue;
     ++activeCount;
     if (view.valid && view.fetching && !view.notice) ++fetchingCount;
-    if (snap.hostPresent && view.valid && !view.notice && !view.fetching && view.rowCount &&
-        now - view.quotaReceivedMs < STALE_MS) ++onlineCount;
+    const auto* provider = aim::provider_style(view.providerKey);
+    // Quota and local activity are independent capabilities. A fresh signal
+    // from some other selected AI must not mark a missing bridge healthy.
+    const bool local = view.valid && view.informational && provider &&
+        token_signal_fresh(snap, now) && (snap.tokenSourceMask & provider->activityMask);
+    if (snap.hostPresent && (local || (view.valid && !view.notice && !view.fetching && view.rowCount &&
+        now - view.quotaReceivedMs < STALE_MS))) ++onlineCount;
   }
 
   // ── header: dot + LIVE/STALE/NO HOST + clock ──
@@ -866,8 +906,8 @@ void dashboard_update() {
     currentPage = (currentPage + (now - lastPageMs) / period) % pageCount;
     lastPageMs = now;
   }
-  visible(pageButton, pageCount > 1);
-  if (pageCount > 1) {
+  lv_obj_set_state(pageButton, LV_STATE_DISABLED, pageCount < 2);
+  {
     char text[16];
     snprintf(text, sizeof(text), "%u / %u >", currentPage + 1u, pageCount);
     if (strcmp(lv_label_get_text(pageLabel), text) != 0) lv_label_set_text(pageLabel, text);
@@ -879,7 +919,7 @@ void dashboard_update() {
     for (size_t i = 0; i < kBigCards; ++i) {
       if (i < used) {
         big[i].viewIndex = entries[i].index;
-        lv_obj_set_x(big[i].card, used == 1 ? 214 : static_cast<int32_t>(20 + i * 388));
+        snprintf(big[i].providerKey, sizeof(big[i].providerKey), "%s", entries[i].key[0] ? entries[i].key : entries[i].view->providerKey);
         lv_obj_set_hidden(big[i].card, false);
         render_card(big[i], bigCache[i], entries[i].view, entries[i].key, i, now, snap.hostPresent);
       } else {
@@ -892,6 +932,7 @@ void dashboard_update() {
     for (size_t i = 0; i < kCompactCards; ++i) {
       if (i < onPage) {
         compact[i].viewIndex = entries[start + i].index;
+        snprintf(compact[i].providerKey, sizeof(compact[i].providerKey), "%s", entries[start + i].key[0] ? entries[start + i].key : entries[start + i].view->providerKey);
         lv_obj_set_hidden(compact[i].card, false);
         render_card(compact[i], compactCache[i], entries[start + i].view, entries[start + i].key, kBigCards + i, now, snap.hostPresent);
       } else {
@@ -933,13 +974,7 @@ void dashboard_update() {
   else snprintf(syncBuf, sizeof(syncBuf), "Updated %lu h ago", (unsigned long)(age / 3600));
   set_label_cached(footSync, footSyncCache, sizeof(footSyncCache), syncBuf);
   char servicesBuf[24];
-  size_t online = 0;
-  for (size_t i = 0; i < used; ++i) {
-    const aim::ViewData& view = *entries[i].view;
-    if (snap.hostPresent && view.valid && !view.notice && !view.fetching && view.rowCount > 0 &&
-        now - view.quotaReceivedMs < STALE_MS) online++;
-  }
-  snprintf(servicesBuf, sizeof(servicesBuf), "%lu / %lu services online", (unsigned long)online, (unsigned long)used);
+  snprintf(servicesBuf, sizeof(servicesBuf), "%lu / %lu services online", (unsigned long)onlineCount, (unsigned long)used);
   set_label_cached(footServices, footServicesCache, sizeof(footServicesCache), servicesBuf);
 
 }

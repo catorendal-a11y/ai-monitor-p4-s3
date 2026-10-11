@@ -12,6 +12,8 @@
 #include "ai_monitor/ai_monitor.h"
 #include "ui/nova_assets.h"
 #include "ui/quota_window.h"
+#include "ui/usage_format.h"
+#include "ui/interaction.h"
 
 static lv_obj_t* settingsScreen = nullptr;
 static lv_obj_t* dashScreen = nullptr;
@@ -29,6 +31,7 @@ static lv_obj_t* presetButtons[4] = {};
 static lv_obj_t* presetLabels[4] = {};
 static lv_obj_t* previewButton = nullptr;
 static lv_obj_t *alertsButton = nullptr, *alertsOverlay = nullptr, *warningSlider = nullptr, *warningValue = nullptr;
+static lv_obj_t *warningPrev = nullptr, *warningNext = nullptr, *warningInherit = nullptr;
 static lv_obj_t *nightButton = nullptr, *nightOverlay = nullptr, *nightToggleLabel = nullptr, *nightValue = nullptr;
 static lv_obj_t *nightTimeValues[4] = {}, *nightTimeButtons[8] = {}, *nightSlider = nullptr;
 static app_settings::NightSettings nightDraft;
@@ -46,6 +49,13 @@ static const uint8_t kDimChoices[] = {0, 1, 5, 10};
 static const char* kDimNames[] = {"OFF", "1 MIN", "5 MIN", "10 MIN"};
 static const uint8_t kBrightnessPresets[] = {25, 50, 75, 100};
 static uint8_t lastDimChoice = 255, lastPresetValue = 255;
+static uint8_t brightnessBeforeDrag = 0;
+static bool brightnessDragging = false;
+
+static void close_overlays() {
+  for (auto* overlay : {alertsOverlay, nightOverlay, appearanceOverlay, quotaOverlay})
+    if (overlay) lv_obj_set_hidden(overlay, true);
+}
 
 static void style_button(lv_obj_t* button, bool selected) {
   lv_obj_set_style_bg_color(button, lv_color_hex(selected ? ui_theme::accent : ui_theme::button), 0);
@@ -56,6 +66,9 @@ static void style_button(lv_obj_t* button, bool selected) {
   lv_obj_set_style_shadow_width(button, 0, 0);
   lv_obj_set_style_pad_all(button, 0, 0);
   lv_obj_set_style_bg_color(button, lv_color_hex(ui_theme::pressed), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(button, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
+  lv_obj_set_style_opa(button, LV_OPA_50, LV_STATE_DISABLED);
+  lv_obj_set_style_recolor_opa(button, LV_OPA_TRANSP, LV_STATE_DISABLED);
   lv_obj_set_style_border_color(button, lv_color_hex(ui_theme::accent), LV_STATE_PRESSED);
 }
 
@@ -104,8 +117,18 @@ static void refresh_choices() {
 }
 
 static void brightness_slider_cb(lv_event_t* event) {
+  if (lv_event_get_code(event) == LV_EVENT_PRESSED) {
+    brightnessBeforeDrag = display_get_brightness(); brightnessDragging = true; return;
+  }
+  if (lv_event_get_code(event) == LV_EVENT_PRESS_LOST) {
+    if (brightnessDragging) display_apply_brightness(brightnessBeforeDrag, false);
+    brightnessDragging = false;
+    lv_slider_set_value(brightnessSlider, brightness_percent(display_get_brightness()), LV_ANIM_OFF);
+    refresh_brightness(); return;
+  }
   const uint8_t percent = static_cast<uint8_t>(lv_slider_get_value(brightnessSlider));
   display_apply_brightness(brightness_raw(percent), lv_event_get_code(event) == LV_EVENT_RELEASED);
+  if (lv_event_get_code(event) == LV_EVENT_RELEASED) brightnessDragging = false;
   refresh_brightness();
 }
 
@@ -133,6 +156,7 @@ static lv_obj_t* make_button(lv_obj_t* parent, int x, int y, int width, const ch
   lv_obj_set_size(button, width, 48);
   style_button(button, false);
   lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, data);
+  ui_interaction::keep_target(button);
   auto* label = make_label(button, 0, 0, width - 8, text, &lv_font_montserrat_16, ui_theme::text, LV_TEXT_ALIGN_CENTER);
   lv_obj_center(label);
   if (labelOut) *labelOut = label;
@@ -165,7 +189,7 @@ static void theme_select(lv_event_t* event) {
   app_settings::set_appearance(look); ui_theme::apply(look.theme); refresh_appearance();
   lastDimChoice = lastPresetValue = 255; refresh_choices();
 }
-static void open_appearance(lv_event_t*) { refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
+static void open_appearance(lv_event_t*) { close_overlays(); refresh_appearance(); lv_obj_move_foreground(appearanceOverlay); lv_obj_set_hidden(appearanceOverlay, false); }
 static void close_appearance(lv_event_t*) { lv_obj_set_hidden(appearanceOverlay, true); }
 
 static void quota_text(lv_obj_t* label, const char* value) {
@@ -226,10 +250,11 @@ static void refresh_quota_choices() {
   for (size_t i = 0; i < 4; ++i) {
     lv_obj_set_hidden(quotaButtons[i], i > quotaChoiceCount);
     if (i > quotaChoiceCount) continue;
-    const bool selected = selectedChoice == static_cast<int>(i);
+    lv_obj_set_state(quotaButtons[i], LV_STATE_DISABLED, quotaChoiceCount == 0);
+    const bool selected = quotaChoiceCount && selectedChoice == static_cast<int>(i);
     style_button(quotaButtons[i], selected);
     lv_obj_set_style_text_color(quotaCaptions[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
-    char text[96] = "AUTO / MOST URGENT";
+    char text[96]; snprintf(text, sizeof(text), "%s", quotaChoiceCount ? "AUTO / MOST URGENT" : "ACTIVITY ONLY");
     const auto* row = view && !view->informational ? nova_quota_row(*view, provider, i ? quotaChoices[i - 1] : app_settings::NovaWindow{}) : nullptr;
     if (i) {
       const auto& option = quotaChoices[i - 1];
@@ -245,8 +270,10 @@ static void refresh_quota_choices() {
       const float remaining = view->showsRemaining ? row->usedPercent : 100.0f - row->usedPercent;
       const char* state = !snapshot.hostPresent ? "OFFLINE" : view->notice ? "ERROR" : view->fetching ? "UPDATING" :
           millis() - view->quotaReceivedMs >= 300000u ? "STALE" : "REPORTED";
-      snprintf(text, sizeof(text), "%.0f%% left / %s", static_cast<double>(remaining), state);
-    } else snprintf(text, sizeof(text), "%s", i ? "NOT REPORTED / can select" : "Lowest remaining quota");
+      char percent[16]; format_percent(remaining, true, percent, sizeof(percent));
+      snprintf(text, sizeof(text), "%s left / %s", percent, state);
+    } else snprintf(text, sizeof(text), "%s", i ? "NOT REPORTED / can select" :
+                    quotaChoiceCount ? "Lowest remaining quota" : "No account quota available");
     quota_text(quotaDetails[i], text);
     lv_obj_set_style_text_color(quotaDetails[i], lv_color_hex(selected ? ui_theme::background : ui_theme::muted), 0);
   }
@@ -314,6 +341,7 @@ static void quota_provider_cb(lv_event_t* event) {
 }
 static void close_quota(lv_event_t*) { lv_obj_set_hidden(quotaOverlay, true); }
 static void open_quota(lv_event_t*) {
+  close_overlays();
   quotaProviderCount = 0; quotaProviderIndex = 0;
   const auto snapshot = aim::read();
   for (size_t v = 0; v < aim::kMaxViews; ++v) {
@@ -335,11 +363,13 @@ static void refresh_quota(lv_event_t*) {
   for (size_t i = 0; i < quotaProviderCount; ++i) if (strcmp(quotaProviders[i], previous) == 0) {
     quotaProviderIndex = static_cast<uint8_t>(i); load_quota_choices(); break;
   }
-  aim::request_refresh();
+  const auto snapshot = aim::read();
+  if (snapshot.hostPresent && snapshot.manualRefreshSupported && !refresh_busy(snapshot.refreshState)) aim::request_refresh();
 }
 
 static void refresh_warning_target();
 static void warning_slider_cb(lv_event_t* event) {
+  if (lv_event_get_code(event) == LV_EVENT_PRESS_LOST) { refresh_warning_target(); return; }
   const uint8_t value = static_cast<uint8_t>(lv_slider_get_value(warningSlider));
   char text[96];
   snprintf(text, sizeof(text), "Low quota <= %u %% remaining / Critical <= %u %%", value, value < 10 ? value : 10);
@@ -353,6 +383,9 @@ static void warning_slider_cb(lv_event_t* event) {
 }
 static void close_alerts(lv_event_t*) { lv_obj_set_hidden(alertsOverlay, true); }
 static void refresh_warning_target() {
+  lv_obj_set_state(warningPrev, LV_STATE_DISABLED, alertTargetCount < 2);
+  lv_obj_set_state(warningNext, LV_STATE_DISABLED, alertTargetCount < 2);
+  lv_obj_set_state(warningInherit, LV_STATE_DISABLED, alertTargetIndex == 0);
   const auto& target = alertTargets[alertTargetIndex];
   const uint8_t percent = alertTargetIndex ? app_settings::warning_for(target.provider, target.title, target.window) : app_settings::warning_percent();
   lv_slider_set_value(warningSlider, percent, LV_ANIM_OFF);
@@ -376,6 +409,7 @@ static void inherit_warning(lv_event_t*) {
   }
 }
 static void open_alerts(lv_event_t*) {
+  close_overlays();
   alertTargetCount = 1; alertTargetIndex = 0;
   const auto snapshot = aim::read();
   for (size_t v = 0; v < aim::kMaxViews; ++v) {
@@ -395,7 +429,7 @@ static void open_alerts(lv_event_t*) {
     }
   }
   refresh_warning_target();
-  lv_obj_set_hidden(alertsOverlay, false);
+  lv_obj_move_foreground(alertsOverlay); lv_obj_set_hidden(alertsOverlay, false);
 }
 
 static void refresh_night_controls() {
@@ -416,6 +450,9 @@ static void night_toggle_cb(lv_event_t*) {
   app_settings::set_night(nightDraft); refresh_night_controls();
 }
 static void night_time_cb(lv_event_t* event) {
+  if (lv_event_get_code(event) == LV_EVENT_PRESS_LOST) {
+    nightDraft = app_settings::night(); refresh_night_controls(); return;
+  }
   if (lv_event_get_code(event) == LV_EVENT_RELEASED) {
     app_settings::set_night(nightDraft); return;
   }
@@ -429,6 +466,10 @@ static void night_time_cb(lv_event_t* event) {
   refresh_night_controls();
 }
 static void night_slider_cb(lv_event_t* event) {
+  if (lv_event_get_code(event) == LV_EVENT_PRESS_LOST) {
+    nightDraft = app_settings::night(); lv_slider_set_value(nightSlider, nightDraft.percent, LV_ANIM_OFF);
+    refresh_night_controls(); return;
+  }
   char text[96];
   const uint8_t percent = lv_slider_get_value(nightSlider);
   snprintf(text, sizeof(text), "Night brightness: %u %% / Saved on release", percent);
@@ -440,10 +481,11 @@ static void night_slider_cb(lv_event_t* event) {
 }
 static void close_night(lv_event_t*) { lv_obj_set_hidden(nightOverlay, true); }
 static void open_night(lv_event_t*) {
+  close_overlays();
   nightDraft = app_settings::night();
   refresh_night_controls();
   lv_slider_set_value(nightSlider, app_settings::night().percent, LV_ANIM_OFF);
-  lv_obj_set_hidden(nightOverlay, false);
+  lv_obj_move_foreground(nightOverlay); lv_obj_set_hidden(nightOverlay, false);
 }
 
 void ui_settings_init() {
@@ -494,6 +536,8 @@ void ui_settings_init() {
   lv_obj_set_style_radius(brightnessSlider, 12, LV_PART_KNOB);
   lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_RELEASED, nullptr);
+  lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_PRESSED, nullptr);
+  lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_PRESS_LOST, nullptr);
 
   for (size_t i = 0; i < 4; ++i) {
     char text[12];
@@ -530,8 +574,8 @@ void ui_settings_init() {
   lv_obj_set_style_border_color(alertCard, lv_color_hex(ui_theme::border), 0);
   lv_obj_set_style_pad_all(alertCard, 0, 0); lv_obj_set_scrollable(alertCard, false);
   make_label(alertCard, 24, 20, 700, "Quota warning threshold", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
-  make_button(alertCard, 24, 72, 96, "< PREV", change_warning_target, reinterpret_cast<void*>(-1));
-  make_button(alertCard, 632, 72, 96, "NEXT >", change_warning_target, reinterpret_cast<void*>(1));
+  warningPrev = make_button(alertCard, 24, 72, 96, "< PREV", change_warning_target, reinterpret_cast<void*>(-1));
+  warningNext = make_button(alertCard, 632, 72, 96, "NEXT >", change_warning_target, reinterpret_cast<void*>(1));
   warningTargetLabel = make_label(alertCard, 132, 84, 484, "", &lv_font_montserrat_14, ui_theme::text, LV_TEXT_ALIGN_CENTER);
   warningValue = make_label(alertCard, 24, 142, 700, "", &lv_font_montserrat_16, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   warningSlider = lv_slider_create(alertCard);
@@ -541,9 +585,10 @@ void ui_settings_init() {
   lv_obj_set_style_bg_color(warningSlider, lv_color_hex(ui_theme::accent), LV_PART_KNOB);
   lv_obj_add_event_cb(warningSlider, warning_slider_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(warningSlider, warning_slider_cb, LV_EVENT_RELEASED, nullptr);
+  lv_obj_add_event_cb(warningSlider, warning_slider_cb, LV_EVENT_PRESS_LOST, nullptr);
   make_label(alertCard, 24, 244, 700, "5-50 %. Release to save. INHERIT restores the global default.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_button(alertCard, 24, 278, 176, "INHERIT", inherit_warning, nullptr);
-  make_button(alertCard, 552, 278, 176, "DONE", close_alerts, nullptr);
+  warningInherit = make_button(alertCard, 24, 278, 176, "INHERIT", inherit_warning, nullptr);
+  make_button(alertsOverlay, 616, 406, 136, "DONE", close_alerts, nullptr);
   lv_obj_set_hidden(alertsOverlay, true);
   nightOverlay = lv_obj_create(lv_layer_top());
   lv_obj_set_pos(nightOverlay, 0, 0); lv_obj_set_size(nightOverlay, 800, 480);
@@ -567,9 +612,9 @@ void ui_settings_init() {
       const size_t index = i * 2 + control;
       auto* timeButton = make_button(nightCard, x + control * 86, 134, 72, control ? "+" : "-", night_time_cb, reinterpret_cast<void*>(index));
       nightTimeButtons[index] = timeButton;
-      lv_obj_set_height(timeButton, 44);
+      lv_obj_set_height(timeButton, 48);
       lv_obj_remove_event_cb(timeButton, night_time_cb);
-      for (auto code : {LV_EVENT_SHORT_CLICKED, LV_EVENT_LONG_PRESSED, LV_EVENT_LONG_PRESSED_REPEAT, LV_EVENT_RELEASED})
+      for (auto code : {LV_EVENT_SHORT_CLICKED, LV_EVENT_LONG_PRESSED, LV_EVENT_LONG_PRESSED_REPEAT, LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST})
         lv_obj_add_event_cb(timeButton, night_time_cb, code, reinterpret_cast<void*>(index));
     }
   }
@@ -581,8 +626,9 @@ void ui_settings_init() {
   lv_obj_set_style_bg_color(nightSlider, lv_color_hex(ui_theme::accent), LV_PART_KNOB);
   lv_obj_add_event_cb(nightSlider, night_slider_cb, LV_EVENT_VALUE_CHANGED, nullptr);
   lv_obj_add_event_cb(nightSlider, night_slider_cb, LV_EVENT_RELEASED, nullptr);
+  lv_obj_add_event_cb(nightSlider, night_slider_cb, LV_EVENT_PRESS_LOST, nullptr);
   make_wrap_label(nightCard, 24, 286, 480, "HH / MM: tap or hold +/- to adjust.\nTouch restores daytime level for 60 seconds.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_button(nightCard, 552, 284, 176, "DONE", close_night, nullptr);
+  make_button(nightOverlay, 616, 406, 136, "DONE", close_night, nullptr);
   lv_obj_set_hidden(nightOverlay, true);
   appearanceOverlay = lv_obj_create(lv_layer_top());
   lv_obj_set_size(appearanceOverlay, 800, 480); lv_obj_set_pos(appearanceOverlay, 0, 0);
@@ -603,7 +649,7 @@ void ui_settings_init() {
       app_settings::theme_name(static_cast<app_settings::Theme>(i)), theme_select, reinterpret_cast<void*>(i), &themeCaptions[i]);
   make_label(appearanceCard, 24, 260, 700, "Changes apply now and are saved on this display.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_label(appearanceCard, 24, 286, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_button(appearanceCard, 552, 312, 176, "DONE", close_appearance, nullptr);
+  make_button(appearanceOverlay, 616, 406, 136, "DONE", close_appearance, nullptr);
   lv_obj_set_hidden(appearanceOverlay, true);
   quotaOverlay = lv_obj_create(lv_layer_top());
   lv_obj_set_size(quotaOverlay, 800, 480); lv_obj_set_pos(quotaOverlay, 0, 0);
@@ -631,11 +677,13 @@ void ui_settings_init() {
     quotaDetails[i] = make_label(quotaButtons[i], 4, 36, 336, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
   }
   quotaSelectionLabel = make_label(quotaCard, 24, 314, 704, "", &lv_font_montserrat_18, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  lv_label_set_long_mode(quotaSelectionLabel, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_height(quotaSelectionLabel, 24);
   quotaSetupHelp = make_wrap_label(quotaCard, 24, 340, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_wrap_label(quotaCard, 24, 386, 400, "NOVA + ORBIT show quota remaining.\nAlerts still check every window.",
                   &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_button(quotaCard, 440, 382, 136, "REFRESH", refresh_quota, nullptr);
-  make_button(quotaCard, 592, 382, 136, "DONE", close_quota, nullptr);
+  make_button(quotaOverlay, 464, 406, 136, "REFRESH", refresh_quota, nullptr);
+  make_button(quotaOverlay, 616, 406, 136, "DONE", close_quota, nullptr);
   lv_obj_set_hidden(quotaOverlay, true);
   ui_theme::watch(settingsScreen); refresh_appearance();
   saveFeedback = make_label(lv_layer_top(), 590, 406, 186, "", &lv_font_montserrat_12, ui_theme::accent, LV_TEXT_ALIGN_LEFT);

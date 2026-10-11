@@ -16,6 +16,19 @@ from telemetry_bridge import ingest, read_counters, claude_statusline, read_clau
 
 
 class SelectionTests(unittest.TestCase):
+    def test_deep_local_json_does_not_break_other_selected_activity_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            nested = '['*20000 + '0' + ']'*20000
+            claude = root/'.claude/projects/p/session.jsonl'; claude.parent.mkdir(parents=True)
+            claude.write_text(nested+'\n', encoding='utf-8')
+            gemini = root/'.gemini/tmp/p/chats/session-test.json'; gemini.parent.mkdir(parents=True)
+            gemini.write_text(json.dumps({'messages':[{'type':'gemini','id':'synthetic','tokens':{'total':20}}]}))
+            reporter = TokenReporter(home=root, providers=['claude','gemini'])
+            self.assertTrue(reporter.poll()['sources'] & 8)
+            gemini.write_text('{"messages":'+nested+'}', encoding='utf-8')
+            reporter.last_poll = None
+            self.assertEqual(reporter.poll()['delta'], 0)
     def test_first_run_has_no_ai_default_and_host_cannot_start(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); (root / 'tools').mkdir()

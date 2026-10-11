@@ -12,6 +12,7 @@ inline constexpr Palette palettes[] = {
   {0x1D1311,0x231815,0x2A1D19,0x4B3730,0xFFF0E5,0xCCB7A8,0xFFB96A,0x402B23,0x614638}
 };
 inline Palette current = palettes[0];
+inline app_settings::Theme selectedTheme = app_settings::Theme::forest;
 inline uint32_t& background = current.background;
 inline uint32_t& header = current.header;
 inline uint32_t& surface = current.surface;
@@ -22,11 +23,13 @@ inline uint32_t& accent = current.accent;
 inline uint32_t& button = current.button;
 inline uint32_t& pressed = current.pressed;
 inline lv_obj_t* roots[4] = {};
+inline uint32_t revision = 0;
 inline void watch(lv_obj_t* screen) {
   for (auto*& root : roots) { if (root == screen) return; if (!root) { root = screen; return; } }
 }
 inline void load(app_settings::Theme theme) {
-  current = palettes[static_cast<uint8_t>(app_settings::normalize_appearance({app_settings::Companion::nova, theme}).theme)];
+  selectedTheme = app_settings::normalize_appearance({app_settings::Companion::nova, theme}).theme;
+  current = palettes[static_cast<uint8_t>(selectedTheme)];
 }
 inline void recolor(lv_obj_t* object, const Palette& before, const Palette& after) {
   const uint32_t oldColors[] = {before.background,before.header,before.surface,before.border,before.text,before.muted,before.accent,before.button,before.pressed};
@@ -47,6 +50,7 @@ inline void recolor(lv_obj_t* object, const Palette& before, const Palette& afte
 }
 inline void apply(app_settings::Theme theme) {
   const auto previous = current; load(theme);
+  ++revision;
   for (auto* root : roots) if (root) recolor(root,previous,current);
   recolor(lv_layer_top(),previous,current);
   lv_obj_invalidate(lv_screen_active());

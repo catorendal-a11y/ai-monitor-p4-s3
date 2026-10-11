@@ -13,6 +13,12 @@ from project_version import HOST_VERSION
 
 
 class PackageAtomicityTests(unittest.TestCase):
+    def test_reusing_executables_without_source_provenance_is_refused(self):
+        with patch.object(build.sys, 'argv', ['build', '--firmware-dir', 'synthetic', '--executables-dir', 'old']), \
+                patch.object(build, 'build_package') as package:
+            with self.assertRaises(SystemExit) as error: build.main()
+        self.assertEqual(error.exception.code, 2)
+        package.assert_not_called()
     def test_failed_zip_write_preserves_existing_archive_and_removes_partial(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); package = root/'synthetic-package'; package.mkdir()

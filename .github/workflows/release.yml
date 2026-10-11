@@ -158,11 +158,33 @@ jobs:
     permissions:
       actions: read
       contents: write
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-package
           path: work/publish
+      - name: Verify downloaded artifacts before attesting
+        shell: pwsh
+        run: |
+          $taskFolder = 'work/publish/work/windows-release'
+          $taskArchive = Get-ChildItem $taskFolder -Filter '*.zip' | Select-Object -First 1
+          $taskInstaller = Get-ChildItem $taskFolder -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
+          if (-not $taskArchive -or -not $taskInstaller) { throw 'Release artifacts missing.' }
+          $taskExpected = @(
+            (Get-FileHash -LiteralPath $taskArchive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $taskArchive.Name
+            (Get-FileHash -LiteralPath $taskInstaller.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $taskInstaller.Name
+          )
+          $taskRecorded = @(Get-Content -LiteralPath (Join-Path $taskFolder 'SHA256SUMS.txt') -Encoding utf8)
+          if ($taskRecorded.Count -ne 2 -or $taskRecorded[0] -cne $taskExpected[0] -or $taskRecorded[1] -cne $taskExpected[1]) { throw 'Release artifact checksum mismatch.' }
+      - name: Attest verified release artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            work/publish/work/windows-release/*.zip
+            work/publish/work/windows-release/AI-Monitor-Setup-*.exe
+            work/publish/work/windows-release/SHA256SUMS.txt
       - name: Create reviewed draft release
         env:
           GH_TOKEN: ${{ github.token }}

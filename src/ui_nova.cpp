@@ -11,6 +11,7 @@
 #include "ui/quota_alert.h"
 #include "ui/quota_window.h"
 #include "ui/theme.h"
+#include "ui/interaction.h"
 #include "ui_settings.h"
 #include "ui_usage_details.h"
 
@@ -23,6 +24,7 @@ static lv_obj_t *updateButton = nullptr, *updateLabel = nullptr, *nextButton = n
 struct ProviderCard {
   lv_obj_t *card = nullptr, *icon = nullptr, *logoBox = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
   uint8_t view = 0;
+  char providerKey[16] = {};
   uint32_t color = UINT32_MAX;
   const lv_image_dsc_t* logo = nullptr;
 };
@@ -49,10 +51,15 @@ static lv_obj_t* button(lv_obj_t* parent, int x, int y, int width, const char* v
   auto* object = lv_btn_create(parent); lv_obj_set_pos(object, x, y); lv_obj_set_size(object, width, 48);
   lv_obj_set_style_bg_color(object, lv_color_hex(ui_theme::button), 0);
   lv_obj_set_style_bg_color(object, lv_color_hex(ui_theme::pressed), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(object, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
+  lv_obj_set_style_opa(object, LV_OPA_50, LV_STATE_DISABLED);
+  lv_obj_set_style_recolor_opa(object, LV_OPA_TRANSP, LV_STATE_DISABLED);
   lv_obj_set_style_radius(object, 12, 0); lv_obj_set_style_shadow_width(object, 0, 0);
+  lv_obj_set_style_pad_all(object, 0, 0);
   auto* textLabel = label(object, 0, 0, width - 12, value, &lv_font_montserrat_16);
   lv_obj_set_style_text_align(textLabel, LV_TEXT_ALIGN_CENTER, 0); lv_obj_center(textLabel);
   lv_obj_add_event_cb(object, callback, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(object);
   if (caption) *caption = textLabel;
   return object;
 }
@@ -66,7 +73,13 @@ static void request_update(lv_event_t*) {
 static void next_page(lv_event_t*) { page = (page + 1) % pageCount; ui_nova_update(); }
 static void details(lv_event_t* event) {
   auto* card = static_cast<ProviderCard*>(lv_event_get_user_data(event));
-  ui_details_show(card->view);
+  if (!card) return;
+  const auto snapshot = aim::read();
+  for (size_t i = 0; i < aim::kMaxViews; ++i) {
+    if (snapshot.viewsConfigured && i >= snapshot.viewCount) break;
+    const char* key = snapshot.viewsConfigured ? snapshot.viewKeys[i] : snapshot.views[i].providerKey;
+    if (card->providerKey[0] && strcmp(key, card->providerKey) == 0) { ui_details_show(static_cast<uint8_t>(i)); return; }
+  }
 }
 }
 
@@ -85,7 +98,7 @@ void init() {
   label(header, 24, 12, 400, "AI MONITOR / COMPANION", &lv_font_montserrat_12, ui_theme::muted);
   companionLabel = label(header, 24, 34, 360, "NOVA", &lv_font_montserrat_26);
   clock = label(header, 574, 28, 92, "--:--", &lv_font_montserrat_26);
-  button(header, 688, 14, 88, "SET", show_settings);
+  button(header, 672, 14, 104, "SET", show_settings);
   stage = lv_obj_create(screen); lv_obj_set_pos(stage, 20, 90); lv_obj_set_size(stage, 350, 315);
   lv_obj_set_style_bg_color(stage, lv_color_hex(ui_theme::surface), 0);
   lv_obj_set_style_border_color(stage, lv_color_hex(ui_theme::border), 0);
@@ -93,6 +106,7 @@ void init() {
   lv_obj_set_style_radius(stage, 22, 0); lv_obj_set_scrollable(stage, false);
   lv_obj_set_style_clip_corner(stage, true, 0);
   lv_obj_add_event_cb(stage, say_hi, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(stage);
   figure = lv_image_create(stage); lv_obj_set_clickable(figure, false);
   // Keep the robot at its original size; trim only transparent canvas margins.
   lv_obj_set_x(figure, -40);
@@ -110,6 +124,7 @@ void init() {
     lv_obj_set_style_border_width(item.card, 0, 0); lv_obj_set_style_pad_all(item.card, 0, 0);
     lv_obj_set_scrollable(item.card, false);
     lv_obj_add_event_cb(item.card, details, LV_EVENT_CLICKED, &item);
+    ui_interaction::keep_target(item.card);
     auto* logoBox = lv_obj_create(item.card); lv_obj_set_pos(logoBox, 4, 14); lv_obj_set_size(logoBox, 48, 48);
     item.logoBox = logoBox;
     lv_obj_set_style_bg_color(logoBox, lv_color_hex(0x0A1114), 0);
@@ -159,7 +174,7 @@ void update() {
     case NovaMood::critical: heading = "Low energy"; message = "A quota window is critical"; pose = &nova_assets::critical; break;
     case NovaMood::resting: heading = "Resting"; message = "No recent token use"; pose = &nova_assets::sleep; break;
     case NovaMood::offline: heading = "Waiting"; message = "Start the PC host"; pose = &nova_assets::sleep; break;
-    case NovaMood::waiting: heading = "Waiting"; message = "No fresh quota yet"; pose = &nova_assets::sleep; break;
+    case NovaMood::waiting: heading = "Waiting"; message = "No fresh provider data"; pose = &nova_assets::sleep; break;
     case NovaMood::issue: heading = "Needs attention"; message = "Tap a provider for details"; pose = &nova_assets::low; break;
     case NovaMood::greeting: heading = "Hi there!"; message = "Ready when you are"; pose = &nova_assets::done; break;
     case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
@@ -182,10 +197,13 @@ void update() {
   else snprintf(value, sizeof(value), "--:--");
   text(clock, value);
   const char* refresh = refresh_hint(snapshot, now);
-  text(link, refresh[0] ? refresh : "USB CONNECTED");
+  text(link, !snapshot.hostPresent ? "Waiting for PC host" : (refresh[0] ? refresh : "USB CONNECTED"));
   const bool busy = refresh_busy(snapshot.refreshState);
   lv_obj_set_state(updateButton, LV_STATE_DISABLED, busy || !snapshot.hostPresent || !snapshot.manualRefreshSupported);
   text(updateLabel, busy ? "UPDATING..." : "UPDATE ALL");
+  // Keep pair selection and visible provider targets stable until release.
+  for (const auto& item : providers) if (lv_obj_has_state(item.card, LV_STATE_PRESSED)) return;
+  if (lv_obj_has_state(nextButton, LV_STATE_PRESSED)) return;
   uint8_t indices[aim::kMaxViews]; size_t count = 0;
   for (size_t v = 0; v < aim::kMaxViews; ++v) {
     if (snapshot.viewsConfigured && v >= snapshot.viewCount) continue;
@@ -194,7 +212,7 @@ void update() {
   pageCount = static_cast<uint8_t>(count ? (count + 1) / 2 : 1);
   if (lastRevision != snapshot.viewRevision) { lastRevision = snapshot.viewRevision; page = snapshot.activeView / 2 % pageCount; }
   page %= pageCount;
-  lv_obj_set_hidden(nextButton, pageCount < 2);
+  lv_obj_set_state(nextButton, LV_STATE_DISABLED, pageCount < 2);
   if (pageCount > 1) snprintf(value, sizeof(value), "Providers / %u of %u", page + 1, pageCount);
   else snprintf(value, sizeof(value), "Tap a provider for all windows");
   text(pageLabel, value);
@@ -204,15 +222,12 @@ void update() {
     if (index >= count) continue;
     item.view = indices[index]; const auto& view = snapshot.views[item.view];
     const char* key = view.valid ? view.providerKey : snapshot.viewKeys[item.view];
+    snprintf(item.providerKey, sizeof(item.providerKey), "%s", key);
     const auto* style = aim::provider_style(key);
     const auto* brand = nova_assets::logo_for(key, 48);
     if (brand != item.logo) { item.logo = brand; if (brand) lv_image_set_src(item.icon, brand); }
     lv_obj_set_hidden(item.icon, !brand);
     lv_obj_set_hidden(item.logoBox, !brand);
-    lv_obj_set_x(item.name, brand ? 62 : 8);
-    lv_obj_set_width(item.name, brand ? 146 : 200);
-    lv_obj_set_x(item.bar, brand ? 62 : 8); lv_obj_set_width(item.bar, brand ? 320 : 374);
-    lv_obj_set_x(item.status, brand ? 62 : 8); lv_obj_set_width(item.status, brand ? 320 : 374);
     text(item.name, style ? style->label : key);
     const auto choice = app_settings::nova_window(key);
     const auto* selectedRow = nova_quota_row(view, key, choice);

@@ -47,7 +47,7 @@ class CodexOnboardingTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs['stdout'],support.subprocess.DEVNULL)
 
     def test_missing_client_install_then_official_sign_in_without_accepting_a_key(self):
-        replies=iter(['','']); output=io.StringIO()
+        replies=iter(['y','y']); output=io.StringIO()
         with patch.object(support,'codex_command',side_effect=[None,['official-cli']]), \
                 patch.object(support.subprocess,'run',side_effect=[Mock(returncode=0),Mock(returncode=1),Mock(returncode=0)]) as run, \
                 contextlib.redirect_stdout(output):
@@ -62,6 +62,18 @@ class CodexOnboardingTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertFalse(support.setup_codex(lambda _: 'n'))
         run.assert_not_called()
+
+    def test_enter_does_not_accept_install_or_sign_in(self):
+        with patch.object(support, 'codex_command', return_value=None), \
+                patch.object(support.subprocess, 'run') as run, contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(support.setup_codex(lambda _: ''))
+        run.assert_not_called()
+        with patch.object(support, 'codex_command', return_value=['official-cli']), \
+                patch.object(support.subprocess, 'run', return_value=Mock(returncode=1)) as run, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(support.setup_codex(lambda _: ''))
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.args[0], ['official-cli', 'login', 'status'])
 
     def test_unselected_codex_is_not_prepared_and_existing_key_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -126,12 +138,22 @@ class CodexOnboardingTests(unittest.TestCase):
         legacy.assert_not_called()
 
     def test_cli_error_text_is_not_exposed_and_invalid_percent_is_not_clamped_into_quota(self):
-        for result in [RuntimeError('private server detail'), {'rateLimits':{'primary':{'usedPercent':200}}}]:
+        for result in [RuntimeError('private server detail'), {'rateLimits':{'primary':{'usedPercent':float('nan')}}}]:
             with patch.object(host,'codex_command',return_value=['official-cli']), \
                     patch.object(host,'read_rate_limits',side_effect=result if isinstance(result,Exception) else None,
                                  return_value=result if not isinstance(result,Exception) else None):
                 rows,notice=host.fetch_codex()
             self.assertIsNone(rows); self.assertNotIn('private server detail',notice)
+
+    def test_over_quota_codex_percentage_reports_zero_remaining_without_setup_error(self):
+        result = {'rateLimits':{'primary':{'usedPercent':200,'windowDurationMins':300}}}
+        with patch.object(host, 'codex_command', return_value=['official-cli']), \
+                patch.object(host, 'read_rate_limits', return_value=result):
+            rows, notice = host.fetch_codex()
+        self.assertIsNone(notice)
+        self.assertEqual(rows[0]['usedPercent'], 100)
+        data = json.loads(host.frame_payload('codex', 0, rows))
+        self.assertEqual(data['data'][0]['usage']['rows'][0]['usedPercent'], 0)
 
 
 if __name__ == '__main__': unittest.main()

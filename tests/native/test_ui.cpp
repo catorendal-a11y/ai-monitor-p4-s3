@@ -7,12 +7,14 @@
 #include <iostream>
 #include <string>
 #include <map>
+#include <vector>
 #include <lvgl.h>
 #include "ai_monitor/ai_monitor.h"
 #include "ui/backlight.h"
 #include "ui/idle_dim.h"
 #include "app_settings.h"
 #include "ui/visual_dimmer.h"
+#include "ui/touch_input.h"
 
 static uint32_t fakeTick = 1000;
 static aim::Snapshot sample{};
@@ -92,9 +94,13 @@ static void flush(lv_display_t* display, const lv_area_t* area, uint8_t* pixels)
 
 static lv_point_t touchPoint = {500, 250};
 static bool touchPressed = false;
-static void read_touch(lv_indev_t*, lv_indev_data_t* data) {
+static bool touchFailed = false;
+static TouchInputGuard testTouchGuard;
+static void read_touch(lv_indev_t* input, lv_indev_data_t* data) {
+  if (touchFailed) { testTouchGuard.failed(input, data); return; }
   data->point = touchPoint;
   data->state = touchPressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+  if (!testTouchGuard.accept(touchPressed)) data->state = LV_INDEV_STATE_RELEASED;
 }
 
 static void screenshot(const std::filesystem::path& directory, const char* name) {
@@ -338,7 +344,7 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   sample.views[0].rows[0].windowMinutes = 1440; std::strcpy(sample.views[0].rows[0].title, "Daily");
   ui_settings_show(); open_quota(nullptr);
   CHECK(quotaChoices[0].minutes == 1440);
-  CHECK(std::string(lv_label_get_text(quotaCaptions[1])) == "1 DAYS");
+  CHECK(std::string(lv_label_get_text(quotaCaptions[1])) == "1 DAY");
   close_quota(nullptr); ui_settings_hide();
   set_sample(8, 0); std::strcpy(sample.views[7].providerKey, "opencode"); std::strcpy(sample.viewKeys[7], "opencode");
   ui_settings_show(); open_quota(nullptr); CHECK(quotaProviderCount == 8);
@@ -353,6 +359,211 @@ static void test_quota_windows(const std::filesystem::path& screenshots) {
   testNovaWindows.clear(); set_sample(2, 2);
 }
 
+static lv_obj_t* find_caption_button(lv_obj_t* parent, const char* text) {
+  for (uint32_t i = 0; i < lv_obj_get_child_count(parent); ++i) {
+    auto* child = lv_obj_get_child(parent, i);
+    if (lv_obj_check_type(child, &lv_label_class) && strcmp(lv_label_get_text(child), text) == 0)
+      return parent;
+    if (auto* found = find_caption_button(child, text)) return found;
+  }
+  return nullptr;
+}
+
+struct ButtonGeometry { lv_obj_t* button; lv_area_t area; };
+static void capture_button_geometry(lv_obj_t* parent, std::vector<ButtonGeometry>& geometry) {
+  for (uint32_t i = 0; i < lv_obj_get_child_count(parent); ++i) {
+    auto* child = lv_obj_get_child(parent, i);
+    if (lv_obj_check_type(child, &lv_button_class)) {
+      lv_area_t area{}; lv_obj_get_coords(child, &area); geometry.push_back({child, area});
+    }
+    capture_button_geometry(child, geometry);
+  }
+}
+
+static void test_stable_touch_targets(const std::filesystem::path& screenshots) {
+  ui_settings_hide(); nova_ui::show_dashboard(nullptr);
+  lv_obj_update_layout(dashboardScreen); lv_obj_update_layout(nova_ui::screen);
+  auto* dashboardSet = find_caption_button(dashboardScreen, "SET");
+  auto* novaSet = find_caption_button(nova_ui::screen, "SET");
+  CHECK(dashboardSet && novaSet);
+  if (dashboardSet && novaSet) {
+    lv_area_t a{}, b{}; lv_obj_get_coords(dashboardSet, &a); lv_obj_get_coords(novaSet, &b);
+    CHECK(a.x1 == b.x1 && a.y1 == b.y1 && a.x2 == b.x2 && a.y2 == b.y2);
+  }
+  auto* pointer = lv_indev_create(); lv_indev_set_type(pointer, LV_INDEV_TYPE_POINTER);
+  lv_indev_set_read_cb(pointer, read_touch);
+  touchFailed = touchPressed = false; testTouchGuard = TouchInputGuard{};
+  lv_indev_read(pointer);
+  set_sample(8, 2); sample.automaticViews = true; sample.viewIntervalSeconds = 2;
+  ++sample.viewRevision; dashboard_update();
+  currentPage = 0; dashboard_update(); lv_obj_update_layout(dashboardScreen);
+  touchPoint = {200, 120}; touchPressed = true; lv_indev_read(pointer);
+  CHECK(lv_obj_has_state(compact[0].card, LV_STATE_PRESSED));
+  fakeTick += 2100; dashboard_update();
+  CHECK(currentPage == 0 && compact[0].viewIndex == 0);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(lv_screen_active() == screen && selected == 0 && strcmp(expectedKey, "codex") == 0);
+  back(nullptr);
+
+  // A provider moves to another protocol slot during a real touch. Release
+  // follows the displayed identity; removal cannot open the replacement AI.
+  set_sample(2, 2); ++sample.viewRevision; dashboard_update(); lv_obj_update_layout(dashboardScreen);
+  touchPoint = {200, 120}; touchPressed = true; lv_indev_read(pointer);
+  CHECK(lv_obj_has_state(big[0].card, LV_STATE_PRESSED));
+  std::swap(sample.views[0], sample.views[1]);
+  std::swap(sample.viewKeys[0], sample.viewKeys[1]); ++sample.viewRevision;
+  dashboard_update(); CHECK(strcmp(big[0].providerKey, "codex") == 0);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(lv_screen_active() == screen && selected == 1 && strcmp(expectedKey, "codex") == 0);
+  back(nullptr); set_sample(2, 2); ++sample.viewRevision; dashboard_update(); lv_obj_update_layout(dashboardScreen);
+  touchPressed = true; lv_indev_read(pointer);
+  sample.viewCount = 1; std::strcpy(sample.viewKeys[0], "zcode"); sample.views[0] = sample.views[1]; ++sample.viewRevision;
+  dashboard_update(); touchPressed = false; lv_indev_read(pointer);
+  CHECK(dashboard_is_active()); dashboard_update();
+  CHECK(lv_obj_get_x(big[0].card) == 20);
+  CHECK(!lv_obj_is_hidden(pageButton) && lv_obj_has_state(pageButton, LV_STATE_DISABLED));
+  screenshot(screenshots, "dashboard-stable-single-slot");
+
+  set_sample(2, 2); ++sample.viewRevision; ui_nova_show(); lv_obj_update_layout(nova_ui::screen);
+  touchPoint = {700, 265}; touchPressed = true; lv_indev_read(pointer);
+  CHECK(lv_obj_has_state(nova_ui::providers[0].card, LV_STATE_PRESSED));
+  std::swap(sample.views[0], sample.views[1]); std::swap(sample.viewKeys[0], sample.viewKeys[1]); ++sample.viewRevision;
+  ui_nova_update(); CHECK(strcmp(nova_ui::providers[0].providerKey, "codex") == 0);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(selected == 1 && strcmp(expectedKey, "codex") == 0); back(nullptr);
+  set_sample(1, 2); ++sample.viewRevision; ui_nova_update();
+  CHECK(!lv_obj_is_hidden(nova_ui::nextButton) && lv_obj_has_state(nova_ui::nextButton, LV_STATE_DISABLED));
+  sample.hostPresent = false; ui_nova_update();
+  CHECK(strcmp(lv_label_get_text(nova_ui::link), "Waiting for PC host") == 0);
+  screenshot(screenshots, "nova-stable-offline-controls");
+
+  set_sample(1, 3); ui_details_show(0); historyMode = false; ui_details_update();
+  const auto rowY = lv_obj_get_y(rows[0].card), rowHeight = lv_obj_get_height(rows[0].card);
+  snprintf(sample.views[0].message, sizeof(sample.views[0].message), "%s", "A very long retained provider error should stay in its reserved strip and never move a card, hide navigation, overlap percentages or shift UPDATE ALL.");
+  sample.views[0].notice = true; ui_details_update(); lv_obj_update_layout(screen);
+  CHECK(lv_obj_get_y(rows[0].card) == rowY && lv_obj_get_height(rows[0].card) == rowHeight);
+  lv_area_t error{}, card{}; lv_obj_get_coords(errorBanner, &error); lv_obj_get_coords(rows[0].card, &card);
+  CHECK(error.y2 < card.y1);
+  screenshot(screenshots, "details-stable-long-error");
+
+  ui_settings_show();
+  // A modal shields covered BACK/actions. Interrupted time adjustment must
+  // restore its draft and must not leak into the next persisted action.
+  lv_obj_update_layout(settingsScreen);
+  const auto brightnessBeforeCancel = display_get_brightness();
+  const auto brightnessSaveBeforeCancel = app_settings::save_revision();
+  lv_area_t sliderArea{}; lv_obj_get_coords(brightnessSlider, &sliderArea);
+  touchPoint = {sliderArea.x1 + (sliderArea.x2 - sliderArea.x1) * brightness_percent(brightnessBeforeCancel) / 100,
+                (sliderArea.y1 + sliderArea.y2) / 2};
+  touchPressed = true; lv_indev_read(pointer);
+  touchPoint.x = sliderArea.x1 + 60; lv_indev_read(pointer);
+  CHECK(display_get_brightness() != brightnessBeforeCancel);
+  touchFailed = true; lv_indev_read(pointer);
+  CHECK(display_get_brightness() == brightnessBeforeCancel);
+  CHECK(lv_slider_get_value(brightnessSlider) == brightness_percent(brightnessBeforeCancel));
+  touchFailed = false; lv_indev_read(pointer);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(app_settings::save_revision() == brightnessSaveBeforeCancel);
+  open_night(nullptr); lv_obj_update_layout(lv_layer_top());
+  touchPoint = {100, 450}; touchPressed = true; lv_indev_read(pointer);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(ui_settings_is_active() && !lv_obj_is_hidden(nightOverlay));
+  const auto persistedNight = app_settings::night();
+  const auto beforeCancelledSave = app_settings::save_revision();
+  lv_area_t timeArea{}; lv_obj_get_coords(nightTimeButtons[0], &timeArea);
+  touchPoint = {(timeArea.x1 + timeArea.x2) / 2, (timeArea.y1 + timeArea.y2) / 2};
+  touchPressed = true; lv_indev_read(pointer); fakeTick += 650; lv_indev_read(pointer);
+  CHECK(nightDraft.start != persistedNight.start);
+  touchPoint = {600, 300}; lv_indev_read(pointer);
+  CHECK(nightDraft.start == persistedNight.start);  // restore before release
+  lv_obj_get_coords(nightTimeButtons[1], &timeArea);
+  touchPoint = {(timeArea.x1 + timeArea.x2) / 2, (timeArea.y1 + timeArea.y2) / 2};
+  lv_indev_read(pointer);  // a different +/- cannot acquire this held finger
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(nightDraft.start == persistedNight.start);
+  CHECK(app_settings::save_revision() == beforeCancelledSave);
+  lv_obj_get_coords(nightTimeButtons[0], &timeArea);
+  touchPoint = {(timeArea.x1 + timeArea.x2) / 2, (timeArea.y1 + timeArea.y2) / 2};
+  touchPressed = true; lv_indev_read(pointer); fakeTick += 650; lv_indev_read(pointer);
+  CHECK(nightDraft.start != persistedNight.start);
+  touchFailed = true; lv_indev_read(pointer);
+  CHECK(nightDraft.start == persistedNight.start);
+  touchFailed = false; lv_indev_read(pointer);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(app_settings::save_revision() == beforeCancelledSave);
+  close_night(nullptr);
+  for (auto opener : {open_alerts, open_night, open_appearance, open_quota}) {
+    opener(nullptr); lv_obj_update_layout(lv_layer_top());
+    auto* overlay = opener == open_alerts ? alertsOverlay : opener == open_night ? nightOverlay :
+                    opener == open_appearance ? appearanceOverlay : quotaOverlay;
+    for (auto* other : {alertsOverlay, nightOverlay, appearanceOverlay, quotaOverlay})
+      CHECK(lv_obj_is_hidden(other) == (other != overlay));
+    auto* done = find_caption_button(overlay, "DONE");
+    CHECK(done != nullptr);
+    if (done) {
+      lv_area_t area{}; lv_obj_get_coords(done, &area);
+      CHECK(area.x1 == 616 && area.y1 == 406 && lv_obj_get_width(done) == 136 && lv_obj_get_height(done) == 48);
+      lv_obj_send_event(done, LV_EVENT_CLICKED, nullptr); CHECK(lv_obj_is_hidden(overlay));
+    }
+  }
+  sample = aim::Snapshot{}; open_alerts(nullptr);
+  CHECK(lv_obj_has_state(warningPrev, LV_STATE_DISABLED) && lv_obj_has_state(warningNext, LV_STATE_DISABLED));
+  CHECK(lv_obj_has_state(warningInherit, LV_STATE_DISABLED));
+  const auto warningBeforeCancel = warningPercent;
+  lv_slider_set_value(warningSlider, 12, LV_ANIM_OFF);
+  lv_obj_send_event(warningSlider, LV_EVENT_VALUE_CHANGED, nullptr);
+  lv_obj_send_event(warningSlider, LV_EVENT_PRESS_LOST, nullptr);
+  CHECK(lv_slider_get_value(warningSlider) == warningBeforeCancel);
+  CHECK(warningPercent == warningBeforeCancel);
+  close_alerts(nullptr);
+  ui_settings_hide(); nova_ui::show_dashboard(nullptr);
+  quota_banner::policy = QuotaNotifications{}; quota_banner::displayed = QuotaNotifications::Alert{};
+  set_sample(1, 1); sample.views[0].rows[0].usedPercent = 5; ui_notifications_update();
+  std::memset(sample.views[0].rows[0].title, 'W', sizeof(sample.views[0].rows[0].title) - 1);
+  sample.views[0].rows[0].title[sizeof(sample.views[0].rows[0].title) - 1] = '\0';
+  ui_notifications_update();
+  lv_obj_update_layout(lv_layer_top());
+  lv_point_t wrappedSize{};
+  lv_text_get_size(&wrappedSize, lv_label_get_text(quota_banner::body),
+                   lv_obj_get_style_text_font(quota_banner::body, LV_PART_MAIN), 0, 0,
+                   lv_obj_get_content_width(quota_banner::body), LV_TEXT_FLAG_NONE);
+  CHECK(wrappedSize.y <= lv_obj_get_height(quota_banner::body));
+  lv_area_t alertBody{}, alertPending{}; lv_obj_get_coords(quota_banner::body, &alertBody);
+  lv_obj_get_coords(quota_banner::pending, &alertPending); CHECK(alertBody.y2 < alertPending.y1);
+  screenshot(screenshots, "quota-long-window-name");
+  touchPoint = {650, 150}; touchPressed = true; lv_indev_read(pointer);
+  CHECK(lv_obj_has_state(quota_banner::dismissButton, LV_STATE_PRESSED));
+  sample.views[0].rows[0].usedPercent = 80; ui_notifications_update();
+  CHECK(!lv_obj_is_hidden(quota_banner::banner));
+  touchPressed = false; lv_indev_read(pointer); ui_notifications_update();
+  CHECK(lv_obj_is_hidden(quota_banner::banner));
+  lv_indev_delete(pointer);
+  // Every navigation/action rectangle survives busy, offline, new data and
+  // palette changes. Captions and disabled styling may change in place.
+  std::vector<ButtonGeometry> geometry;
+  for (auto* root : {dashboardScreen, nova_ui::screen, settingsScreen, screen, lv_layer_top()}) {
+    lv_obj_update_layout(root); capture_button_geometry(root, geometry);
+  }
+  for (int transition = 0; transition < 4; ++transition) {
+    set_sample(transition % 2 ? 1 : 8, 3);
+    sample.hostPresent = transition != 1; sample.manualRefreshSupported = true;
+    sample.refreshState = transition == 2 ? aim::RefreshState::updating : aim::RefreshState::idle;
+    ui_theme::apply(static_cast<app_settings::Theme>(transition));
+    nova_ui::show_dashboard(nullptr); dashboard_update(); ui_nova_show();
+    ui_details_show(0); ui_settings_show(); ui_settings_update(); ui_settings_hide();
+    for (auto* root : {dashboardScreen, nova_ui::screen, settingsScreen, screen, lv_layer_top()}) lv_obj_update_layout(root);
+    for (const auto& saved : geometry) {
+      lv_area_t current{}; lv_obj_get_coords(saved.button, &current);
+      CHECK(current.x1 == saved.area.x1 && current.y1 == saved.area.y1 &&
+            current.x2 == saved.area.x2 && current.y2 == saved.area.y2);
+    }
+  }
+  ui_theme::apply(app_settings::Theme::forest);
+  char window[24]; quota_window_label(60, "Hourly", window, sizeof(window)); CHECK(strcmp(window, "1 HOUR") == 0);
+  quota_window_label(120, "Hourly", window, sizeof(window)); CHECK(strcmp(window, "2 HOURS") == 0);
+  set_sample(2, 2); dashboard_update();
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -362,11 +573,38 @@ int main(int argc, char** argv) {
   lv_display_set_buffers(display, drawBuffer, nullptr, sizeof(drawBuffer), LV_DISPLAY_RENDER_MODE_FULL);
   lv_display_set_flush_cb(display, flush);
   dashboard_init();
+#if defined(AIM_BOARD_WAVESHARE_S3)
+  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "AI MONITOR / S3") == 0);
+#else
+  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "AI MONITOR / P4") == 0);
+#endif
   ui_settings_init();
   ui_details_init();
   ui_notifications_init();
   ui_nova_init();
   settle_backlight();
+
+  // First activity-only frame clears initialized quota headings and remains
+  // healthy only when this provider's own counter source is readable.
+  set_sample(1, 0);
+  std::strcpy(sample.viewKeys[0], "gemini"); std::strcpy(sample.views[0].providerKey, "gemini");
+  sample.views[0].hasUsage = false;
+  sample.views[0].notice = sample.views[0].informational = true;
+  sample.tokenUsageKnown = true; sample.tokenSourceMask = 8; sample.tokenActivityMs = fakeTick;
+  dashboard_update();
+  CHECK(std::strcmp(lv_label_get_text(hdr.live), "LIVE") == 0);
+  CHECK(std::strcmp(lv_label_get_text(footServices), "1 / 1 services online") == 0);
+  CHECK(std::strcmp(lv_label_get_text(big[0].remaining), "LOCAL") == 0);
+  sample.tokenSourceMask = 1; dashboard_update();
+  CHECK(std::strcmp(lv_label_get_text(hdr.live), "ISSUE") == 0);
+  set_sample(2, 2);
+  std::strcpy(sample.viewKeys[1], "gemini"); std::strcpy(sample.views[1].providerKey, "gemini");
+  sample.views[1].hasUsage = false; sample.views[1].rowCount = 0;
+  sample.views[1].notice = sample.views[1].informational = true;
+  sample.tokenUsageKnown = true; sample.tokenSourceMask = 8; sample.tokenActivityMs = fakeTick;
+  dashboard_update();
+  CHECK(std::strcmp(lv_label_get_text(hdr.live), "LIVE") == 0);
+  CHECK(std::strcmp(lv_label_get_text(footServices), "2 / 2 services online") == 0);
 
   set_sample(2, 2);
   dashboard_update();
@@ -374,7 +612,7 @@ int main(int argc, char** argv) {
   set_sample(1, 2);
   dashboard_update();
   lv_obj_update_layout(lv_screen_active());
-  CHECK(lv_obj_get_x(big[0].card) == 214);
+  CHECK(lv_obj_get_x(big[0].card) == 20);
   screenshot(screenshots, "dashboard-single-provider");
   set_sample(2, 2);
   dashboard_update();
@@ -458,7 +696,7 @@ int main(int argc, char** argv) {
   set_sample(2, 2);
   ++sample.viewRevision;
   dashboard_update();
-  CHECK(lv_obj_is_hidden(pageButton));
+  CHECK(!lv_obj_is_hidden(pageButton) && lv_obj_has_state(pageButton, LV_STATE_DISABLED));
   CHECK(lv_obj_is_hidden(big[0].rows[2].bar));
   sample.views[0].notice = true;
   sample.views[0].hasUsage = false; sample.views[0].rowCount = 0;  // first-ever failed measurement
@@ -591,6 +829,17 @@ int main(int argc, char** argv) {
   screenshot(screenshots, "provider-details");
   lv_obj_send_event(updateButton, LV_EVENT_CLICKED, nullptr);
   CHECK(requestedRefreshes == 1);
+  // An I2C failure while touching UPDATE must not become a click. The held
+  // finger remains suppressed after recovery until a confirmed release.
+  touchPoint = {620, 450}; touchPressed = true; lv_indev_read(pointer);
+  touchFailed = true; lv_indev_read(pointer);
+  touchFailed = false; lv_indev_read(pointer);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(requestedRefreshes == 1);
+  touchPressed = true; lv_indev_read(pointer);
+  touchPressed = false; lv_indev_read(pointer);
+  CHECK(requestedRefreshes == 2);
+  requestedRefreshes = 1;  // later refresh lifecycle assertions use one request
   sample.refreshState = aim::RefreshState::waiting;
   ui_details_update();
   CHECK(lv_obj_has_state(updateButton, LV_STATE_DISABLED));
@@ -613,6 +862,10 @@ int main(int argc, char** argv) {
   CHECK(history.series(0).count == 2);
   screenshot(screenshots, "provider-history");
   CHECK(historyEdges == 3);
+  ui_theme::apply(app_settings::Theme::ocean);
+  ui_details_update();
+  CHECK(lv_color_eq(lv_obj_get_style_text_color(historyLegends[0], LV_PART_MAIN), lv_color_hex(historyColors[0])));
+  ui_theme::apply(app_settings::Theme::forest); ui_details_update();
   lv_obj_send_event(historyRangeButtons[1], LV_EVENT_CLICKED, nullptr);
   CHECK(historyRange == 1);
   CHECK(std::string(lv_label_get_text(historyHint)).find("6 h") != std::string::npos);
@@ -814,7 +1067,7 @@ int main(int argc, char** argv) {
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "UPDATING / last good");
   sample.views[0].fetching = false; sample.tokenSourceMask = 2; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::tracking)) == "TRACKING / ZCode");
-  sample.tokenActivityMs = fakeTick - 15000u; ui_nova_update();
+  sample.tokenActivityMs = fakeTick - 35000u; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::subtitle)) == "Token signal unavailable");
   CHECK(std::string(lv_label_get_text(nova_ui::tracking)) == "TRACKING / signal lost");
   screenshot(screenshots, "nova-signal-lost");
@@ -931,6 +1184,7 @@ int main(int argc, char** argv) {
   lv_obj_delete(dimmer);
   test_quota_windows(screenshots);
   test_nova_readability(screenshots);
+  test_stable_touch_targets(screenshots);
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

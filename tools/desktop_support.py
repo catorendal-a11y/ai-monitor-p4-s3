@@ -85,6 +85,17 @@ def connection_summary(root: Path, processes) -> str:
             'error': 'HOST ERROR • CHECK LOG'}[state]
 
 
+def _wait_for_boot(read_identity):
+    """Opening serial can reboot a board; retry only bounded identity timeouts."""
+    for attempt in range(3):
+        try:
+            return read_identity()
+        except TimeoutError:
+            if attempt == 2:
+                raise
+            time.sleep(0.25)
+
+
 def check_connection(root: Path, emit) -> None:
     """Read device identity; no flash, quota requests or settings mutation."""
     config = load_settings(root)
@@ -103,8 +114,10 @@ def check_connection(root: Path, emit) -> None:
     try:
         panel = control.host.Panel(port)
         time.sleep(0.5)
-        panel.send_line('{"cmd":"get_info"}')
-        info = panel.wait_for('info')
+        def read_identity():
+            panel.send_line('{"cmd":"get_info"}')
+            return panel.wait_for('info')
+        info = _wait_for_boot(read_identity)
         from board_profiles import matches_info
         if not matches_info(board, info):
             raise control.SetupError('This port does not report the selected AI Monitor board. Check the port and board; a new factory display needs firmware installation.')
@@ -186,7 +199,8 @@ def run_firmware_command(command, root, environment, emit, timeout_s=600, idle_s
             now = time.monotonic()
             if now - started >= timeout_s or now - last_output >= idle_s:
                 raise control.SetupError('Firmware tool timed out and was stopped. The write may be incomplete. '
-                    'Keep the display powered, check USB, then retry the same firmware operation.')
+                    'Keep the display powered and check USB. If AI Monitor still boots, retry the update. '
+                    'If it no longer boots, use First installation; this resets display settings. PC provider settings are kept.')
             try:
                 line = lines.get(timeout=0.05)
                 last_output = time.monotonic()
@@ -234,7 +248,7 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
             panel = control.host.Panel(port)
             panel.expected_board = get_board(board_id)
             time.sleep(0.5)
-            panel.heartbeat()
+            _wait_for_boot(panel.heartbeat)
         except (RuntimeError, TimeoutError, OSError, control.host.serial.SerialException):
             raise control.SetupError('Existing AI Monitor identity could not be verified. '
                 'Check the board/port. A factory demo or another project requires First installation. '

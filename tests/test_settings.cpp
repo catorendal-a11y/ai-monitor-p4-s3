@@ -3,6 +3,8 @@
 #include <iostream>
 
 static unsigned failures = 0;
+static uint32_t settingsTick = 0;
+uint32_t millis() { return settingsTick; }
 #define CHECK(value) do { if (!(value)) { ++failures; std::cerr << __LINE__ << ": " #value "\n"; } } while (false)
 
 static app_settings::NovaWindow manual_window(uint32_t minutes, const char* title) {
@@ -12,6 +14,20 @@ static app_settings::NovaWindow manual_window(uint32_t minutes, const char* titl
 
 int main() {
   using namespace app_settings;
+  fake_nvs::values["dim_min"] = {10}; fake_nvs::values["brightness"] = {90}; fake_nvs::fail_open = true;
+  CHECK(dim_minutes() == 5 && !s_loaded && save_status() == SaveStatus::failed);
+  set_dim_minutes(5); CHECK(save_status() == SaveStatus::failed && fake_nvs::writes == 0);
+  set_brightness(DISPLAY_DEFAULT_BRIGHTNESS); CHECK(save_status() == SaveStatus::failed && fake_nvs::writes == 0);
+  fake_nvs::fail_open = false; settingsTick = 1001;
+  CHECK(dim_minutes() == 10 && s_loaded);
+  CHECK(brightness() == 90);
+  set_brightness(DISPLAY_DEFAULT_BRIGHTNESS);
+  CHECK(save_status() == SaveStatus::saved && fake_nvs::values["brightness"][0] == DISPLAY_DEFAULT_BRIGHTNESS);
+  const auto brightnessWrites = fake_nvs::writes;
+  set_brightness(DISPLAY_DEFAULT_BRIGHTNESS); CHECK(fake_nvs::writes == brightnessWrites);
+  set_dim_minutes(5);
+  CHECK(save_status() == SaveStatus::saved && fake_nvs::values["dim_min"][0] == 5);
+  s_loaded = false;
   Preferences legacy;
   legacy.putBool("night_on", true); legacy.putUShort("night_start", 1200);
   legacy.putUShort("night_end", 360); legacy.putUChar("night_pct", 15);

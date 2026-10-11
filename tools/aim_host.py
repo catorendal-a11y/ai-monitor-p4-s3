@@ -25,13 +25,17 @@ import urllib.error
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from token_activity import TokenReporter
+from token_activity import TokenReporter, TokenSampler
 from host_status import HostStatus, OPTIONS, FLAGS, validate_options
 from provider_catalog import selected_providers, PROVIDERS
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
 from host_security import open_provider_request, read_local_json, safe_text, serial_port
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+import queue
+import subprocess
+import threading
+from process_runtime import stop_child
+from project_version import HOST_VERSION, numeric_version
 
 import serial
 from serial.tools import list_ports
@@ -339,8 +343,7 @@ def fetch_codex():
                 if minutes is None: minutes = 0
                 if type(minutes) is not int or not 0 <= minutes <= 0xffffffff: raise ValueError('Invalid window duration')
                 reset = window.get('resetsAt')
-                percent = percent_value(window.get('usedPercent'))
-                if percent > 100: raise ValueError('Invalid quota percentage')
+                percent = min(100.0, percent_value(window.get('usedPercent')))
                 rows.append({'title':'Week' if key == 'secondary' and minutes == 10080 else title,
                              'usedPercent':percent,
                              'windowMinutes':minutes, 'resetsAt':now_iso_epoch(reset) if reset is not None else ''})
@@ -356,7 +359,7 @@ def fetch_codex():
         access = credential(access)
         req = urllib.request.Request("https://chatgpt.com/backend-api/wham/usage")
         req.add_header("Authorization", "Bearer " + access)
-        req.add_header("User-Agent", "codex_cli_rs/0.159.3")
+        req.add_header("User-Agent", "AI-Monitor/" + numeric_version(HOST_VERSION))
         with open_provider_request(req) as r:
             data = read_json_response(r)
         rl = data.get("rate_limit") or {}
@@ -557,7 +560,7 @@ class Panel:
         if isinstance(status, HostStatus): status.update('connected', self.name)
 
     def report_tokens(self):
-        if self.tokens_supported and isinstance(self.token_reporter, TokenReporter):
+        if self.tokens_supported and isinstance(self.token_reporter, (TokenReporter, TokenSampler)):
             message = self.token_reporter.poll()
             if message is not None:
                 self.send_line(json.dumps(message))
@@ -625,43 +628,121 @@ def connect_panel(port_name, views, board_id='guition-p4'):
 
 
 class FetchPool:
-    """API workers never access USB; the calling thread remains its sole owner."""
+    """Bounded quota subprocesses: deadlines reap the transport before retrying.
+
+    No credential is placed in an argument, log or file. Workers cannot access
+    USB; the calling thread remains its sole owner while pumping heartbeats.
+    """
     def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="aim-api")
-        self.pending = {}
+        self.process = None
+        self.cleanup_failed = False
+        self.request_seconds = 25
+
+    @staticmethod
+    def command(provider):
+        if provider not in ('codex', 'zcode'): raise ValueError('Unsupported quota worker')
+        if getattr(sys, 'frozen', False):
+            helper = HERE.parent / 'AI-Monitor-Console.exe'
+            if not helper.is_file(): raise FileNotFoundError('Console helper missing')
+            return [str(helper), '--quota-worker', provider]
+        return [sys.executable, '-u', str(Path(__file__).resolve()), '--quota-worker', provider]
 
     def close(self):
-        self.executor.shutdown(wait=False, cancel_futures=True)
+        if self.process is not None:
+            stop_child(self.process)
+            self.process = None
 
-    def fetch(self, provider, callback, panel):
-        old = self.pending.get(provider)
-        if old is not None and not old.done():
-            return None, f"{provider}: previous request still running"
-        future = self.executor.submit(callback)
-        self.pending[provider] = future
+    def fetch(self, provider, key, panel):
+        if self.cleanup_failed or self.process is not None:
+            raise RuntimeError('Previous quota worker cleanup is unconfirmed; retry blocked.')
         started = last_heartbeat = time.monotonic()
+        cycle_deadline = getattr(panel, 'cycle_deadline', None)
+        deadline = started + self.request_seconds
+        if type(cycle_deadline) in (int, float): deadline = min(deadline, cycle_deadline)
+        if started >= deadline: return None, f'{provider}: request timed out; retrying'
+        try:
+            payload = json.dumps({'key':credential(key, optional=True)}).encode() + b'\n'
+            if len(payload) > MAX_RESPONSE_BYTES: raise ValueError('Invalid credential length')
+        except ValueError as error:
+            return None, provider_failure(provider, error)
+        environment = dict(os.environ)
+        environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
+        process = subprocess.Popen(self.command(provider), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, env=environment,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        self.process = process
+        replies = queue.Queue(maxsize=1)
+        def read():
+            try:
+                raw = process.stdout.read(MAX_RESPONSE_BYTES + 1)
+            except (ValueError, OSError): raw = b''
+            replies.put_nowait(raw)
+        reader = threading.Thread(target=read, daemon=True, name='aim-quota-output')
+        reader.start()
+        def write():
+            try:
+                process.stdin.write(payload)
+                process.stdin.close()
+            except (OSError, ValueError):
+                try: process.stdin.close()
+                except (OSError, ValueError): pass
+        writer = threading.Thread(target=write, daemon=True, name='aim-quota-input')
+        writer.start()
         try:
             while True:
+                if time.monotonic() >= deadline:
+                    return None, f'{provider}: request timed out; retrying'
                 try:
-                    return future.result(timeout=0.1)
-                except FutureTimeout:
-                    if future.done():
-                        return None, provider_failure(provider, future.exception())
+                    raw = replies.get(timeout=0.1)
+                except queue.Empty:
                     panel.collect_requests()
                     if isinstance(panel, Panel): panel.report_tokens()
                     now = time.monotonic()
                     if now - last_heartbeat >= HEARTBEAT_SECONDS:
                         panel.heartbeat(); last_heartbeat = now
-                    cycle_deadline = getattr(panel, "cycle_deadline", None)
-                    cycle_expired = type(cycle_deadline) in (int, float) and now >= cycle_deadline
-                    if now - started >= 25 or cycle_expired:
-                        future.cancel()
-                        return None, f"{provider}: request timed out; retrying"
-                except Exception as error:
-                    return None, provider_failure(provider, error)
-        except BaseException:
-            future.cancel()
-            raise
+                    continue
+                if len(raw) > MAX_RESPONSE_BYTES or process.poll() not in (None, 0):
+                    raise ValueError('Invalid quota worker reply')
+                result = json.loads(raw)
+                if not isinstance(result, dict) or set(result) != {'rows', 'notice', 'retry_after'}:
+                    raise ValueError('Invalid quota worker envelope')
+                rows, notice, delay = result['rows'], result['notice'], result['retry_after']
+                if rows is not None and not isinstance(rows, list): raise ValueError('Invalid quota rows')
+                if notice is not None and not isinstance(notice, str): raise ValueError('Invalid quota notice')
+                if type(delay) is not int or not 0 <= delay <= 3600: raise ValueError('Invalid retry delay')
+                return rows, ProviderNotice(notice, delay) if notice else None
+        except (ValueError, OSError, RecursionError) as error:
+            return None, provider_failure(provider, error)
+        finally:
+            # Never allow a new worker to start until this exact tree is reaped.
+            try:
+                self.close()
+                reader.join(timeout=1)
+                writer.join(timeout=1)
+                if reader.is_alive() or writer.is_alive(): raise RuntimeError('Quota pipe cleanup failed; retry blocked.')
+            except BaseException:
+                self.cleanup_failed = True
+                raise
+            process.stdout.close()
+            if not process.stdin.closed: process.stdin.close()
+
+
+def quota_worker(provider):
+    """Internal allowlisted numeric-only worker; never dispatch remote commands."""
+    try:
+        raw = sys.stdin.buffer.read(MAX_RESPONSE_BYTES + 1)
+        if provider not in ('codex', 'zcode') or len(raw) > MAX_RESPONSE_BYTES: return 1
+        data = json.loads(raw)
+        if not isinstance(data, dict) or set(data) != {'key'}: return 1
+        key = credential(data['key'], optional=True)
+        rows, notice = fetch_codex() if provider == 'codex' else fetch_zcode(key)
+        reply = json.dumps({'rows':rows, 'notice':str(notice) if notice else None,
+                            'retry_after':min(3600, max(0, int(getattr(notice, 'retry_after', 0))))}, allow_nan=False)
+        if len(reply.encode()) > MAX_RESPONSE_BYTES: return 1
+        sys.stdout.write(reply); sys.stdout.flush()
+        return 0
+    except Exception:
+        return 1  # Provider/credential exceptions never leave the private worker.
 
 
 class ConfigWatcher:
@@ -768,7 +849,7 @@ def _run_loop(cfg, interval, zai_key, views):
     health = HostStatus(HERE)
     health.data['board'] = cfg.get('board', '')
     health.update('starting')
-    tokens = TokenReporter(providers=views, activity_dir=HERE / 'activity')
+    tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity')
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
         while True:
@@ -785,12 +866,16 @@ def _run_loop(cfg, interval, zai_key, views):
                     LOG('No providers selected; stopping host. Open First-time setup.')
                     return
                 if changed_views != views:
-                    tokens = TokenReporter(providers=changed_views, activity_dir=HERE / 'activity')
+                    tokens.configure(changed_views)
                 retries.interval = interval
                 tokens.poll_seconds = cfg.get('token_poll_s', 2)
                 health.data['providers'] = {key: value for key, value in health.data['providers'].items() if key in changed_views}
                 if previous.get("zai_key") != zai_key:
                     retries.succeeded("zcode")
+                    # A success from the old credential cannot verify the
+                    # newly saved key while its first request is pending.
+                    health.data['providers'].pop('zcode', None)
+                    health.update()
                 if cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views:
                     if panel is not None: panel.close()
                     panel = None
@@ -852,6 +937,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 wait_for_config(watcher, cfg.get('reconnect_s', 5))
     finally:
         health.update('stopped')
+        tokens.close()
         fetcher.close()
         if panel is not None:
             panel.close()
@@ -881,10 +967,10 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         elif deferred:
             rows, notice = None, panel.retries.deferred_notice(provider)
         elif provider == "codex":
-            rows, notice = fetcher.fetch(provider, fetch_codex, panel) if isinstance(fetcher, FetchPool) else fetch_codex()
+            rows, notice = fetcher.fetch(provider, '', panel) if isinstance(fetcher, FetchPool) else fetch_codex()
         elif provider == cfg["zai_provider"] and zai_key:
             callback = lambda: fetch_zcode(zai_key)
-            rows, notice = fetcher.fetch(provider, callback, panel) if isinstance(fetcher, FetchPool) else callback()
+            rows, notice = fetcher.fetch(provider, zai_key, panel) if isinstance(fetcher, FetchPool) else callback()
         elif provider not in ('codex', 'zcode'):
             from telemetry_bridge import read_claude_quota, read_counters
             reported = read_claude_quota(HERE / 'activity') if provider == 'claude' else None
@@ -952,4 +1038,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(quota_worker(sys.argv[2]) if len(sys.argv) == 3 and sys.argv[1] == '--quota-worker' else main())

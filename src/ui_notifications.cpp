@@ -6,6 +6,7 @@
 #include "ui/quota_notifications.h"
 #include "ui/usage_format.h"
 #include "ui/theme.h"
+#include "ui/interaction.h"
 #include "app_settings.h"
 #include "ui_settings.h"
 
@@ -40,6 +41,8 @@ void ui_notifications_init() {
   lv_obj_set_style_pad_all(banner, 0, 0); lv_obj_set_scrollable(banner, false);
   heading = label(banner, 20, 14, 530, &lv_font_montserrat_24);
   body = label(banner, 20, 53, 530, &lv_font_montserrat_20);
+  lv_label_set_long_mode(body, LV_LABEL_LONG_MODE_WRAP);
+  lv_obj_set_height(body, 48);
   pending = label(banner, 20, 108, 530, &lv_font_montserrat_14);
   lv_obj_set_style_text_color(pending, lv_color_hex(ui_theme::muted), 0);
   dismissButton = lv_btn_create(banner);
@@ -51,6 +54,7 @@ void ui_notifications_init() {
   lv_label_set_text(caption, "DISMISS");
   lv_obj_set_style_text_align(caption, LV_TEXT_ALIGN_CENTER, 0); lv_obj_center(caption);
   lv_obj_add_event_cb(dismissButton, dismiss, LV_EVENT_CLICKED, nullptr);
+  ui_interaction::keep_target(dismissButton);
   lv_obj_set_hidden(banner, true);
 }
 
@@ -61,10 +65,12 @@ void ui_notifications_update() {
     return app_settings::warning_for(provider, row.title, row.windowMinutes);
   });
   if (!banner) return;
+  // Preserve both the identity and visibility of a held dismiss target,
+  // including when its quota recovers while the finger is down.
+  if (lv_obj_has_state(dismissButton, LV_STATE_PRESSED)) return;
   const auto* alert = policy.current();
   if (!alert || ui_settings_is_active()) { lv_obj_set_hidden(banner, true); return; }
   // Dismiss exactly the alert whose text was visible when this tap began.
-  if (lv_obj_has_state(dismissButton, LV_STATE_PRESSED)) return;
   const bool critical = alert->severity == 2;
   const uint32_t color = critical ? 0xFF5252 : 0xFFAA00;
   if (displayed.severity != alert->severity) {

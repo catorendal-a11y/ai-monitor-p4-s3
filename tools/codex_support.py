@@ -62,7 +62,7 @@ def setup_codex(ask=input):
     command = codex_command()
     if not command:
         print('Codex CLI is missing. The official OpenAI installer prepares it for this account.')
-        if ask('Install the official Codex CLI now? [Y/n]: ').strip().lower() not in ('','y','yes'):
+        if ask('Install the official Codex CLI now? [y/N]: ').strip().lower() not in ('y','yes'):
             print('Skipped. Codex remains selected; use Provider integration help to finish setup.')
             return False
         if subprocess.run(install_command(), check=False).returncode:
@@ -77,7 +77,7 @@ def setup_codex(ask=input):
         raise RuntimeError('Codex login status timed out. Open the official CLI and finish sign-in, then retry.') from None
     if status.returncode:
         print('Codex needs sign-in. Use your own ChatGPT account in the official browser/CLI flow.')
-        if ask('Open official Codex sign-in now? [Y/n]: ').strip().lower() not in ('','y','yes'):
+        if ask('Open official Codex sign-in now? [y/N]: ').strip().lower() not in ('y','yes'):
             print('Skipped. Codex remains selected; no other provider was enabled.')
             return False
         # Interactive, inherited console. Never read a password/token from the monitor UI.

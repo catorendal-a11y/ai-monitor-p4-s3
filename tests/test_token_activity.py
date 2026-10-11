@@ -2,15 +2,56 @@ import sys
 import sqlite3
 import tempfile
 import unittest
+import threading
+import time
 from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from token_activity import TokenReporter
+from token_activity import TokenReporter, TokenSampler
 import aim_host
 
 
 class TokenActivityTests(unittest.TestCase):
+    def test_blocked_local_read_keeps_usb_responsive_and_discards_old_selection(self):
+        from test_aim_host import panel_with, FakeSerial
+        entered, release = threading.Event(), threading.Event()
+        def blocked(*_args):
+            entered.set(); release.wait(3)
+            return {'synthetic-old-provider':100}
+        with tempfile.TemporaryDirectory() as directory, patch.object(TokenReporter, 'read_counts', side_effect=blocked):
+            sampler = TokenSampler(home=Path(directory), providers=['zcode'])
+            try:
+                self.assertIsNone(sampler.poll())
+                self.assertTrue(entered.wait(1))
+                serial = FakeSerial([b'{"type":"info"}\n'])
+                panel = panel_with(serial); panel.tokens_supported = True; panel.token_reporter = sampler
+                started = time.monotonic()
+                panel.report_tokens(); panel.heartbeat()
+                self.assertLess(time.monotonic()-started, .2)
+                worker = sampler.worker
+                for _ in range(20): sampler.configure(['copilot']); sampler.poll()
+                self.assertIs(sampler.worker, worker)
+                release.set()
+                deadline = time.monotonic()+2
+                result = None
+                while result is None and time.monotonic()<deadline:
+                    result = sampler.poll(); time.sleep(.01)
+                self.assertIsNotNone(result)
+                self.assertEqual(result['sources'], 0)  # stale ZCode work was not published
+                self.assertFalse(result['seen'])
+            finally:
+                release.set(); sampler.close(); sampler.worker.join(timeout=2)
+            self.assertFalse(sampler.worker.is_alive())
+    def test_one_failed_adapter_cannot_remove_a_healthy_provider_signal(self):
+        reporter = TokenReporter(home=Path('unused'), providers=['claude', 'gemini'])
+        def read(provider, _path):
+            if provider == 'claude': raise RecursionError('synthetic malformed nesting')
+            return {'synthetic':100}
+        with patch.object(reporter.local, 'read', side_effect=read):
+            value = reporter.poll()
+        self.assertEqual(value['sources'], 8)
+        self.assertEqual(value['delta'], 0)
     def test_evicted_old_request_is_baselined_without_faking_activity(self):
         clock = {'now': 100.0}
         reporter = TokenReporter(home=Path('unused'), providers=['zcode'], clock=lambda: clock['now'])

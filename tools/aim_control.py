@@ -166,14 +166,22 @@ def owned_hosts(root=ROOT):
             if process.pid == os.getpid():
                 continue
             command = process.info.get("cmdline") or []
-            if "--host" in command and process.info.get("exe") and Path(process.info["exe"]).resolve() in portable:
+            executable = Path(process.info.get('exe') or '')
+            if command[1:] == ['--host'] and executable.resolve() in portable:
                 found.append(process)
                 continue
-            for argument in command[1:]:
-                if argument.endswith(("aim_host.py", "aim_control.py")) and Path(argument).is_absolute():
-                    if Path(argument).resolve() in expected and (argument.endswith("aim_host.py") or "--host" in command):
-                        found.append(process)
-                        break
+            # A script path used as editor input or another script's argument
+            # does not identify a host. Inspect only a Python entry point.
+            import re
+            if not executable.is_absolute() or not re.fullmatch(r'pythonw?(?:[0-9]+(?:\.[0-9]+)*)?(?:\.exe)?', executable.name, re.I):
+                continue
+            arguments = command[1:]
+            while arguments and arguments[0] in ('-u', '-B', '-E', '-s', '-S', '-I', '-O', '-OO'):
+                arguments = arguments[1:]
+            if not arguments or not Path(arguments[0]).is_absolute(): continue
+            script = Path(arguments[0]).resolve()
+            if script in expected and (arguments[1:] == [] if script.name == 'aim_host.py' else arguments[1:] == ['--host']):
+                found.append(process)
         except (psutil.Error, OSError):
             continue
     return found
@@ -313,12 +321,11 @@ def flash(root=ROOT, ask=input):
     if ask(f"Write firmware to {port} on {board.name}? Type FLASH to proceed: ").strip() != "FLASH":
         print("Cancelled. Nothing was written.")
         return
-    stop_host(root)
-    result = subprocess.run(command, cwd=root, check=False)
-    if result.returncode:
-        raise SetupError("Firmware installation failed. Check USB cable/port and close other serial clients.")
+    # Share the identity, file, port and child-lifetime guards with the GUI.
+    from desktop_support import write_firmware
     config["port"] = port
     save_config(config, root)
+    write_firmware(root, board.id, kind, port, print)
     print("Firmware written. Use Start host next. The first display connection can take a few seconds.")
 
 
@@ -372,12 +379,16 @@ def integration_help(root=ROOT, ask=input, home=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", action="store_true", help="Run the background companion")
+    parser.add_argument('--start-host', action='store_true', help='Start this installation\'s independent background host')
+    parser.add_argument('--quota-worker', choices=('codex', 'zcode'), help=argparse.SUPPRESS)
     parser.add_argument("--check", action="store_true", help="Show local diagnostics without connecting to the panel or API")
     parser.add_argument('--integrations', action='store_true', help='Open selected provider integrations interactively')
     parser.add_argument('--setup-codex', action='store_true', help='Install/sign in the explicitly selected official Codex CLI')
     parser.add_argument('--ingest', choices=list(PROVIDERS), help='Read a cumulative numeric telemetry record from stdin')
     parser.add_argument('--claude-statusline', action='store_true', help='Receive documented Claude statusline quota fields')
     args = parser.parse_args(argv)
+    if args.quota_worker:
+        return host.quota_worker(args.quota_worker)
     (ROOT / "tools").mkdir(exist_ok=True)
     if args.ingest or args.claude_statusline:
         from telemetry_bridge import ingest, claude_statusline
@@ -388,13 +399,29 @@ def main(argv=None):
             if args.ingest: ingest(args.ingest, data, ROOT / 'tools/activity')
             else: print(claude_statusline(data, ROOT / 'tools/activity'))
             return 0
-        except (ValueError, OSError, TypeError): return 1
+        except (ValueError, OSError, TypeError, RecursionError): return 1
     if args.host:
         return host.main()
+    if args.start_host:
+        try:
+            start_host()
+            return 0
+        except SetupError as error:
+            print(str(error))
+        except (ValueError, RuntimeError, OSError, psutil.Error):
+            print('Host startup failed. Check local settings and dependencies. No keys were printed.')
+        return 1
     if args.check:
-        status()
-        return 0
+        try:
+            status()
+            return 0
+        except SetupError as error:
+            print(str(error))
+        except (ValueError, RuntimeError, OSError, psutil.Error):
+            print('Local diagnostics failed. Check configuration, permissions and provider setup. No keys were printed.')
+        return 1
     if args.integrations or args.setup_codex:
+        failed = False
         try:
             if args.setup_codex:
                 if 'codex' not in local_config()['providers']: raise SetupError('Select Codex and save settings first.')
@@ -402,12 +429,13 @@ def main(argv=None):
             else:
                 integration_help()
         except (ValueError, RuntimeError, OSError):
+            failed = True
             print('Provider setup could not finish. Check your selected providers and official CLI installation.')
         try:
             input('Press Enter to close provider setup: ')
         except (EOFError, KeyboardInterrupt):
             pass
-        return 0
+        return 1 if failed else 0
     actions = {"1": configure, "2": start_host, "3": stop_host, "4": flash, "5": status, "6": view_log, '7': integration_help}
     while True:
         print("\nAI MONITOR\n1. First-time setup / choose board and AI providers\n2. Start host (hidden)\n3. Stop host\n4. Install / update display firmware\n5. Status / connection help\n6. View recent log\n7. Provider integration help\n0. Exit")

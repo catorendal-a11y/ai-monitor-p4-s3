@@ -33,11 +33,17 @@ class WorkflowSecurityTests(unittest.TestCase):
                 permissions = job.get('permissions', document['permissions'])
                 if 'write' not in permissions.values(): continue
                 self.assertEqual((path.name, name), ('release.yml', 'publish'))
-                self.assertEqual(permissions, {'actions': 'read', 'contents': 'write'})
+                self.assertEqual(permissions, {'actions': 'read', 'contents': 'write',
+                                              'id-token': 'write', 'attestations': 'write'})
                 self.assertEqual(job['needs'], 'windows')
                 for step in job['steps']:
                     if step.get('uses'):
-                        self.assertTrue(step['uses'].startswith('actions/download-artifact@'))
+                        self.assertTrue(step['uses'].startswith(('actions/download-artifact@', 'actions/attest-build-provenance@')))
+                        if step['uses'].startswith('actions/attest-build-provenance@'):
+                            self.assertNotIn('run', step)
+                            subjects = step['with']['subject-path']
+                            self.assertIn('work/publish/work/windows-release/', subjects)
+                            self.assertNotIn('${{', subjects)
                     script = step.get('run', '')
                     self.assertNotRegex(script, r'(?i)python|pip install|\.exe|checkout|Invoke-Expression')
                     if 'gh release create' in script:

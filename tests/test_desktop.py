@@ -21,6 +21,35 @@ from desktop_window import MonitorWindow, ConfirmFlashDialog, ActionWorker
 
 
 class DesktopSettingsTests(unittest.TestCase):
+    def test_identity_probe_retries_slow_serial_boot_and_has_a_fixed_limit(self):
+        read = Mock(side_effect=[TimeoutError('booting'), {'boardId':'guition-p4'}])
+        with patch.object(desktop.time, 'sleep'):
+            self.assertEqual(desktop._wait_for_boot(read)['boardId'], 'guition-p4')
+        self.assertEqual(read.call_count, 2)
+        read = Mock(side_effect=TimeoutError('still unavailable'))
+        with patch.object(desktop.time, 'sleep'), self.assertRaises(TimeoutError):
+            desktop._wait_for_boot(read)
+        self.assertEqual(read.call_count, 3)
+        read = Mock(side_effect=RuntimeError('wrong board'))
+        with self.assertRaises(RuntimeError): desktop._wait_for_boot(read)
+        self.assertEqual(read.call_count, 1)
+
+    def test_update_waits_for_boot_but_timeout_cannot_start_a_write(self):
+        panel = Mock()
+        for outcomes, writes in (([TimeoutError('booting'), None], 1),
+                                 (TimeoutError('unavailable'), 0)):
+            panel.reset_mock(); panel.heartbeat.side_effect = outcomes
+            with patch.object(desktop, 'prepare_flash', return_value=('COM6',['flasher'])), \
+                    patch.object(control, 'stop_host'), patch.object(control.host, 'Panel', return_value=panel), \
+                    patch.object(desktop.time, 'sleep'), patch.object(desktop, 'run_firmware_command') as write:
+                if writes:
+                    desktop.write_firmware(Path('.'), 'guition-p4', 'update', 'COM6', Mock())
+                else:
+                    with self.assertRaises(control.SetupError):
+                        desktop.write_firmware(Path('.'), 'guition-p4', 'update', 'COM6', Mock())
+                self.assertEqual(write.call_count, writes)
+                panel.close.assert_called_once()
+
     def test_transient_windows_lock_keeps_atomic_config_replacement(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)
@@ -134,6 +163,24 @@ class DesktopWindowTests(unittest.TestCase):
         self.assertTrue(self.window.activity.isReadOnly())
         self.assertTrue(self.window.host_log.isReadOnly())
         self.assertFalse((self.root/'tools/aim_host.json').exists())
+
+    def test_status_failure_invalidates_visible_connection_and_provider_health(self):
+        window = self.window
+        window.status_known = window.host_running = window.live_connected = True
+        window.host_state.setText('USB CONNECTED')
+        window.provider_health.setText('Quota received')
+        window._status_finished(None)
+        self.assertFalse(window.status_known)
+        self.assertFalse(window.live_connected)
+        self.assertIn('UNAVAILABLE', window.host_state.text())
+        self.assertIn('unconfirmed', window.provider_health.text())
+        self.assertFalse(window.robot_working)
+        data = {'running':True, 'summary':'USB CONNECTED', 'health':{'state':'connected',
+                'board':window.config['board'], 'port':'COM6', 'providers':{}},
+                'reporter':None, 'log':'', 'sample':None, 'working':False}
+        window._status_finished((window.status_epoch, data))
+        self.assertTrue(window.status_known)
+        self.assertTrue(window.live_connected)
 
     def test_missing_packaged_firmware_fails_diagnostics_without_a_crash_dialog(self):
         import aim_desktop

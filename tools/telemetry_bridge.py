@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import time
 from provider_catalog import PROVIDERS
+from host_security import read_local_json
 
 
 def write_record(path, record):
@@ -40,7 +41,7 @@ def read_counters(directory, provider):
     for path in list(folder.glob('*.json'))[:128]:
         try:
             if path.stat().st_size > 4096: continue
-            record = json.loads(path.read_text(encoding='utf-8'))
+            record = read_local_json(path, 4096)
             value = record.get('total_tokens')
             if type(value) is int and 0 <= value <= 0xffffffffffffffff:
                 counts['bridge:' + path.stem] = value
@@ -68,7 +69,7 @@ def read_claude_quota(directory, now=None):
     try:
         path = Path(directory) / 'claude-quota.json'
         if path.stat().st_size > 4096: return None
-        data = json.loads(path.read_text(encoding='utf-8'))
+        data = read_local_json(path, 4096)
         age = (time.time() if now is None else now) - data['received_at']
         if not 0 <= age <= 300 or not isinstance(data['rows'], list) or not 1 <= len(data['rows']) <= 2: return None
         for row in data['rows']:

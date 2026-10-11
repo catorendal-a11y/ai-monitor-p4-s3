@@ -6,7 +6,6 @@
 
 #include "display.h"
 #include <Arduino.h>
-#include <Preferences.h>
 #include "../app_settings.h"
 #include "../config.h"
 
@@ -98,10 +97,8 @@ static esp_lcd_panel_io_handle_t dsi_io = nullptr;
 #define BL_LEDC_FREQ 5000
 #define BL_MAX_DUTY 1023
 
-static const char* NVS_NAMESPACE = "aimon";
 static std::atomic<uint8_t> s_brightness{DISPLAY_DEFAULT_BRIGHTNESS};
 static uint16_t s_appliedBrightness = 256;
-static uint8_t s_persistedBrightness = DISPLAY_DEFAULT_BRIGHTNESS;
 
 static void backlight_init() {
   ledc_timer_config_t timer = {
@@ -144,15 +141,7 @@ void display_apply_brightness(uint8_t brightness, bool persist) {
 // Backlight changes and persistence are owned by the UI task.
 void display_remember_brightness(uint8_t brightness) {
   s_brightness = brightness;
-  if (brightness == s_persistedBrightness) { app_settings::report_save(true); return; }
-  Preferences prefs;
-  bool saved = false;
-  if (prefs.begin(NVS_NAMESPACE, false)) {
-    saved = prefs.putUChar("brightness", brightness) == sizeof(brightness);
-    if (saved) s_persistedBrightness = brightness;
-    prefs.end();
-  }
-  app_settings::report_save(saved);
+  app_settings::set_brightness(brightness);
 }
 
 void display_fill_black() {
@@ -178,12 +167,7 @@ void display_init() {
   LOG_I("Display init: ESP32-P4 MIPI-DSI ST7701S %dx%d", DISPLAY_H_RES, DISPLAY_V_RES);
 
   // Load persisted brightness before anything touches the backlight.
-  Preferences prefs;
-  if (prefs.begin(NVS_NAMESPACE, true)) {
-    s_brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
-    s_persistedBrightness = display_get_brightness();
-    prefs.end();
-  }
+  s_brightness = app_settings::brightness();
 
   LOG_I("  [1/6] Backlight init...");
   backlight_init();

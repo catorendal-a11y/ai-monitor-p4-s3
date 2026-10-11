@@ -10,6 +10,8 @@
 #include "../config.h"
 #include "display.h"
 #include "idle_dim.h"
+#include "touch_input.h"
+static TouchInputGuard touchInputGuard;
 
 #include "freertos/FreeRTOS.h"
 #include <esp_timer.h>
@@ -114,12 +116,12 @@ void lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 void lvgl_touchpad_read_cb(lv_indev_t* indev_drv, lv_indev_data_t* data) {
   (void)indev_drv;
   if (display_touch == nullptr) {
-    data->state = LV_INDEV_STATE_RELEASED;
+    touchInputGuard.failed(indev_drv, data);
     return;
   }
 
   if (esp_lcd_touch_read_data(display_touch) != ESP_OK) {
-    data->state = LV_INDEV_STATE_RELEASED;
+    touchInputGuard.failed(indev_drv, data);
     return;
   }
 
@@ -127,7 +129,7 @@ void lvgl_touchpad_read_cb(lv_indev_t* indev_drv, lv_indev_data_t* data) {
   uint8_t touch_cnt = 0;
   const esp_err_t result = esp_lcd_touch_get_data(display_touch, &point, &touch_cnt, 1);
   if (result != ESP_OK) {
-    data->state = LV_INDEV_STATE_RELEASED;
+    touchInputGuard.failed(indev_drv, data);
     return;
   }
 
@@ -149,7 +151,8 @@ void lvgl_touchpad_read_cb(lv_indev_t* indev_drv, lv_indev_data_t* data) {
   }
   // Only successful reads prove that the waking finger was lifted.
   const bool pressed = data->state == LV_INDEV_STATE_PRESSED;
-  if (!idle_dim_touch(pressed)) data->state = LV_INDEV_STATE_RELEASED;
+  const bool awake = idle_dim_touch(pressed);
+  if (!touchInputGuard.accept(pressed) || !awake) data->state = LV_INDEV_STATE_RELEASED;
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -186,8 +189,8 @@ void lvgl_hal_init() {
                                                    .dispatch_method = esp_timer_dispatch_t::ESP_TIMER_TASK,
                                                    .name = "lvgl_tick"};
 
-  esp_timer_create(&tick_timer_args, &lvgl_tick_timer);
-  esp_timer_start_periodic(lvgl_tick_timer, 1000);  // 1ms
+  ESP_ERROR_CHECK(esp_timer_create(&tick_timer_args, &lvgl_tick_timer));
+  ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, 1000));  // 1ms
 
   LOG_I("LVGL tick timer started (1ms)");
   LOG_I("LVGL HAL init complete");

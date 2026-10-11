@@ -36,9 +36,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--firmware-dir', type=Path, required=True, help='Directory containing both board-specific firmware folders')
     parser.add_argument('--output', type=Path, default=ROOT / 'work/windows-release')
-    parser.add_argument('--executables-dir', type=Path, help='Reuse executables already built from the same reviewed source')
+    parser.add_argument('--executables-dir', type=Path, help='Deprecated: executable reuse is refused without build provenance')
     parser.add_argument('--qt-source-dir', type=Path, help='Reuse hash-verified corresponding-source archives')
     args = parser.parse_args()
+    if args.executables_dir:
+        parser.error('Executable reuse is disabled. Build all executables from the reviewed source in this run.')
     if sys.platform != 'win32':
         parser.error('Windows executables must be built on Windows.')
     git_root = Path(subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', '--show-toplevel'], text=True).strip())
@@ -75,9 +77,7 @@ def build_package(output, package, version, args):
               '--version-file', str(version_file),
               '--distpath', str(package), '--workpath', str(scratch / 'build'), '--specpath', str(scratch)]
     if args.executables_dir:
-        for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe'):
-            shutil.copy2(args.executables_dir / name, package / name)
-        shutil.copytree(args.executables_dir / '_internal', package / '_internal')
+        raise RuntimeError('Executable reuse is disabled; build from the reviewed source.')
     else:
         gui_dist = scratch / 'desktop-dist'
         build_desktop(*common, '--distpath', str(gui_dist), '--onedir', '--windowed', '--name', 'AI-Monitor',
