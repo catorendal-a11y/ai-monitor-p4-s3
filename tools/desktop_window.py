@@ -23,8 +23,9 @@ from board_profiles import BOARDS, get_board
 from host_security import safe_text, serial_port
 from provider_catalog import PROVIDERS, PROVIDER_SETUP
 from host_status import read_status
+from project_version import HOST_VERSION
 
-APP_VERSION = 'v1.18.3'
+APP_VERSION = HOST_VERSION
 ASSETS = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1])) / 'assets/desktop'
 
 STYLE = '''

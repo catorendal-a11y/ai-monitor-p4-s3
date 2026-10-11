@@ -4,13 +4,16 @@ import hashlib
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'tools'))
+from project_version import fw_version, numeric_version, version_tuple
 
 
 def verify_package(package: Path) -> str:
     package = package.resolve()
-    version = re.search(r'#define FW_VERSION "v(\d+\.\d+\.\d+)"', (package/'src/config.h').read_text()).group(1)
+    version = numeric_version(fw_version(package))
     expected = set()
     for line in (package/'SHA256SUMS.txt').read_text().splitlines():
         digest, relative = line.split('  ', 1)
@@ -41,7 +44,8 @@ def main():
     version = verify_package(args.package)
     args.output.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(args.compiler.resolve()), '/Qp', f'/DPackageDir={args.package.resolve()}',
-                    f'/DAppVersion={version}', f'/DOutputDir={args.output.resolve()}',
+                    f'/DAppVersion={version}', f'/DAppNumericVersion={".".join(map(str, version_tuple("v"+version)))}',
+                    f'/DOutputDir={args.output.resolve()}',
                     str(ROOT/'scripts/windows_installer.iss')], check=True)
     print('Verified per-user installer built; no administrator access or provider credentials required.')
 

@@ -1,3 +1,21 @@
+# AI Monitor v1.18.4
+
+Desktop observations and USB scans run in the background so slow local records do not freeze the window. Status refreshes are coalesced; results from an older setup or tray state are discarded. NOVA images are scaled once and changed only when their state changes. Tray Start host now guides ambiguous USB selection through Display setup.
+
+Firmware preparation also runs off the UI thread. The verified board/port confirmation remains mandatory, and the write revalidates files and configuration afterward. A hung flasher is stopped and reaped before retry is enabled, with an explicit warning that firmware may be incomplete. Normal flashing still requires an identified board and FLASH confirmation.
+
+- Evicted historical token records establish a baseline when they reappear; they no longer produce a false burst of activity. The bounded cache accommodates the full local-file snapshot.
+- Invalid ZCode key errors identify the environment variable or saved setting without printing the key. Legacy Codex authentication files have a size limit. Action output uses explicit callbacks rather than replacing global stdout.
+- Fresh source setup checks an existing Python environment before installing dependencies. The batch launcher rechecks GUI components after setup and reports DLL/import failures instead of silently closing.
+- Firmware rejects invalid quota-window/rotation fields and reports oversized input. Dashboard time follows the same 12-hour freshness policy as NOVA. Settings help wraps onto its second line. Snapshot publication follows completed state changes rather than serial chunks.
+- Executable version resources are generated from the project version. Desktop, Codex handshake, firmware and release notes are checked for agreement. Installer parsing supports prerelease versions with separate numeric Windows metadata.
+- Failed packaging removes its incomplete directory; ZIP publication is atomic. Missing firmware has a direct error. Release reruns preserve existing drafts/assets and verify the downloaded checksums before publication.
+- README encoding artifacts are corrected and covered by a regression check.
+
+Synthetic tests exercise real Qt workers, delayed reads/scans, stale results, fragmented local-window messages, child-process timeout/recovery and packaging failure/retry. A controlled 300 ms read-delay fixture reduced maximum visible event-loop delay from 284 ms to 2.5 ms; it does not measure real provider latency. See [performance evidence](DESKTOP_PERFORMANCE.md).
+
+An application-only firmware update keeps existing display settings. Windows binaries remain unsigned, and SmartScreen may still warn. Physical S3 support remains experimental. No monitor test or quota check starts a model turn.
+
 # AI Monitor v1.18.3
 
 Codex onboarding explicitly explains the fresh-PC route: choose Codex, accept official standalone CLI installation if missing, complete your own browser sign-in and start the host. The app and guides list bundled runtime components and distinguish Windows releases from source/developer setup. No separate Python, Node.js or Git installation is needed for the Windows monitor route.

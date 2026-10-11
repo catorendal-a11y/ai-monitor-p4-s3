@@ -46,7 +46,7 @@ The desktop build uses a clean PATH to avoid unrelated ICU DLLs. An unexpected b
 
 Tagging/publishing is a maintainer action. Preparing an archive locally does not upload it to GitHub.
 
-Keep `scripts/windows_version.txt`, firmware, desktop and client versions synchronized. After building the portable package, create and test the per-user installer:
+Versions are kept on one source: `#define FW_VERSION` in `src/config.h`. All build scripts parse it through `tools/project_version.py` (UTF-8/BOM tolerant, pre-release tolerant), executable version resources are generated from it at build time instead of the removed hand-maintained `scripts/windows_version.txt`, and the host-tool identity `HOST_VERSION` in the same module must match — `tests/test_project_version.py` and the release build itself refuse a mismatch, and the test also verifies that the top heading of `docs/RELEASE_NOTES.md` names the same version. A failed build removes its half-built package directory and publishes the ZIP through a temporary name, so retries are never blocked and no truncated archive is left behind. After building the portable package, create and test the per-user installer:
 
 ```powershell
 ./scripts/install_inno_builder.ps1 -Destination work/inno-builder

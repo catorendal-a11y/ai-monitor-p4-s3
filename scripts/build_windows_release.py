@@ -5,7 +5,6 @@ from importlib import metadata
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
@@ -15,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from board_profiles import BOARDS
 from aim_control import firmware_file
+from project_version import HOST_VERSION, fw_version, windows_version_resource
 from collect_qt_sources import collect as collect_qt_sources
 
 
@@ -44,17 +44,35 @@ def main():
     git_root = Path(subprocess.check_output(['git', '-C', str(ROOT), 'rev-parse', '--show-toplevel'], text=True).strip())
     if git_root.resolve() != ROOT.resolve():
         parser.error('Release building requires this project to be its own Git root; parent repositories are refused.')
-    version = re.search(r'#define FW_VERSION "([^"]+)"', (ROOT / 'src/config.h').read_text(encoding='utf-8-sig')).group(1)
+    version = fw_version(ROOT)
+    if HOST_VERSION != version:
+        parser.error('tools/project_version.py HOST_VERSION ' + HOST_VERSION +
+                     ' does not match FW_VERSION ' + version + '; synchronize them before building.')
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     package = output / ('ai-monitor-p4-' + version + '-windows')
-    if package.exists():
-        parser.error('Package directory already exists; use a new output directory.')
+    if package.exists() or (output / (package.name + '.zip')).exists():
+        parser.error('Package directory or archive already exists; use a new output directory.')
     package.mkdir()
+    try:
+        build_package(output, package, version, args)
+    except BaseException:
+        # A half-built package would block every retry with "directory already
+        # exists"; remove only the directory this run created.
+        if package.resolve().parent != output:
+            raise RuntimeError('Refusing package cleanup outside the selected output directory') from None
+        shutil.rmtree(package, ignore_errors=True)
+        raise
+    print('Portable package: ' + str(output / (package.name + '.zip')))
+
+
+def build_package(output, package, version, args):
     scratch = ROOT / 'work/windows-build'
     scratch.mkdir(parents=True, exist_ok=True)
+    version_file = scratch / 'windows_version.txt'
+    version_file.write_text(windows_version_resource(version), encoding='utf-8')
     common = ['-m', 'PyInstaller', '--noconfirm', '--clean',
-              '--version-file', str(ROOT/'scripts/windows_version.txt'),
+              '--version-file', str(version_file),
               '--distpath', str(package), '--workpath', str(scratch / 'build'), '--specpath', str(scratch)]
     if args.executables_dir:
         for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe'):
@@ -148,11 +166,21 @@ def main():
             hashes.append(hashlib.sha256(path.read_bytes()).hexdigest() + '  ' + path.relative_to(package).as_posix())
     (package / 'SHA256SUMS.txt').write_text('\n'.join(hashes) + '\n', encoding='utf-8')
     archive = output / (package.name + '.zip')
-    with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as bundle:
-        for path in sorted(package.rglob('*')):
-            if path.is_file():
-                bundle.write(path, package.name + '/' + path.relative_to(package).as_posix())
-    print('Portable package: ' + str(archive))
+    archive_package(package, archive)
+
+
+def archive_package(package, archive):
+    partial = archive.with_name(archive.name + '.partial')
+    # Write beside the destination, then publish atomically: an interrupted run
+    # must not leave a truncated archive that still looks like a deliverable.
+    try:
+        with zipfile.ZipFile(partial, 'w', zipfile.ZIP_DEFLATED) as bundle:
+            for path in sorted(package.rglob('*')):
+                if path.is_file():
+                    bundle.write(path, package.name + '/' + path.relative_to(package).as_posix())
+        os.replace(partial, archive)
+    finally:
+        partial.unlink(missing_ok=True)
 
 
 if __name__ == '__main__':

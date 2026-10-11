@@ -7,11 +7,15 @@
 #ifndef OutputDir
   #error OutputDir is required
 #endif
+#ifndef AppNumericVersion
+  #error AppNumericVersion must contain the numeric major.minor.patch version
+#endif
 
 [Setup]
 AppId={{873FC919-66BF-49AE-8265-F25894DBE139}
 AppName=AI Monitor
 AppVersion={#AppVersion}
+VersionInfoVersion={#AppNumericVersion}
 AppPublisher=AI Monitor contributors
 AppPublisherURL=https://github.com/catorendal-a11y/ai-monitor-p4-s3
 DefaultDirName={localappdata}\Programs\AI Monitor

@@ -8,6 +8,7 @@ import threading
 import time
 import psutil
 from host_security import allowed_executable, path_executable, powershell_executable
+from project_version import HOST_VERSION, numeric_version
 
 MAX_REPLY_BYTES = 65536
 
@@ -123,7 +124,7 @@ def read_rate_limits(command, timeout=20):
             if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
             return message['result']
     try:
-        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':'1.17.0'}}})
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':numeric_version(HOST_VERSION)}}})
         response(1); send({'method':'initialized','params':{}})
         send({'method':'account/rateLimits/read','id':2})
         return response(2)

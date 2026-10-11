@@ -29,6 +29,11 @@ class InstallerTests(unittest.TestCase):
     def test_complete_verified_package_is_accepted(self):
         self.assertEqual(builder.verify_package(self.package), '1.16.0')
 
+    def test_prerelease_version_is_accepted_without_crashing(self):
+        (self.package/'src/config.h').write_text('#define FW_VERSION "v1.17.0-rc1"')
+        self.hashes()
+        self.assertEqual(builder.verify_package(self.package), '1.17.0-rc1')
+
     def test_modified_missing_and_unreviewed_files_are_rejected(self):
         (self.package/'AI-Monitor.exe').write_text('changed')
         with self.assertRaises(ValueError): builder.verify_package(self.package)

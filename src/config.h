@@ -1,7 +1,7 @@
 #pragma once
 // Shared AI Monitor configuration; hardware backend selected at build time.
 
-#define FW_VERSION "v1.18.3"
+#define FW_VERSION "v1.18.4"
 #include "board_profile.h"
 // Reported to the AI Monitor companion in the info handshake (protocol level).
 #define AIM_REPORTED_VERSION "2.23.0"
