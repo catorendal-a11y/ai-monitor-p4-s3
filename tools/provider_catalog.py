@@ -27,7 +27,9 @@ PROVIDER_SETUP = {
     'claude': ('1. Install Claude Code, sign in and use the CLI on this PC. Local token records are read automatically.\n'
                '2. For available subscription quotas, click Link Claude quota below. Existing custom '
                'statuslines are preserved.\n3. Restart Claude Code. '
-               'A Claude API key alone does not supply subscription quotas.',
+               'A Claude API key alone does not supply subscription quotas.\n'
+               '4. Optional: Link Claude session events for reported working, waiting and turn-complete states. '
+               'This preserves other hooks and never approves commands. Restart Claude Code; display events require v1.19.0 firmware.',
                'https://code.claude.com/docs/en/statusline'),
     'gemini': ('1. Install Gemini CLI and sign in with your own account.\n2. Use recorded CLI sessions on this PC; '
                'the monitor reads their numeric token totals.\n3. This integration displays LOCAL activity. '

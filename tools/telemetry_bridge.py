@@ -16,7 +16,13 @@ def write_record(path, record):
     try:
         with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
             json.dump(record, output)
-        os.replace(temporary, path)
+        for attempt in range(4):
+            try:
+                os.replace(temporary, path)
+                break
+            except PermissionError as error:
+                if os.name!='nt' or getattr(error,'winerror',None) not in (5,32,33) or attempt==3: raise
+                time.sleep(.02)
     finally:
         if os.path.exists(temporary): os.unlink(temporary)
 

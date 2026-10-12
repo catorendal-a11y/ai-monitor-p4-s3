@@ -1,5 +1,6 @@
 """Atomic local health snapshots. Never store keys, prompts or RPC replies."""
 import json
+import math
 import os
 from pathlib import Path
 import tempfile
@@ -11,7 +12,7 @@ STATES = frozenset(('starting', 'waiting_usb', 'connecting', 'connected',
 OPTIONS = {'reconnect_s': (2, 60, 5), 'token_poll_s': (2, 15, 2),
            'log_font_size': (10, 18, 10)}
 FLAGS = {'start_host_on_open': False, 'keep_host_on_close': True,
-         'minimize_to_tray': True, 'close_to_tray': False}
+         'minimize_to_tray': True, 'close_to_tray': False, 'usage_history': False}
 
 
 def validate_options(config):
@@ -70,6 +71,14 @@ def read_status(root, pids):
         from provider_catalog import PROVIDERS
         for name, value in data['providers'].items():
             if name not in PROVIDERS or value not in ('ready', 'unavailable', 'activity_only'): return None
+        if 'display_sources' in data:
+            mask,stamp=data['display_sources'],data.get('display_sources_at')
+            if type(mask) is not int or not 0<=mask<=255 or type(stamp) not in (int,float) or not math.isfinite(stamp): return None
+        if 'history' in data:
+            from usage_history import ERRORS
+            history=data['history']
+            if not isinstance(history,dict) or type(history.get('enabled')) is not bool: return None
+            if history.get('error') is not None and history['error'] not in ERRORS: return None
         return data
     except (ValueError, OSError, TypeError):
         return None

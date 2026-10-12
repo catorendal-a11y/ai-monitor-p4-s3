@@ -9,19 +9,26 @@ from host_security import powershell_executable, read_local_json
 from telemetry_bridge import write_record
 
 
-def claude_command(root):
+def claude_command(root, option='--claude-statusline'):
+    if option not in ('--claude-statusline','--claude-event'): raise ValueError('Unsupported Claude integration')
     if getattr(sys, 'frozen', False):
         helper = root / 'AI-Monitor-Console.exe'
         if not helper.is_file(): raise ValueError('Console helper missing. Reinstall the complete release.')
-        command = [str(helper), '--claude-statusline']
+        command = [str(helper), option]
     else:
-        command = [sys.executable, str(root / 'tools/aim_control.py'), '--claude-statusline']
+        command = [sys.executable, str(root / 'tools/aim_control.py'), option]
     if os.name == 'nt':
         expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + arg.replace("'", "''") + "'" for arg in command)
+        if option=='--claude-event':
+            expression=("$ProgressPreference='SilentlyContinue'; try { $buffer=[char[]]::new(65537); "
+                '$count=[Console]::In.ReadBlock($buffer,0,$buffer.Length); '
+                'if ($count -lt $buffer.Length) { $payload=[string]::new($buffer,0,$count); $payload | & '+
+                ' '.join("'"+arg.replace("'","''")+"'" for arg in command)+
+                ' *> $null } } catch {}; exit 0')
         encoded = base64.b64encode(expression.encode('utf-16le')).decode('ascii')
         return '"' + powershell_executable() + '" -NoProfile -EncodedCommand ' + encoded
     import shlex
-    return shlex.join(command)
+    return shlex.join(command)+(' >/dev/null 2>&1; exit 0' if option=='--claude-event' else '')
 
 
 def claude_bridge(root, remove=False, home=None):
@@ -71,6 +78,117 @@ def _host_quota_report(running, state):
     if state == 'ready': return 'verified'
     if state == 'unavailable': return 'failed'
     return 'pending-running' if running else 'pending-stopped'
+
+
+CLAUDE_EVENTS = ('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse',
+                 'PermissionRequest','Notification','Stop','StopFailure','SessionEnd')
+
+
+def claude_session_link(root, remove=False, home=None):
+    """Append/remove only this installation's observational command hooks."""
+    settings=(Path.home() if home is None else Path(home))/'.claude/settings.json'
+    document=read_local_json(settings,65536) if settings.exists() else {}
+    if not isinstance(document,dict): raise ValueError('Invalid Claude settings; nothing changed.')
+    hooks=document.get('hooks',{})
+    if not isinstance(hooks,dict): raise ValueError('Invalid Claude hooks; nothing changed.')
+    expected={'type':'command','command':claude_command(root,'--claude-event'),'timeout':2}
+    changed=False
+    for event in CLAUDE_EVENTS:
+        entries=hooks.get(event,[])
+        if not isinstance(entries,list) or any(not isinstance(e,dict) or not isinstance(e.get('hooks'),list) for e in entries):
+            raise ValueError('Invalid Claude hook entries; nothing changed.')
+        matcher='permission_prompt|elicitation_dialog|agent_needs_input' if event=='Notification' else ''
+        if remove:
+            kept=[]
+            for entry in entries:
+                owned=entry.get('matcher','')==matcher and expected in entry['hooks']
+                if not owned: kept.append(entry); continue
+                remaining=[h for h in entry['hooks'] if h!=expected]
+                if remaining: kept.append(dict(entry,hooks=remaining))
+                changed=True
+            if kept: hooks[event]=kept
+            else: hooks.pop(event,None)
+        elif not any(entry.get('matcher','')==matcher and expected in entry['hooks'] for entry in entries):
+            hooks[event]=entries+[{'matcher':matcher,'hooks':[expected]}]
+            changed=True
+    from session_activity import link_marker
+    marker_path=root/'tools/activity/claude-session-link.json'
+    if remove:
+        # Invalidates old/in-flight observations before removing the commands.
+        write_record(marker_path,{'enabled':False,'generation':time.time_ns()})
+    if not changed:
+        if not remove and not link_marker(root/'tools/activity')['enabled']:
+            write_record(marker_path,{'enabled':True,'generation':time.time_ns()})
+        return 'Claude session events already '+('removed.' if remove else 'linked. Restart Claude Code to activate them.')
+    if hooks: document['hooks']=hooks
+    else: document.pop('hooks',None)
+    settings.parent.mkdir(parents=True,exist_ok=True)
+    if settings.exists(): shutil.copy2(settings,settings.with_name('settings.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+    write_record(settings,document)
+    if not remove: write_record(marker_path,{'enabled':True,'generation':time.time_ns()})
+    return ('Claude session events removed; other hooks were preserved.' if remove else
+            'Claude session events linked. Restart Claude Code. Hooks only record state; they return no permission decision.')
+
+
+def setup_report(root, home=None):
+    """Structured, source-specific readiness; no model/USB requests or writes."""
+    from aim_control import local_config, owned_hosts
+    from codex_support import codex_command
+    from host_status import read_status
+    from provider_catalog import PROVIDERS
+    from token_activity import TokenReporter
+    from session_activity import summary
+    config=local_config(root)
+    reporter=TokenReporter(providers=config['providers'],activity_dir=root/'tools/activity',home=home)
+    sample=reporter.poll()
+    processes=owned_hosts(root)
+    health=read_status(root,{p.pid for p in processes}) if processes else None
+    states=health['providers'] if health else {}
+    session_rows=summary(root/'tools/activity',config['providers'])['providers']
+    live=bool(health and health['state']=='connected' and health.get('board')==config.get('board')
+              and config['port'] in ('auto',health.get('port')))
+    results=[]
+    for provider in config['providers']:
+        readable=bool(sample['sources'] & PROVIDERS[provider][1])
+        quota=_host_quota_report(bool(processes),states.get(provider))
+        if provider=='codex': next_step=_codex_extra(bool(codex_command()),quota)
+        elif provider=='zcode': next_step=_zcode_extra(_zcode_key_source(config),quota)
+        elif provider=='claude': next_step=_claude_extra(claude_link_state(root,home))
+        elif provider in ('gemini','opencode'): next_step='Use the official client once, then check again. This integration does not report remaining account quota.'
+        else: next_step=_bridge_extra(provider,readable)
+        event_state=claude_session_state(root,home) if provider=='claude' else 'unsupported'
+        results.append(dict(provider=provider,activity='readable' if readable else 'missing',
+            quota=quota if provider in ('codex','zcode','claude') else 'unsupported',
+            display=('source-echoed' if live and type(health.get('display_sources')) is int
+                     and health['display_sources'] & PROVIDERS[provider][1]
+                     and type(health.get('display_sources_at')) in (int,float)
+                     and 0<=time.time()-health['display_sources_at']<=35 else 'connected' if live else 'unconfirmed'),
+            sessions='reporting' if any(r['provider']==provider for r in session_rows) else
+                     'linked / waiting for events' if event_state=='installed' else event_state,
+            next_step=next_step))
+    return results
+
+
+def claude_session_state(root,home=None):
+    settings=(Path.home() if home is None else Path(home))/'.claude/settings.json'
+    try:
+        document=read_local_json(settings,65536) if settings.exists() else {}
+        if not isinstance(document,dict) or not isinstance(document.get('hooks',{}),dict): return 'invalid'
+        hooks=document.get('hooks',{})
+        expected={'type':'command','command':claude_command(root,'--claude-event'),'timeout':2}
+        found=0
+        for event in CLAUDE_EVENTS:
+            entries=hooks.get(event,[])
+            if not isinstance(entries,list): return 'invalid'
+            matcher='permission_prompt|elicitation_dialog|agent_needs_input' if event=='Notification' else ''
+            found+=any(isinstance(e,dict) and e.get('matcher','')==matcher
+                       and isinstance(e.get('hooks'),list) and expected in e['hooks'] for e in entries)
+        if found==len(CLAUDE_EVENTS):
+            if document.get('disableAllHooks') is True: return 'hooks disabled in Claude settings'
+            from session_activity import link_marker
+            return 'installed' if link_marker(root/'tools/activity')['enabled'] else 'link disabled / retry setup'
+        return 'partial link' if found else 'not linked'
+    except (ValueError,OSError,TypeError): return 'invalid'
 
 
 def _codex_extra(cli_found, report):

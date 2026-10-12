@@ -161,8 +161,19 @@ void update() {
   });
   const char *heading = "Ready", *message = "Waiting for token activity";
   char tokenMessage[96];
+  const auto sessions = session_status(snapshot, now);
   const lv_image_dsc_t* pose = &nova_assets::work;
   switch (mood) {
+    case NovaMood::session_working:
+      heading = "Working";
+      snprintf(tokenMessage, sizeof(tokenMessage), "%u reported running %s", sessions.running, sessions.running == 1 ? "session" : "sessions");
+      message = tokenMessage; break;
+    case NovaMood::attention:
+      heading = "Needs you";
+      snprintf(tokenMessage, sizeof(tokenMessage), "%u %s waiting for input", sessions.waiting, sessions.waiting == 1 ? "session" : "sessions");
+      message = tokenMessage; break;
+    case NovaMood::completed: heading = "Turn complete"; message = "Reported by the AI client"; pose = &nova_assets::done; break;
+    case NovaMood::session_error: heading = "Session error"; message = "Check the AI client on your PC"; break;
     case NovaMood::working: {
       heading = "Working";
       char count[24]; format_token_count(snapshot.lastTokenDelta, count, sizeof(count));
@@ -179,7 +190,7 @@ void update() {
     case NovaMood::greeting: heading = "Hi there!"; message = "Ready when you are"; pose = &nova_assets::done; break;
     case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
   }
-  if ((mood == NovaMood::ready || mood == NovaMood::working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
+  if ((mood == NovaMood::ready || mood == NovaMood::working || mood == NovaMood::session_working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
   pose = nova_assets::companion_pose(companion == app_settings::Companion::orbit, pose);
   if (pose != drawnPose) { drawnPose = pose; lv_image_set_src(figure, pose); }
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
@@ -190,9 +201,15 @@ void update() {
     if (lv_obj_get_y(figure) != y) lv_obj_set_y(figure, y);
   }
   text(title, heading); text(subtitle, message);
+  const uint32_t stageColor = mood == NovaMood::attention ? 0xFFC857 :
+      (mood == NovaMood::session_error ? 0xFF5252 : ui_theme::border);
+  if (lv_color_to_u32(lv_obj_get_style_border_color(stage, LV_PART_MAIN)) != lv_color_to_u32(lv_color_hex(stageColor)))
+    lv_obj_set_style_border_color(stage, lv_color_hex(stageColor), 0);
   uint16_t minutes = 0; char value[128];
-  text(tracking, token_tracking_label(snapshot, now));
-  token_activity_hint(snapshot, now, value, sizeof(value)); text(hint, value);
+  text(tracking, sessions.known ? "SESSION EVENTS / selected AIs" : token_tracking_label(snapshot, now));
+  token_activity_hint(snapshot, now, value, sizeof(value));
+  text(hint, mood == NovaMood::attention ? "Input needed in your AI client" :
+      (mood == NovaMood::session_error ? "Check the AI client on your PC" : value));
   if (local_minutes(snapshot, now, minutes)) snprintf(value, sizeof(value), "%02u:%02u", minutes / 60, minutes % 60);
   else snprintf(value, sizeof(value), "--:--");
   text(clock, value);
@@ -248,6 +265,13 @@ void update() {
     snprintf(selectedStatus, sizeof(selectedStatus), "%s%s", period, choice.automatic ? " / AUTO" : "");
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
                           (view.fetching ? "UPDATING / last good" : (!hasRow ? (choice.automatic ? "Waiting for data" : "Selected window unavailable") : (!fresh ? "STALE / last good" : selectedStatus)))));
+    const auto provider_sessions = style ? session_status(snapshot, now, style->activityMask) : SessionStatus{};
+    if (snapshot.hostPresent && provider_sessions.known) {
+      if (provider_sessions.waiting) status = "SESSION / needs you";
+      else if (provider_sessions.running) status = "SESSION / running";
+      else if (provider_sessions.error) status = "SESSION / error";
+      else if (provider_sessions.completed) status = "SESSION / turn complete";
+    }
     text(item.status, status);
   }
 }

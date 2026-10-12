@@ -17,8 +17,9 @@ class TokenSampler:
     A stuck local source makes its signal expire, rather than creating more
     threads or delaying the heartbeat. Configuration changes discard old work.
     """
-    def __init__(self, **options):
+    def __init__(self, history=None, **options):
         self.options = options
+        self.history = history
         self.condition = threading.Condition()
         self.reporter = TokenReporter(**options)
         self.generation = 0
@@ -61,7 +62,18 @@ class TokenSampler:
                 self.requested = False
                 self.busy = True
                 reporter, generation = self.reporter, self.generation
-            try: value = reporter.poll()
+            try:
+                value = reporter.poll()
+                if value is not None:
+                    value['deltas'] = dict(reporter.deltas)
+                    from session_activity import summary
+                    try:
+                        value['sessions'] = summary(self.options.get('activity_dir'), reporter.providers) if self.options.get('activity_dir') else {'cmd':'session_activity','providers':[]}
+                    except (OSError,ValueError,TypeError,RecursionError): value['sessions']={'cmd':'session_activity','providers':[]}
+                    with self.condition: current = generation == self.generation and not self.closed
+                    if current and self.history is not None:
+                        try: self.history.record_tokens(reporter.deltas)
+                        except (OSError,ValueError,TypeError): pass  # Optional history never suppresses activity delivery.
             except Exception: value = None  # No source content or exceptions are exported.
             with self.condition:
                 self.busy = False
@@ -110,6 +122,7 @@ class TokenReporter:
         self.last_use = None
         self.last_poll = None
         self.poll_seconds = 2
+        self.deltas = {}
 
     @staticmethod
     def read_counts(provider, path):
@@ -136,6 +149,7 @@ class TokenReporter:
             return None
         self.last_poll = now
         delta, sources = 0, 0
+        self.deltas = {}
         for provider in self.providers:
             bit = PROVIDERS[provider][1]
             try:
@@ -160,13 +174,16 @@ class TokenReporter:
                 continue
             sources |= bit
             previous = self.previous.get(provider)
+            provider_delta = 0
             if previous is not None:
                 for key, value in counts.items():
                     # Codex forks/imports can contain history on first sight. Baseline new thread IDs.
                     baseline_new = (provider == 'codex' or (provider == 'opencode' and key.startswith('session:')) or
                                     (key not in previous and provider in self.retired and self.retired[provider].contains(key)))
                     old = previous.get(key, value if baseline_new else 0)
-                    delta += max(0, value - old)
+                    provider_delta += max(0, value - old)
+            delta += provider_delta
+            self.deltas[provider] = provider_delta
             history = previous if previous is not None else OrderedDict()
             for key, value in counts.items():
                 history[key] = value

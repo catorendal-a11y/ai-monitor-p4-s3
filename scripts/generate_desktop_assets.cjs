@@ -6,10 +6,12 @@ const root = path.resolve(__dirname, '..');
 const target = path.join(root, 'assets', 'desktop');
 (async () => {
   fs.mkdirSync(target, {recursive: true});
-  for (const pose of ['done', 'work']) {
+  const sessionOnly = process.argv.includes('--session-only');
+  for (const pose of (sessionOnly ? ['attention', 'error'] : ['done', 'work', 'attention', 'error'])) {
     await sharp(path.join(root, 'assets', 'nova', pose + '.svg')).resize(430, 284)
       .png().toFile(path.join(target, 'nova-' + pose + '.png'));
   }
+  if (sessionOnly) { console.log('Rendered session-state poses from original NOVA vectors.'); return; }
   const nova = fs.readFileSync(path.join(root, 'assets', 'nova', 'work.svg')).toString('base64');
   const icon = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" rx="48" fill="#101d24"/><circle cx="128" cy="128" r="112" fill="#17352c"/><image x="-32" y="23" width="320" height="211" href="data:image/svg+xml;base64,${nova}"/></svg>`;
   await sharp(Buffer.from(icon)).png().toFile(path.join(target, 'nova-icon.png'));

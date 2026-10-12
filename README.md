@@ -100,7 +100,9 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 [Preview AI setup and provider choices](docs/media/desktop-ai-setup.png). ZCode's masked key field appears only when it is selected; leave it blank to preserve an existing key.
 
-**Check AI setup** checks selected local sources. Claude users can link and remove the optional subscription-quota integration directly in AI setup. OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage.
+**Check AI setup** separates local activity, account quota, USB delivery and session events, with a 60-second observation test and the next action for each AI. Optional **History** shows local token increases, quota charts and cautious consumption estimates. Claude users can explicitly link session events so NOVA/ORBIT show **Working**, **Needs you** and **Turn complete**, alongside the separate subscription-quota link. [Checklist, history and session setup](docs/USAGE_INSIGHTS.md).
+
+OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage. Session events currently support Claude Code only; the other AIs use recorded token activity.
 
 **Host settings:** choose USB retry speed, local token read speed, terminal text size, automatic start, minimize/close-to-tray behavior, and whether quitting stops the host. **Check connection** verifies the display without flashing. The sidebar shows USB health separately from account quota; corrupt configuration has an explicit backup-and-recover flow. [Preview Host settings](docs/media/desktop-host-settings.png) or read the [connection guide](docs/QUICK_START.md#connection-checks-and-host-preferences).
 
@@ -114,7 +116,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.18.5-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.18.5-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest) and run **AI-Monitor-Setup-v1.19.0-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.19.0-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -122,7 +124,7 @@ Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program ic
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.5/AI-Monitor-Setup-v1.18.5-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.5/ai-monitor-p4-v1.18.5-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.18.5/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.0/AI-Monitor-Setup-v1.19.0-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.0/ai-monitor-p4-v1.19.0-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.0/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 

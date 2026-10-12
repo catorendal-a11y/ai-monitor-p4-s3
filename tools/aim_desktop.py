@@ -14,7 +14,8 @@ def main():
         application = QApplication.instance() or QApplication(sys.argv[:1])
         with tempfile.TemporaryDirectory(prefix='ai-monitor-gui-check-') as directory:
             window = MonitorWindow(Path(directory), monitor=False)
-            valid = not window.nova.pixmap().isNull() and not window.windowIcon().isNull()
+            valid = not window.nova.pixmap().isNull() and not window.windowIcon().isNull() and all(
+                not image.isNull() for image in window.session_pixmaps.values())
             window.close()
         if getattr(sys, 'frozen', False):
             from desktop_support import check_flasher_runtime

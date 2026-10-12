@@ -29,6 +29,41 @@ static std::string frame(const std::string& rows, const char* provider = "codex"
       ",\"usage\":{\"rows\":" + rows + "}}]}\n";
 }
 
+static void session_events_are_bounded_selected_and_expire() {
+  aim::ProtoCore core;
+  uint32_t now = 100; core.tick = [&] { return now; };
+  feed(core,"{\"cmd\":\"get_info\",\"heartbeat\":true}\n");
+  CHECK(core.out().find("\"sessionActivity\":true") != std::string::npos);
+  feed(core,"{\"cmd\":\"set_views\",\"views\":[\"claude\"]}\n");
+  const std::string row="{\"provider\":\"claude\",\"running\":1,\"waiting\":0,\"completed\":0,\"error\":0}";
+  feed(core,"{\"cmd\":\"session_activity\",\"providers\":["+row+"]}\n");
+  CHECK(session_status(core.snapshot(),now).running==1);
+  NovaState state;
+  const auto warning=[](const char*,const aim::Row&) { return static_cast<uint8_t>(20); };
+  CHECK(state.evaluate(core.snapshot(),now,false,warning)==NovaMood::session_working);
+  const auto before=core.snapshot();
+  for (const std::string& rows : {"["+row+","+row+"]",std::string("[{\"provider\":\"claude\",\"running\":true,\"waiting\":0,\"completed\":0,\"error\":0}]"),
+      std::string("[{\"provider\":\"claude\",\"running\":65,\"waiting\":0,\"completed\":0,\"error\":0}]"),std::string("[null]")}) {
+    core.clear_out(); feed(core,"{\"cmd\":\"session_activity\",\"providers\":"+rows+"}\n");
+    CHECK(core.out().find("error")!=std::string::npos);
+    CHECK(core.snapshot().sessions[0].running==before.sessions[0].running);
+  }
+  auto snapshot=core.snapshot(); snapshot.sessions[0].running=0; snapshot.sessions[0].waiting=1;
+  CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::attention);
+  snapshot.sessions[0].waiting=0; snapshot.sessions[0].completed=1;
+  CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::completed);
+  snapshot.sessions[0].completed=0; snapshot.sessions[0].error=1;
+  CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::session_error);
+  CHECK(!session_status(snapshot,now+35000u).known);
+  std::snprintf(snapshot.viewKeys[0],sizeof(snapshot.viewKeys[0]),"%s","codex");
+  CHECK(!session_status(snapshot,now).known);
+  snapshot.viewsConfigured=false; snapshot.sessionActivityMs=0xfffffff0u;
+  CHECK(session_status(snapshot,10u).known);
+  snapshot.hostPresent=false; CHECK(!session_status(snapshot,10u).known);
+  feed(core,"{\"cmd\":\"session_activity\",\"providers\":[]}\n");
+  CHECK(core.snapshot().sessionCount==0);
+}
+
 static void timestamp_and_ack() {
   aim::ProtoCore core;
   core.tick = [] { return 1234u; };
@@ -767,6 +802,7 @@ int main() {
     feed(core, "{\"data\":[{\"provider\":\"opencode\",\"notice\":\"Setup\",\"informational\":\"bad\"}]}\n");
     CHECK(core.out().find("invalid informational flag") != std::string::npos);
   }
+  session_events_are_bounded_selected_and_expire();
   timestamp_and_ack();
   invalid_frame_keeps_snapshot();
   set_views_clears_old_data_and_rejects_bad_keys();

@@ -1,5 +1,8 @@
 # Choose your AI providers
 
+For the connection checklist, a live observation test, optional local history and Claude's separate
+session-event integration, see [Usage insights](USAGE_INSIGHTS.md).
+
 First-time setup has **no preselected AI**. Check one or more providers explicitly in the desktop app, or use the numbered console choices. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
 
 ## What each choice supports

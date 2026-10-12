@@ -21,6 +21,7 @@
 #include "ui/theme.h"
 #include "ui/usage_format.h"
 #include "ui/token_status.h"
+#include "ui/session_status.h"
 #include "ui/interaction.h"
 #include "ui/quota_alert.h"
 #include "ui_usage_details.h"
@@ -663,7 +664,7 @@ static void layout_rows(CardWidgets& card, const aim::ViewData* view) {
 }
 
 static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* view, const char* key, size_t slot,
-                        uint32_t now, bool hostConnected) {
+                        uint32_t now, bool hostConnected, const SessionStatus& sessions) {
   layout_rows(c, view);
   const V2Style* vs = v2_style(view && view->valid ? view->providerKey : key);
   const char* keyStr = view && view->valid ? view->providerKey : key;
@@ -722,6 +723,10 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
   snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
            !view || !view->valid ? "WAITING" :
            (!hostConnected ? "OFFLINE" : (view->informational ? "ACTIVITY / SETUP" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus))))));
+  if (hostConnected && sessions.known && (sessions.waiting || sessions.running || sessions.error || sessions.completed)) {
+    snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
+             sessions.waiting ? "NEEDS YOU" : sessions.error ? "SESSION ERROR" : sessions.running ? "WORKING" : "TURN DONE");
+  }
   set_label_cached(c.vendor, cache.vendor, sizeof(cache.vendor), vendorBuf);
 
   char remBuf[12];
@@ -837,7 +842,8 @@ void dashboard_update() {
     // Quota and local activity are independent capabilities. A fresh signal
     // from some other selected AI must not mark a missing bridge healthy.
     const bool local = view.valid && view.informational && provider &&
-        token_signal_fresh(snap, now) && (snap.tokenSourceMask & provider->activityMask);
+        ((token_signal_fresh(snap, now) && (snap.tokenSourceMask & provider->activityMask)) ||
+         session_status(snap, now, provider->activityMask).known);
     if (snap.hostPresent && (local || (view.valid && !view.notice && !view.fetching && view.rowCount &&
         now - view.quotaReceivedMs < STALE_MS))) ++onlineCount;
   }
@@ -921,7 +927,8 @@ void dashboard_update() {
         big[i].viewIndex = entries[i].index;
         snprintf(big[i].providerKey, sizeof(big[i].providerKey), "%s", entries[i].key[0] ? entries[i].key : entries[i].view->providerKey);
         lv_obj_set_hidden(big[i].card, false);
-        render_card(big[i], bigCache[i], entries[i].view, entries[i].key, i, now, snap.hostPresent);
+        render_card(big[i], bigCache[i], entries[i].view, entries[i].key, i, now, snap.hostPresent,
+                    session_status(snap, now, entries[i].key));
       } else {
         lv_obj_set_hidden(big[i].card, true);
       }
@@ -934,7 +941,8 @@ void dashboard_update() {
         compact[i].viewIndex = entries[start + i].index;
         snprintf(compact[i].providerKey, sizeof(compact[i].providerKey), "%s", entries[start + i].key[0] ? entries[start + i].key : entries[start + i].view->providerKey);
         lv_obj_set_hidden(compact[i].card, false);
-        render_card(compact[i], compactCache[i], entries[start + i].view, entries[start + i].key, kBigCards + i, now, snap.hostPresent);
+        render_card(compact[i], compactCache[i], entries[start + i].view, entries[start + i].key, kBigCards + i, now, snap.hostPresent,
+                    session_status(snap, now, entries[start + i].key));
       } else {
         lv_obj_set_hidden(compact[i].card, true);
       }

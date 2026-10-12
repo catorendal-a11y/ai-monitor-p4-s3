@@ -494,6 +494,7 @@ class Panel:
         self.activity_supported = False
         self.tokens_supported = False
         self.provider_selection_supported = False
+        self.sessions_supported = False
         self.token_reporter = None
         self.info = {}
         self.expected_board = None
@@ -550,6 +551,7 @@ class Panel:
         self.activity_supported = info.get("hostActivity") is True
         self.tokens_supported = info.get("tokenActivity") is True
         self.provider_selection_supported = info.get('providerSelection') is True
+        self.sessions_supported = info.get('sessionActivity') is True
         boot_id, uptime = info.get("bootId"), info.get("uptime")
         if self.boot_id is not None and boot_id != self.boot_id:
             raise ConnectionResetError("Panel restarted; restoring views")
@@ -557,13 +559,29 @@ class Panel:
             raise ConnectionResetError("Panel uptime reset; restoring views")
         self.boot_id, self.last_uptime = boot_id, uptime
         status = getattr(self, 'health', None)
-        if isinstance(status, HostStatus): status.update('connected', self.name)
+        if isinstance(status, HostStatus):
+            source_mask=info.get('tokenSources')
+            if type(source_mask) is int and 0<=source_mask<=255:
+                age=info.get('tokenAgeSeconds')
+                status.data['display_sources']=source_mask if info.get('tokenKnown') is True and type(age) is int and 0<=age<35 else 0
+                status.data['display_sources_at']=time.time()
+            history=getattr(self,'history',None)
+            if history is not None:
+                status.data['history']={'enabled':history.enabled,'error':history.last_error}
+            status.update('connected', self.name)
 
     def report_tokens(self):
         if self.tokens_supported and isinstance(self.token_reporter, (TokenReporter, TokenSampler)):
             message = self.token_reporter.poll()
             if message is not None:
-                self.send_line(json.dumps(message))
+                sessions = message.get('sessions')
+                self.send_line(json.dumps({key:value for key,value in message.items() if key not in ('sessions','deltas')}))
+                if sessions is not None:
+                    if self.sessions_supported: self.send_line(json.dumps(sessions))
+                    health = getattr(self, 'health', None)
+                    if isinstance(health, HostStatus):
+                        health.data['sessions'] = sessions
+                        health.data['sessions_at'] = time.time()
 
     def _write(self, data):
         if self.ser.write(data) != len(data):
@@ -849,7 +867,9 @@ def _run_loop(cfg, interval, zai_key, views):
     health = HostStatus(HERE)
     health.data['board'] = cfg.get('board', '')
     health.update('starting')
-    tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity')
+    from usage_history import HistoryRecorder
+    history = HistoryRecorder(HERE / 'activity', cfg.get('usage_history',False))
+    tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
         while True:
@@ -858,6 +878,7 @@ def _run_loop(cfg, interval, zai_key, views):
             if changed_config is not None:
                 previous = cfg
                 cfg = changed_config
+                history.configure(cfg.get('usage_history',False))
                 health.data['board'] = cfg.get('board', '')
                 interval = cfg["interval_s"]
                 zai_key = cfg.get("zai_key", "")
@@ -886,7 +907,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 if not port_name:
                     health.update('waiting_usb', '')
                     LOG('USB selection unresolved. Choose an explicit port if several devices are connected.')
-                    wait_for_config(watcher, cfg.get('reconnect_s', 5))
+                    wait_for_config(watcher, cfg.get('reconnect_s', 5), tokens if cfg.get('usage_history') else None)
                     continue
                 try:
                     health.update('connecting', port_name)
@@ -897,12 +918,13 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.fetcher = fetcher
                     panel.config_watcher = watcher
                     panel.token_reporter = tokens
+                    panel.history = history
                     panel.report_tokens()
                     LOG(f"connected to {port_name}, views={views}")
                 except Exception as exc:
                     LOG(f"open {port_name} failed: {exc}")
                     health.update('reconnecting', port_name)
-                    wait_for_config(watcher, cfg.get('reconnect_s', 5))
+                    wait_for_config(watcher, cfg.get('reconnect_s', 5), tokens if cfg.get('usage_history') else None)
                     continue
             try:
                 cycle_started = time.monotonic()
@@ -934,19 +956,21 @@ def _run_loop(cfg, interval, zai_key, views):
                 panel.close()
                 panel = None
                 health.update('reconnecting')
-                wait_for_config(watcher, cfg.get('reconnect_s', 5))
+                wait_for_config(watcher, cfg.get('reconnect_s', 5), tokens if cfg.get('usage_history') else None)
     finally:
         health.update('stopped')
         tokens.close()
+        history.close()
         fetcher.close()
         if panel is not None:
             panel.close()
 
 
-def wait_for_config(watcher, seconds):
+def wait_for_config(watcher, seconds, sampler=None):
     """Apply a saved USB change promptly even while the display is unplugged."""
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
+        if sampler is not None: sampler.poll()
         time.sleep(min(0.5, max(0, deadline - time.monotonic())))
         watcher.check()
         if watcher.pending is not None: return
@@ -1011,6 +1035,8 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         health = getattr(panel, 'health', None)
         if isinstance(health, HostStatus):
             health.provider(provider, 'activity_only' if informational else 'ready' if rows and not notice else 'unavailable')
+        history = getattr(panel, 'history', None)
+        if history is not None and rows and not notice: history.record_quota(provider, rows)
         LOG(f"{provider}: frame {frame_id} ACK")
     return frame_id
 

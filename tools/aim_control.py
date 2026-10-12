@@ -386,10 +386,23 @@ def main(argv=None):
     parser.add_argument('--setup-codex', action='store_true', help='Install/sign in the explicitly selected official Codex CLI')
     parser.add_argument('--ingest', choices=list(PROVIDERS), help='Read a cumulative numeric telemetry record from stdin')
     parser.add_argument('--claude-statusline', action='store_true', help='Receive documented Claude statusline quota fields')
+    parser.add_argument('--claude-event', action='store_true', help='Observe a Claude lifecycle event silently; never return a decision')
     args = parser.parse_args(argv)
     if args.quota_worker:
         return host.quota_worker(args.quota_worker)
     (ROOT / "tools").mkdir(exist_ok=True)
+    if args.claude_event:
+        # Observational hooks must stay silent and never block/inject context.
+        # The JSON may contain text; discard it and retain only hashed ID/state.
+        from session_activity import claude_event,link_marker
+        try:
+            if 'claude' not in local_config()['providers']: return 0
+            marker=link_marker(ROOT/'tools/activity')
+            if not marker['enabled']: return 0
+            raw = sys.stdin.buffer.read(65537)
+            if len(raw)<=65536: claude_event(json.loads(raw), ROOT/'tools/activity',generation=marker['generation'])
+        except (ValueError,OSError,TypeError,RecursionError): pass
+        return 0
     if args.ingest or args.claude_statusline:
         from telemetry_bridge import ingest, claude_statusline
         try:

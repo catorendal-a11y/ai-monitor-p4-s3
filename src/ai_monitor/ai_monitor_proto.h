@@ -237,13 +237,14 @@ class ProtoCore {
           "\"display\":\"%s\",\"panel\":\"%s\",\"panelId\":\"%s\",\"boardId\":\"%s\",\"chip\":\"%s\","
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
-          "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,"
-          "\"uptime\":%lu,\"heap\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu}\n",
+          "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
+          "\"uptime\":%lu,\"heap\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
           (unsigned long)(tick() / 1000u), (unsigned)heap(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
-          (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta));
+          (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
+          static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();
   }
 
@@ -513,6 +514,31 @@ class ProtoCore {
       snap_.tokenIdleSeconds = doc["idleSeconds"].as<uint32_t>(); snap_.tokenActivityMs = tick();
       if (doc["delta"].as<uint64_t>() > 0) snap_.lastTokenDelta = doc["delta"].as<uint64_t>();
       emit("{\"type\":\"ok\",\"cmd\":\"token_activity\"}\n");
+    } else if (strcmp(cmd, "session_activity") == 0) {
+      const JsonArrayConst providers = doc["providers"].as<JsonArrayConst>();
+      if (providers.isNull() || providers.size() > kMaxViews) {
+        reply_error(-1, 0, "invalid session activity"); return;
+      }
+      SessionCounts incoming[kMaxViews]{};
+      uint8_t count = 0, sources = 0;
+      for (const auto row : providers) {
+        const auto* style = provider_style(row["provider"] | "");
+        if (!row.is<JsonObjectConst>() || !row["provider"].is<const char*>() || !style ||
+            (sources & style->activityMask) || !row["running"].is<uint16_t>() ||
+            !row["waiting"].is<uint16_t>() || !row["completed"].is<uint16_t>() || !row["error"].is<uint16_t>()) {
+          reply_error(-1, 0, "invalid session activity"); return;
+        }
+        const auto running = row["running"].as<uint16_t>(), waiting = row["waiting"].as<uint16_t>();
+        const auto completed = row["completed"].as<uint16_t>(), error = row["error"].as<uint16_t>();
+        if (static_cast<uint32_t>(running) + waiting + completed + error > 64u) {
+          reply_error(-1, 0, "invalid session counts"); return;
+        }
+        incoming[count++] = SessionCounts{running, waiting, completed, error, style->activityMask};
+        sources |= style->activityMask;
+      }
+      for (size_t i = 0; i < kMaxViews; ++i) snap_.sessions[i] = incoming[i];
+      snap_.sessionCount = count; snap_.sessionActivityMs = tick();
+      emit("{\"type\":\"ok\",\"cmd\":\"session_activity\"}\n");
     } else if (strcmp(cmd, "host_activity") == 0) {
       if (!doc["state"].is<const char*>() || (!doc["message"].isNull() && !doc["message"].is<const char*>())) {
         reply_error(-1, 0, "invalid host activity"); return;

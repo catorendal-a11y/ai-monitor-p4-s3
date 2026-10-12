@@ -156,7 +156,8 @@ def collect_status(root, config, secrets, reporter, tokens):
                    time.monotonic() - reporter.last_use < 20)
     return {'running': bool(processes), 'summary': desktop.connection_summary(root, processes),
             'health': health, 'log': desktop.recent_log(root, secrets) if tokens else None,
-            'sample': sample, 'reporter': reporter, 'working': working}
+            'sample': sample, 'reporter': reporter, 'working': working,
+            'sessions': __import__('session_activity').summary(root/'tools/activity',config['providers']) if tokens else None}
 
 
 class ActionWorker(QRunnable):
@@ -257,6 +258,9 @@ class MonitorWindow(QMainWindow):
         self.connection_checked = False
         self.connection_failed = False
         self.current_action = None
+        self.pending_setup_report = None
+        self.live_sampler = None
+        self.cached_health = None
         self.live_connected = False
         self.host_running = False
         self.status_worker = None
@@ -292,6 +296,9 @@ class MonitorWindow(QMainWindow):
         self.robot_pixmaps = tuple(image.scaled(230, 174, Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation) for image in (self.ready_image, self.work_image))
         self.robot_working = None
+        self.robot_pose = None
+        self.session_pixmaps={pose:QPixmap(str(ASSETS/('nova-'+pose+'.png'))).scaled(230,174,
+            Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation) for pose in ('attention','error')}
         self._build()
         self._load_fields()
         if self.config_error:
@@ -519,6 +526,10 @@ class MonitorWindow(QMainWindow):
         self.tabs.addTab(self._preferences_tab(), 'Host settings')
         self.tabs.addTab(self._firmware_tab(), 'Firmware')
         self.tabs.addTab(self._help_tab(), 'Help')
+        from insights_ui import HistoryView
+        self.history_view=HistoryView(self)
+        history_scroll=QScrollArea(); history_scroll.setWidgetResizable(True); history_scroll.setWidget(self.history_view)
+        self.tabs.addTab(history_scroll, 'History')
         right.addWidget(self.tabs, 1)
         console_heading = QHBoxLayout()
         console_heading.addWidget(label('COMPANION TERMINAL', 'eyebrow'))
@@ -682,6 +693,12 @@ class MonitorWindow(QMainWindow):
         self.provider_action_slot.setFixedHeight(44)
         self.provider_remove_slot.setFixedHeight(44)
         form.addLayout(bridge_row)
+        self.claude_session_button=self._button('Link Claude session events…',lambda:self.claude_sessions(False))
+        self.claude_session_remove=self._button('Remove session events…',lambda:self.claude_sessions(True))
+        session_row=QHBoxLayout()
+        for button in (self.claude_session_button,self.claude_session_remove):
+            reserve_hidden_space(button); session_row.addWidget(button,1)
+        form.addLayout(session_row)
         self.key_row = QWidget()
         key_layout = QHBoxLayout(self.key_row)
         key_layout.setContentsMargins(0, 0, 0, 0)
@@ -744,7 +761,9 @@ class MonitorWindow(QMainWindow):
         self.keep_host = QCheckBox('Keep the host running when I quit AI Monitor')
         self.minimize_tray = QCheckBox('Minimize to the NOVA system tray icon')
         self.close_tray = QCheckBox('Close button hides the app in the system tray')
-        for field in (self.auto_start, self.keep_host, self.minimize_tray, self.close_tray):
+        self.history_enabled=QCheckBox('Keep local numeric usage history (up to 30 days)')
+        self.history_enabled.setToolTip('Opt-in: observed token increases and numeric quota snapshots only. No prompts or keys.')
+        for field in (self.auto_start, self.keep_host, self.minimize_tray, self.close_tray, self.history_enabled):
             field.toggled.connect(self._changed); layout.addWidget(field)
         layout.addWidget(label('Click the NOVA icon near the clock to reopen. Right-click it for host controls and Quit. '
                                'Hiding or minimizing never stops the host or discards unsaved settings. '
@@ -816,6 +835,7 @@ class MonitorWindow(QMainWindow):
         self.keep_host.setChecked(self.config['keep_host_on_close'])
         self.minimize_tray.setChecked(self.config['minimize_to_tray'])
         self.close_tray.setChecked(self.config['close_to_tray'])
+        self.history_enabled.setChecked(self.config['usage_history'])
         self._apply_preferences()
         self.unsaved = False
         self._changed(mark=False)
@@ -885,6 +905,8 @@ class MonitorWindow(QMainWindow):
         self.codex_setup_button.setEnabled(ready and 'codex' in self.config['providers'])
         self.claude_link_button.setEnabled(ready and 'claude' in self.config['providers'])
         self.claude_unlink_button.setEnabled(ready and 'claude' in self.config['providers'])
+        self.claude_session_button.setEnabled(ready and 'claude' in self.config['providers'])
+        self.claude_session_remove.setEnabled(ready and 'claude' in self.config['providers'])
         self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
 
     def continue_setup(self):
@@ -915,6 +937,8 @@ class MonitorWindow(QMainWindow):
         key = self.provider_guide.currentData()
         self.provider_action_slot.setCurrentIndex(1 if key == 'codex' else 2 if key == 'claude' else 0)
         self.provider_remove_slot.setCurrentIndex(1 if key == 'claude' else 0)
+        self.claude_session_button.setVisible(key=='claude')
+        self.claude_session_remove.setVisible(key=='claude')
         if key in PROVIDER_SETUP:
             self.provider_instructions.setText(PROVIDER_SETUP[key][0])
             self.provider_link.setEnabled(True)
@@ -943,8 +967,27 @@ class MonitorWindow(QMainWindow):
 
     def check_ai_setup(self):
         if self._ready():
-            from provider_setup import readiness
-            self._run('Checking AI setup', lambda emit: readiness(self.root, emit))
+            from provider_setup import setup_report
+            def check(emit):
+                self.pending_setup_report=setup_report(self.root)
+                for item in self.pending_setup_report:
+                    emit(PROVIDERS[item['provider']][0]+': activity '+item['activity']+'; quota '+item['quota']+'; display '+item['display'])
+            self._run('Checking AI setup',check)
+
+    def claude_sessions(self,remove):
+        if not self._ready() or 'claude' not in self.config['providers']: return
+        question=('Remove only this installation\'s observational Claude session hooks? Other hooks are preserved.' if remove else
+            'Link Claude session events? A private settings backup is kept and other hooks are preserved. '
+            'This records a hashed session ID and state only. It never approves tools, reads transcripts or returns context to Claude. '
+            'Restart Claude Code after linking.')
+        answer=QMessageBox.question(self,'Claude session events',question,
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes: return
+        from provider_setup import claude_session_link
+        def update(emit):
+            try: emit(claude_session_link(self.root,remove=remove))
+            except ValueError as error: raise control.SetupError(str(error)) from None
+        self._run('Updating Claude session events',update)
 
     def claude_quota(self, remove):
         if not self._ready() or 'claude' not in self.config['providers']: return
@@ -1024,7 +1067,8 @@ class MonitorWindow(QMainWindow):
                 options={'reconnect_s': self.reconnect.value(), 'token_poll_s': self.token_poll.value(),
                          'log_font_size': self.log_size.value(), 'start_host_on_open': self.auto_start.isChecked(),
                          'keep_host_on_close': self.keep_host.isChecked(),
-                         'minimize_to_tray': self.minimize_tray.isChecked(), 'close_to_tray': self.close_tray.isChecked()})
+                         'minimize_to_tray': self.minimize_tray.isChecked(), 'close_to_tray': self.close_tray.isChecked(),
+                         'usage_history':self.history_enabled.isChecked()})
         except (control.SetupError, ValueError, OSError):
             self._error('Choose a supported board, at least one provider and a valid USB port. '
                         'API keys must be a single printable token. Nothing was saved.')
@@ -1035,6 +1079,7 @@ class MonitorWindow(QMainWindow):
         self.unsaved = False
         self.live_connected = False
         self.status_epoch += 1
+        self.cached_health = None
         self.token_reporter = None
         self._apply_preferences()
         self._update_setup_progress()
@@ -1116,6 +1161,15 @@ class MonitorWindow(QMainWindow):
             prepared = self.pending_flash
             self.pending_flash = None
             if success and prepared is not None: self._confirm_flash(*prepared)
+        if action_name == 'Checking AI setup':
+            prepared,self.pending_setup_report=self.pending_setup_report,None
+            if success and prepared is not None:
+                from insights_ui import SetupReportDialog
+                if self.hidden_to_tray: self.restore_from_tray()
+                dialog=SetupReportDialog(prepared,self)
+                if dialog.exec()==QDialog.DialogCode.Accepted and dialog.provider():
+                    self.provider_guide.setCurrentIndex(self.provider_guide.findData(dialog.provider()))
+                    self.read_ai_instructions()
 
     def start(self):
         if self._usb_setup_issue():
@@ -1207,9 +1261,16 @@ class MonitorWindow(QMainWindow):
         self.activity.appendPlainText(f'[{datetime.now():%H:%M:%S}] {safe_text(text)}')
 
     def _show_robot(self, working: bool):
-        if self.robot_working == working: return
+        pose='work' if working else 'done'
+        if self.robot_working == working and self.robot_pose==pose: return
         self.robot_working = working
+        self.robot_pose=pose
         self.nova.setPixmap(self.robot_pixmaps[int(working)])
+
+    def _show_session_robot(self,pose):
+        if self.robot_pose==pose: return
+        self.robot_pose=pose; self.robot_working=False
+        self.nova.setPixmap(self.session_pixmaps[pose])
 
     def refresh_status(self):
         if self.closed or self.status_worker is not None: return
@@ -1247,6 +1308,7 @@ class MonitorWindow(QMainWindow):
             epoch, data = result
             if epoch != self.status_epoch: return
         if data is None:
+            self.cached_health = None
             self.status_known = False
             self.live_connected = False
             self.cached_summary = 'STATUS UNAVAILABLE — OPEN AI MONITOR'
@@ -1263,6 +1325,7 @@ class MonitorWindow(QMainWindow):
         self.cached_summary = data['summary']
         self.host_state.setText(data['summary'])
         health = data['health']
+        self.cached_health=health
         self.token_reporter = data['reporter']
         if not self.hidden_to_tray:
             states = health.get('providers', {}) if health else {}
@@ -1292,6 +1355,22 @@ class MonitorWindow(QMainWindow):
                 else:
                     self.token_state.setText('Token sources readable. Baseline established.')
             self._show_robot(data['working'])
+            sessions=data.get('sessions')
+            if sessions and sessions.get('providers'):
+                from session_activity import aggregate
+                counts=aggregate(sessions)
+                if counts['waiting']:
+                    self.token_state.setText(f'SESSION EVENTS: {counts["waiting"]} waiting for you')
+                    self._show_session_robot('attention')
+                elif counts['running']:
+                    self.token_state.setText(f'SESSION EVENTS: {counts["running"]} running')
+                    self._show_robot(True)
+                elif counts['error']:
+                    self.token_state.setText('SESSION EVENTS: a turn ended with an error')
+                    self._show_session_robot('error')
+                elif counts['completed']:
+                    self.token_state.setText('SESSION EVENTS: turn complete')
+                    self._show_robot(False)
         self.refresh_tray(poll=False)
         if self.auto_start_pending:
             self.auto_start_pending = False
@@ -1319,6 +1398,7 @@ class MonitorWindow(QMainWindow):
         self.timer.stop()
         self.tray_timer.stop()
         self.closed = True
+        if self.live_sampler is not None: self.live_sampler.close()
         if self.tray is not None: self.tray.hide()
         event.accept()  # The independent background host is deliberately left running.
         if self.monitor_enabled: QTimer.singleShot(0, QApplication.instance().quit)

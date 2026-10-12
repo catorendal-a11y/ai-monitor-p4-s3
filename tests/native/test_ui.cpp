@@ -564,6 +564,32 @@ static void test_stable_touch_targets(const std::filesystem::path& screenshots) 
   set_sample(2, 2); dashboard_update();
 }
 
+static void test_reported_session_poses(const std::filesystem::path& screenshots) {
+  ui_settings_hide(); ui_nova_show(); fakeTick += 5000;
+  set_sample(1, 1); sample.hostPresent = true; sample.viewsConfigured = true;
+  std::strcpy(sample.viewKeys[0], "claude"); std::strcpy(sample.views[0].providerKey, "claude");
+  sample.views[0].informational = true; sample.views[0].hasUsage = false;
+  sample.views[0].rowCount = 0; sample.sessionCount = 1; sample.sessionActivityMs = fakeTick;
+  sample.sessions[0] = aim::SessionCounts{1,0,0,0,4};
+  ui_nova_update(); CHECK(nova_ui::mood == NovaMood::session_working);
+  CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Working");
+  const auto update_x = lv_obj_get_x(nova_ui::updateButton), update_y = lv_obj_get_y(nova_ui::updateButton);
+  screenshot(screenshots, "nova-session-working");
+  sample.sessions[0] = aim::SessionCounts{0,1,0,0,4}; ui_nova_update();
+  CHECK(nova_ui::mood == NovaMood::attention);
+  CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Needs you");
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "SESSION / needs you");
+  screenshot(screenshots, "nova-session-waiting");
+  sample.sessions[0] = aim::SessionCounts{0,0,1,0,4}; ui_nova_update();
+  CHECK(nova_ui::mood == NovaMood::completed); screenshot(screenshots, "nova-session-complete");
+  sample.sessions[0] = aim::SessionCounts{0,0,0,1,4}; ui_nova_update();
+  CHECK(nova_ui::mood == NovaMood::session_error); screenshot(screenshots, "nova-session-error");
+  CHECK(lv_obj_get_x(nova_ui::updateButton) == update_x && lv_obj_get_y(nova_ui::updateButton) == update_y);
+  sample.sessionActivityMs = fakeTick - 35000u; ui_nova_update();
+  CHECK(nova_ui::mood != NovaMood::session_error);
+  sample.sessionCount = 0;
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -1185,6 +1211,7 @@ int main(int argc, char** argv) {
   test_quota_windows(screenshots);
   test_nova_readability(screenshots);
   test_stable_touch_targets(screenshots);
+  test_reported_session_poses(screenshots);
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }
