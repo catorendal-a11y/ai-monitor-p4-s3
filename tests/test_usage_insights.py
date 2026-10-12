@@ -143,6 +143,7 @@ class SessionTests(unittest.TestCase):
             sessions.claude_event(payload,activity,generation=marker['generation'])
             self.assertEqual(sessions.aggregate(sessions.summary(activity,['claude']))['running'],1)
 
+    @unittest.skipUnless(os.name=='nt','Windows file sharing semantics')
     def test_atomic_event_record_retries_windows_sharing_failure_without_deleting_destination(self):
         from telemetry_bridge import write_record
         import telemetry_bridge
