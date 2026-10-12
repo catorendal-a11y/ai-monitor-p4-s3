@@ -42,6 +42,11 @@ def main():
                         "-I", str(ROOT / "tests/native"), str(ROOT / "tests/test_settings.cpp"), "-o", str(settings_binary)],
                        cwd=ROOT, check=True)
         subprocess.run([str(settings_binary)], cwd=ROOT, check=True)
+        live_binary = Path(directory) / ("claude-live-tests.exe" if os.name == "nt" else "claude-live-tests")
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
+                        "-I", str(json_include), str(ROOT / "tests/test_claude_live.cpp"), "-o", str(live_binary)],
+                       cwd=ROOT, check=True)
+        subprocess.run([str(live_binary)], cwd=ROOT, check=True)
     if args.ui:
         c_compiler = shutil.which(args.cc)
         if not c_compiler or not shutil.which("cmake") or not shutil.which("ninja"):

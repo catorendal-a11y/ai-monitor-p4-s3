@@ -10,7 +10,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtCore import Qt
-from PySide6.QtTest import QTest
+from PySide6.QtTest import QTest, QSignalSpy
 from PySide6.QtNetwork import QLocalSocket
 from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 from desktop_window import MonitorWindow
@@ -241,8 +241,11 @@ class TrayTests(unittest.TestCase):
                 self.assertTrue(window.hidden_to_tray)
                 socket = QLocalSocket(); socket.connectToServer(owner.name)
                 self.assertTrue(socket.waitForConnected(1000))
+                received = QSignalSpy(owner.requested)
                 socket.write(b'firmware\n' if cycle % 2 else b'show\n')
-                socket.flush(); QTest.qWait(20)
+                socket.flush()
+                self.assertTrue(received.count() > 0 or received.wait(1000))
+                self.assertEqual(received.at(0)[0], 'firmware' if cycle % 2 else 'show')
                 socket.abort(); QTest.qWait(5)
                 self.assertTrue(window.isVisible()); self.assertFalse(window.isMinimized())
                 self.assertFalse(window.hidden_to_tray); self.assertTrue(owner.lock.isLocked())

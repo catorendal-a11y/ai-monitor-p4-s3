@@ -42,6 +42,7 @@ static void uiTask(void*) {
   ui_notifications_init();
   ui_nova_init();
   ui_nova_show();
+  diagnostics::capture_startup_memory(diagnostics::StartupStage::afterCompanion);
 
   uint32_t lastUpdate = 0;
   for (;;) {
@@ -81,8 +82,11 @@ void setup() {
   LOG_I("AI Monitor P4 %s", FW_VERSION);
   LOG_I("Hardware: %s", board_profile::name);
 
+  diagnostics::capture_startup_memory(diagnostics::StartupStage::beforeDisplay);
   display_init();
+  diagnostics::capture_startup_memory(diagnostics::StartupStage::afterDisplay);
   lvgl_hal_init();
+  diagnostics::capture_startup_memory(diagnostics::StartupStage::afterLvgl);
   diagnostics::initialize_hardware();
   diagnostics::run_isolated_ppa_benchmark();
   aim::begin();  // initializes the control queue before the UI task starts

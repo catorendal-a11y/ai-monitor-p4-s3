@@ -10,6 +10,7 @@
 #include "ui/nova_state.h"
 #include "diagnostics/rotation.h"
 #include "companions/manifest.h"
+#include "diagnostics/probe_deadline.h"
 #include "companions/frame_cache.h"
 
 #include <cmath>
@@ -796,6 +797,9 @@ static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
   value.ppaSupported = true; value.applicationBytes = 4500000; value.partitionBytes = 6553600;
   value.display.drawBytes = 1536000; value.display.rotationBytes = 768000;
   value.display.framebufferBytes = 1536000; value.display.drawCount = value.display.framebufferCount = 2;
+  for (unsigned i=0;i<4;++i)
+    CHECK(value.startup.capture(static_cast<diagnostics::StartupStage>(i),100+i*100,
+                               {300000,150000,140000,100000},{33000000,28000000,27000000,24000000}));
   core.hardware = [&] { return value; };
   unsigned writes = 0; core.apply_brightness = [&](uint8_t, bool) { ++writes; return true; };
   const auto revision = core.snapshot_revision();
@@ -805,6 +809,12 @@ static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
   CHECK(reply["boardId"] == board_profile::id);
   CHECK(reply["psram"]["sizeBytes"].as<uint32_t>() == value.psramSize);
   CHECK(reply["psram"]["heapTotal"].as<uint32_t>() == value.psramTotal);
+  CHECK(reply["flash"]["freeApplicationBytes"].as<uint32_t>()==2053600);
+  CHECK(reply["startupMemory"].size()==4);
+  CHECK(reply["startupMemory"][3]["stage"]=="after-companion");
+  CHECK(reply["startupMemory"][3]["captured"]==true);
+  CHECK(reply["startupMemory"][3]["psram"]["largestFreeBlock"].as<uint32_t>()==24000000);
+  CHECK(core.out().size()<=4096);
   CHECK(reply["hosted"]["compiled"] == true && reply["hosted"]["probeState"] == "not-probed");
   CHECK(reply["hosted"]["detectedChip"].isNull() && reply["hosted"]["coprocessorVersion"].isNull());
   CHECK(reply["ppa"]["supported"] == true && reply["ppa"]["active"] == false);
@@ -921,7 +931,26 @@ static void ppa_benchmark_queries_are_read_only() {
   CHECK(core.out().find("PPA benchmark unavailable")!=std::string::npos);
 }
 
+static void startup_memory_is_ordered_once_only_and_handles_clock_rollover() {
+  CHECK(!diagnostics::probe_deadline_exceeded(100,10099,false));
+  CHECK(diagnostics::probe_deadline_exceeded(100,10100,false));
+  CHECK(!diagnostics::probe_deadline_exceeded(100,20000,true));
+  CHECK(!diagnostics::probe_deadline_exceeded(0xfffffff0u,16,false));
+  CHECK(diagnostics::probe_deadline_exceeded(0xfffffff0u,10000,false));
+  diagnostics::StartupMemory stages;
+  const diagnostics::MemoryReading memory{100,80,70,50};
+  CHECK(!stages.capture(diagnostics::StartupStage::afterDisplay,10,memory,memory));
+  CHECK(!stages.capture(static_cast<diagnostics::StartupStage>(4),10,memory,memory));
+  CHECK(!stages.capture(diagnostics::StartupStage::beforeDisplay,10,{100,101,90,50},memory));
+  CHECK(stages.capture(diagnostics::StartupStage::beforeDisplay,0xfffffff0u,memory,memory));
+  CHECK(!stages.capture(diagnostics::StartupStage::beforeDisplay,10,memory,memory));
+  CHECK(stages.capture(diagnostics::StartupStage::afterDisplay,16,memory,memory));
+  CHECK(stages.checkpoints[0].uptimeMs==0xfffffff0u && stages.checkpoints[1].uptimeMs==16);
+  CHECK(!stages.checkpoints[2].captured && !stages.checkpoints[3].captured);
+}
+
 int main() {
+  startup_memory_is_ordered_once_only_and_handles_clock_rollover();
   ppa_benchmark_queries_are_read_only();
   companion_manifests_and_preallocated_cache_fail_safely();
   graphics_measurements_preserve_rotation_and_do_not_invent_fps();

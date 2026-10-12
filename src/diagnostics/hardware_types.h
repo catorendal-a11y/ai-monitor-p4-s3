@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "startup_memory.h"
 
 namespace diagnostics {
 struct DisplayMemory {
@@ -15,6 +16,7 @@ struct HardwareBaseline {
   const char* hostedVersion = "unavailable";
   bool hostedCompiled = false, ppaSupported = false;
   DisplayMemory display;
+  StartupMemory startup;
 };
 DisplayMemory draw_memory();
 DisplayMemory panel_memory();

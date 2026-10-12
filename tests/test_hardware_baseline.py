@@ -21,6 +21,30 @@ def fixture():
 
 
 class HardwareBaselineTests(unittest.TestCase):
+    def test_startup_samples_are_bounded_ordered_and_private_fields_are_removed(self):
+        data=fixture()
+        names=('before-display','after-display','after-lvgl','after-companion')
+        data['startupMemory']=[dict(stage=name,captured=True,uptimeMs=100+i*100,
+            internalHeap=copy.deepcopy(data['internalHeap']),
+            psram=dict(total=data['psram']['heapTotal'],free=data['psram']['free'],
+                minimumFree=data['psram']['minimumFree'],largestFreeBlock=data['psram']['largestFreeBlock']),
+            private='do not export') for i,name in enumerate(names)]
+        result=validate_hardware(data,'guition-p4')
+        self.assertEqual(result['flash']['freeApplicationBytes'],2053600)
+        self.assertEqual(len(result['startupMemory']),4)
+        self.assertNotIn('private',result['startupMemory'][0])
+        for change in ('order','type','missing','oversize','time','free-app'):
+            broken=copy.deepcopy(data)
+            if change=='order': broken['startupMemory'][1]['stage']='before-display'
+            if change=='type': broken['startupMemory'][1]['captured']=1
+            if change=='missing': broken['startupMemory'][1]['captured']=False
+            if change=='oversize': broken['startupMemory'][1]['psram']['free']=40000000
+            if change=='time': broken['startupMemory'][1]['uptimeMs']=0
+            if change=='free-app': broken['flash']['freeApplicationBytes']=0
+            with self.assertRaises(ValueError): validate_hardware(broken,'guition-p4')
+        data['startupMemory'][3]=dict(stage=names[3],captured=False)
+        self.assertFalse(validate_hardware(data,'guition-p4')['startupMemory'][3]['captured'])
+
     def test_versions_capabilities_and_physical_capacity_are_distinct(self):
         data=fixture(); data['mac']='private-device'; data['private']='fixture never export'
         report=validate_hardware(data,'guition-p4')

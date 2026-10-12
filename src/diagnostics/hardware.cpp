@@ -16,6 +16,23 @@ namespace diagnostics {
 namespace {
 uint32_t imageBytes = 0;
 char hostedVersion[24] = "unavailable";
+StartupMemory startup;
+portMUX_TYPE startupMux = portMUX_INITIALIZER_UNLOCKED;
+MemoryReading memory_reading(uint32_t caps) {
+  multi_heap_info_t info{};
+  heap_caps_get_info(&info,caps);
+  return {static_cast<uint32_t>(info.total_free_bytes+info.total_allocated_bytes),
+          static_cast<uint32_t>(info.total_free_bytes),static_cast<uint32_t>(info.minimum_free_bytes),
+          static_cast<uint32_t>(info.largest_free_block)};
+}
+}
+void capture_startup_memory(StartupStage stage) {
+  const auto internal=memory_reading(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+  const auto external=memory_reading(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  const uint32_t now=millis();
+  portENTER_CRITICAL(&startupMux);
+  startup.capture(stage,now,internal,external);
+  portEXIT_CRITICAL(&startupMux);
 }
 void initialize_hardware() {
   imageBytes = ESP.getSketchSize();  // Verify/measure the image once, never each heartbeat.
@@ -52,6 +69,9 @@ HardwareBaseline hardware_baseline() {
   result.display.framebufferBytes = panel.framebufferBytes;
   result.display.framebufferCount = panel.framebufferCount;
   result.display.bounceBytes = panel.bounceBytes;
+  portENTER_CRITICAL(&startupMux);
+  result.startup=startup;
+  portEXIT_CRITICAL(&startupMux);
   return result;
 }
 }  // namespace diagnostics

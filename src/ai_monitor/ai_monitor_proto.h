@@ -268,6 +268,8 @@ class ProtoCore {
     flash["bytes"] = value.flashBytes; flash["frequencyHz"] = value.flashHz;
     flash["applicationBytes"] = value.applicationBytes; flash["partitionBytes"] = value.partitionBytes;
     flash["partitionOffset"] = value.partitionOffset;
+    flash["freeApplicationBytes"] = value.applicationBytes<=value.partitionBytes ?
+      value.partitionBytes-value.applicationBytes : 0;
     auto heap = reply["internalHeap"].to<JsonObject>();
     heap["total"] = value.heapTotal; heap["free"] = value.heapFree;
     heap["minimumFree"] = value.heapMinimum; heap["largestFreeBlock"] = value.heapLargest;
@@ -286,6 +288,20 @@ class ProtoCore {
     hosted["detectedChip"] = nullptr;
     auto ppa = reply["ppa"].to<JsonObject>();
     ppa["supported"] = value.ppaSupported; ppa["active"] = false;
+    auto stages=reply["startupMemory"].to<JsonArray>();
+    for (unsigned i=0;i<4;++i) {
+      const auto& checkpoint=value.startup.checkpoints[i];
+      auto stage=stages.add<JsonObject>();
+      stage["stage"]=diagnostics::startup_stage_names[i]; stage["captured"]=checkpoint.captured;
+      if (!checkpoint.captured) continue;
+      stage["uptimeMs"]=checkpoint.uptimeMs;
+      const auto addMemory=[&](const char* name,const diagnostics::MemoryReading& reading) {
+        auto memory=stage[name].to<JsonObject>();
+        memory["total"]=reading.total; memory["free"]=reading.free;
+        memory["minimumFree"]=reading.minimum; memory["largestFreeBlock"]=reading.largest;
+      };
+      addMemory("internalHeap",checkpoint.internal); addMemory("psram",checkpoint.psram);
+    }
     if (measureJson(reply) > kAim1MaxPayload) { reply_error(-1, 0, "hardware reply exceeds limit"); return; }
     std::string output; serializeJson(reply, output); output.push_back('\n'); emit(output.c_str());
   }

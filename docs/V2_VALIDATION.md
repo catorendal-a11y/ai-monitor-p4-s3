@@ -23,8 +23,12 @@ Free application space is `partitionBytes - applicationBytes`, not free flash ov
 External allocator capacity is separate from physical PSRAM (particularly relevant to S3 PSRAM XIP).
 
 Compiled ESP-Hosted/PPA capability is distinguished from runtime detection. C6 is explicitly
-`not-probed`, its version is unknown, and production PPA acceleration is inactive. SD detection and
-before/after initialization memory checkpoints are not implemented in this increment.
+`not-probed`, its version is unknown, and production PPA acceleration is inactive. SD detection is pending.
+Four one-time `startupMemory` readings now cover before display, after display, after LVGL, and
+after companion screen creation. They include internal/external total/free/minimum/largest blocks
+and uptime. Missing stages are explicitly uncaptured. The final stage includes all initial screen
+creation, not only companion assets; it precedes steady-state rendering. Allocations by concurrently
+started USB tasks can also affect that final reading.
 The owner's reported PCB is **JC4880P443C_I_W_Y**; wiring and actual SD presence still need verification.
 No active coprocessor initialization or C6 firmware update is performed by these commands.
 
@@ -87,12 +91,14 @@ LVGL lifetime management or SD. Those integrations require their own tests befor
 
 ## Verification and remaining gates
 
-The foundation passed 305 Python regressions, strict C++ protocol/settings tests for both board
+The foundation passed 306 Python regressions, strict C++ protocol/settings/live-agent tests and both board
 identities, real native LVGL UI tests for P4/S3, and production firmware builds for both boards.
-P4 production build: application **4,568,660 / 6,553,600 bytes**, static RAM **100,780 / 327,680 bytes**.
+P4 production build: application **4,570,004 / 6,553,600 bytes**, static RAM **100,068 / 327,680 bytes**.
 Static linker RAM usage is not runtime heap or total physical SRAM consumption.
 
 No new candidate has been physically flashed as part of this validation. No runtime C6 detection,
 BLE security/pairing, Claude Desktop exchange, permission approval, SD pack activation or new
 Windows installer release is claimed. The installed program and device were left untouched.
 Follow [the construction plan](../plans/COMPANION_V2.md) for incremental implementation and physical gates.
+The separate [Claude live foundation](CLAUDE_LIVE_FOUNDATION.md) now has a tested bounded parser
+and permission state machine; it is not connected to the UI or a transport yet.

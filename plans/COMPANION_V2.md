@@ -191,11 +191,13 @@ follow later. No Wi-Fi host, web dashboard, camera, voice assistant, cloud accou
 ## Current implementation checkpoint
 
 Source fixes and regression validation are recorded in `docs/V2_VALIDATION.md`. B exposes read-only
-metrics but physical collection, SD/C6 detection and initialization checkpoints remain pending.
+metrics and initialization checkpoints; physical collection and SD/C6 detection remain pending.
+The standalone C6 build and physical gate are documented in `docs/C6_BRINGUP.md`.
 C provides instrumentation and an isolated compiled benchmark, not measured P4 performance.
 D has exact host compression sizes; target decode timing and final runtime format remain pending.
 E has tested manifest/cache scaffolding and built-in rendering; runtime PSRAM/LVGL/SD binding remains
-pending. F/G/H/I and the additional live product domains are not implemented by this foundation push.
+pending. F now has a tested bounded parser and permission state machine; firmware publication and
+transport binding are pending. G/H/I and the additional live product domains are not implemented.
 Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
 
 Primary references: [Claude Desktop Hardware Buddy](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md),
