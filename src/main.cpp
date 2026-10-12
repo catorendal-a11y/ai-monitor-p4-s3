@@ -16,6 +16,8 @@
 #include "ui_notifications.h"
 #include "ui_nova.h"
 #include "ui/theme.h"
+#include "diagnostics/hardware_types.h"
+#include "diagnostics/ppa_benchmark.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -81,6 +83,8 @@ void setup() {
 
   display_init();
   lvgl_hal_init();
+  diagnostics::initialize_hardware();
+  diagnostics::run_isolated_ppa_benchmark();
   aim::begin();  // initializes the control queue before the UI task starts
 
   if (xTaskCreatePinnedToCore(uiTask, "ui", board_profile::ui_stack_bytes, nullptr, 2, &uiHandle, 1) != pdPASS) {

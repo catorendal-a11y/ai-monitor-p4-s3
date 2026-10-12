@@ -11,6 +11,9 @@
 #include "display.h"
 #include "idle_dim.h"
 #include "touch_input.h"
+#include "../diagnostics/hardware_types.h"
+#include "../diagnostics/graphics_types.h"
+#include "../diagnostics/rotation.h"
 static TouchInputGuard touchInputGuard;
 
 #include "freertos/FreeRTOS.h"
@@ -35,6 +38,14 @@ static uint8_t* buf2 = nullptr;
 static size_t buf_bytes = 0;
 static uint16_t* rot_buf = nullptr;
 static size_t rot_buf_pixels = 0;
+
+diagnostics::DisplayMemory diagnostics::draw_memory() {
+  DisplayMemory result{};
+  result.drawCount = static_cast<uint8_t>((buf1 ? 1 : 0) + (buf2 ? 1 : 0));
+  result.drawBytes = result.drawCount * buf_bytes;
+  result.rotationBytes = rot_buf ? rot_buf_pixels * sizeof(uint16_t) : 0;
+  return result;
+}
 
 void lvgl_alloc_buffers() {
   buf_bytes = DISPLAY_H_RES * DISPLAY_V_RES * 2;   // 800 x 480 x 2 = 768000
@@ -92,13 +103,15 @@ void lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
 
   const uint16_t* src = (const uint16_t*)px_map;
 
-  // 90 deg CW rotation: landscape (x, y) -> portrait (y, 799-x)
-  for (int r = 0; r < H; r++) {
-    for (int c = 0; c < W; c++) {
-      const int lx = x1 + c;
-      rot_buf[(x2 - lx) * H + r] = src[r * W + c];
-    }
+#if AIM_GRAPHICS_TELEMETRY
+  const int64_t began = esp_timer_get_time();
+#endif
+  if (!diagnostics::rotate_to_panel(src, W * H, rot_buf, rot_buf_pixels, W, H)) {
+    lv_display_flush_ready(disp); return;
   }
+#if AIM_GRAPHICS_TELEMETRY
+  const int64_t rotated = esp_timer_get_time();
+#endif
 
   const int px1 = y1;        // portrait x start
   const int py1 = 799 - x2;  // portrait y start
@@ -106,6 +119,10 @@ void lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
   const int py2 = 799 - x1;  // portrait y end
 
   esp_lcd_panel_draw_bitmap(display_panel, px1, py1, px2 + 1, py2 + 1, rot_buf);
+#if AIM_GRAPHICS_TELEMETRY
+  diagnostics::record_flush(W * H, static_cast<uint32_t>(rotated - began),
+                           static_cast<uint32_t>(esp_timer_get_time() - rotated));
+#endif
   lv_display_flush_ready(disp);
 }
 

@@ -4,6 +4,7 @@
 // CH422G register addresses: WCH CH422 datasheet (8-bit address >> 1).
 #include "display.h"
 #include "../app_settings.h"
+#include "../diagnostics/hardware_types.h"
 #include <Arduino.h>
 #include <algorithm>
 #include <array>
@@ -92,6 +93,15 @@ void display_fill_black() {
   void* frame = nullptr;
   ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(display_panel, 1, &frame));
   memset(frame, 0, DISPLAY_H_RES * DISPLAY_V_RES * sizeof(uint16_t));
+}
+
+diagnostics::DisplayMemory diagnostics::panel_memory() {
+  DisplayMemory result{}; void* frame = nullptr;
+  if (display_panel && esp_lcd_rgb_panel_get_frame_buffer(display_panel, 1, &frame) == ESP_OK && frame) {
+    result.framebufferCount = 1; result.framebufferBytes = DISPLAY_H_RES * DISPLAY_V_RES * sizeof(uint16_t);
+    result.bounceBytes = DISPLAY_H_RES * 10u * sizeof(uint16_t) * 2u;
+  }
+  return result;
 }
 
 void display_init() {

@@ -7,6 +7,7 @@
 #include "display.h"
 #include <Arduino.h>
 #include "../app_settings.h"
+#include "../diagnostics/hardware_types.h"
 #include "../config.h"
 
 #include "esp_lcd_panel_ops.h"
@@ -164,6 +165,16 @@ void display_fill_black() {
 // ───────────────────────────────────────────────────────────────────────────────
 // DISPLAY INITIALIZATION - MIPI-DSI + ST7701S
 // ───────────────────────────────────────────────────────────────────────────────
+diagnostics::DisplayMemory diagnostics::panel_memory() {
+  DisplayMemory result{};
+  void *first = nullptr, *second = nullptr;
+  if (display_panel && esp_lcd_dpi_panel_get_frame_buffer(display_panel, 2, &first, &second) == ESP_OK) {
+    result.framebufferCount = static_cast<uint8_t>((first ? 1 : 0) + (second ? 1 : 0));
+    result.framebufferBytes = result.framebufferCount * DISPLAY_H_RES * DISPLAY_V_RES * sizeof(uint16_t);
+  }
+  return result;
+}
+
 void display_init() {
   LOG_I("Display init: ESP32-P4 MIPI-DSI ST7701S %dx%d", DISPLAY_H_RES, DISPLAY_V_RES);
 

@@ -5,6 +5,8 @@
 #include "idle_dim.h"
 #include "touch_input.h"
 #include "visual_dimmer.h"
+#include "../diagnostics/hardware_types.h"
+#include "../diagnostics/graphics_types.h"
 #include <Arduino.h>
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -27,11 +29,23 @@ void lvgl_alloc_buffers() {
   if (!draw_buffer) fatal_halt("S3 draw buffer allocation failed");
 }
 
+diagnostics::DisplayMemory diagnostics::draw_memory() {
+  DisplayMemory result{}; result.drawCount = draw_buffer ? 1 : 0;
+  result.drawBytes = draw_buffer ? draw_bytes : 0; return result;
+}
+
 void lvgl_flush_cb(lv_display_t* display, const lv_area_t* area, uint8_t* pixels) {
   // PARTIAL mode supplies contiguous rows. The RGB driver copies them into
   // its persistent PSRAM framebuffer before returning; no rotation needed.
   if (display_panel && area && pixels) {
+#if AIM_GRAPHICS_TELEMETRY
+    const int64_t began = esp_timer_get_time();
+#endif
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(display_panel, area->x1, area->y1, area->x2 + 1, area->y2 + 1, pixels));
+#if AIM_GRAPHICS_TELEMETRY
+    diagnostics::record_flush((area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1), 0,
+                             static_cast<uint32_t>(esp_timer_get_time() - began));
+#endif
   }
   lv_display_flush_ready(display);
 }

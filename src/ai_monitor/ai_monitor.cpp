@@ -20,6 +20,9 @@
 #include "../config.h"
 #include "../ui/backlight.h"
 #include "ai_monitor_proto.h"
+#include "../diagnostics/hardware_types.h"
+#include "../diagnostics/graphics_types.h"
+#include "../diagnostics/ppa_benchmark.h"
 
 namespace aim {
 
@@ -67,6 +70,9 @@ static void ai_monitor_task(void*) {
   core.tick = [] { return millis(); };
   core.heap = [] { return ESP.getFreeHeap(); };
   core.psram_free = [] { return ESP.getFreePsram(); };
+  core.hardware = diagnostics::hardware_baseline;
+  core.graphics = diagnostics::graphics_snapshot;
+  core.ppa_benchmark = diagnostics::ppa_benchmark_result;
   core.firmware_version = FW_VERSION;
   core.boot_id = esp_random();
   core.brightness = [] { return brightness_percent(display_get_brightness()); };

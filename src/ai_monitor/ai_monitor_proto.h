@@ -24,6 +24,9 @@
 
 #include "ai_monitor.h"
 #include "../board_profile.h"
+#include "../diagnostics/hardware_types.h"
+#include "../diagnostics/graphics_types.h"
+#include "../diagnostics/ppa_benchmark.h"
 
 namespace aim {
 
@@ -33,6 +36,9 @@ class ProtoCore {
   std::function<uint32_t()> tick = [] { return 0u; };
   std::function<uint32_t()> heap = [] { return 0u; };
   std::function<uint32_t()> psram_free = [] { return 0u; };
+  std::function<diagnostics::HardwareBaseline()> hardware;
+  std::function<diagnostics::GraphicsSnapshot()> graphics;
+  std::function<diagnostics::PpaBenchmark()> ppa_benchmark;
   const char* firmware_version = "unknown";
   uint32_t boot_id = 0;
   // Reported in the info handshake (percent 0-100).
@@ -247,6 +253,56 @@ class ProtoCore {
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
           static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();
+  }
+
+  void reply_hardware() {
+    if (!hardware) { reply_error(-1, 0, "hardware diagnostics unavailable"); return; }
+    const auto value = hardware();
+    JsonDocument reply;
+    reply["type"] = "hardware"; reply["schema"] = 1;
+    reply["boardId"] = board_profile::id; reply["chip"] = board_profile::chip;
+    reply["firmwareVersion"] = firmware_version; reply["chipRevision"] = value.chipRevision;
+    reply["bootId"] = boot_id; reply["uptimeMs"] = tick();
+    reply["cpuMHz"] = value.cpuMHz; reply["sdkVersion"] = value.sdkVersion;
+    auto flash = reply["flash"].to<JsonObject>();
+    flash["bytes"] = value.flashBytes; flash["frequencyHz"] = value.flashHz;
+    flash["applicationBytes"] = value.applicationBytes; flash["partitionBytes"] = value.partitionBytes;
+    flash["partitionOffset"] = value.partitionOffset;
+    auto heap = reply["internalHeap"].to<JsonObject>();
+    heap["total"] = value.heapTotal; heap["free"] = value.heapFree;
+    heap["minimumFree"] = value.heapMinimum; heap["largestFreeBlock"] = value.heapLargest;
+    auto psram = reply["psram"].to<JsonObject>();
+    psram["sizeBytes"] = value.psramSize; psram["heapTotal"] = value.psramTotal; psram["free"] = value.psramFree;
+    psram["minimumFree"] = value.psramMinimum; psram["largestFreeBlock"] = value.psramLargest;
+    auto display = reply["display"].to<JsonObject>();
+    display["width"] = 800; display["height"] = 480; display["color"] = "RGB565";
+    display["drawBytes"] = value.display.drawBytes; display["drawCount"] = value.display.drawCount;
+    display["rotationBytes"] = value.display.rotationBytes;
+    display["framebufferBytes"] = value.display.framebufferBytes;
+    display["framebufferCount"] = value.display.framebufferCount; display["bounceBytes"] = value.display.bounceBytes;
+    auto hosted = reply["hosted"].to<JsonObject>();
+    hosted["compiled"] = value.hostedCompiled; hosted["hostVersion"] = value.hostedVersion;
+    hosted["probeState"] = "not-probed"; hosted["coprocessorVersion"] = nullptr;
+    hosted["detectedChip"] = nullptr;
+    auto ppa = reply["ppa"].to<JsonObject>();
+    ppa["supported"] = value.ppaSupported; ppa["active"] = false;
+    if (measureJson(reply) > kAim1MaxPayload) { reply_error(-1, 0, "hardware reply exceeds limit"); return; }
+    std::string output; serializeJson(reply, output); output.push_back('\n'); emit(output.c_str());
+  }
+
+  void reply_graphics() {
+    if (!graphics) { reply_error(-1, 0, "graphics telemetry unavailable"); return; }
+    const auto value = graphics(); const auto& data = value.counters;
+    JsonDocument reply;
+    reply["type"] = "graphics"; reply["schema"] = 1; reply["enabled"] = value.enabled;
+    reply["bootId"] = boot_id; reply["uptimeMs"] = tick();
+    reply["flushCalls"] = data.flushCalls; reply["pixelsSubmitted"] = data.pixels;
+    reply["rotationUs"] = data.rotateUs; reply["submissionUs"] = data.submitUs;
+    reply["maxRotationUs"] = data.maxRotateUs; reply["maxSubmissionUs"] = data.maxSubmitUs;
+    reply["saturated"] = data.saturated;
+    reply["displayRefreshHz"] = nullptr;  // Submission timing is not scanout/VSYNC timing.
+    reply["ppaActive"] = false;
+    std::string output; serializeJson(reply, output); output.push_back('\n'); emit(output.c_str());
   }
 
   void reply_ack(int frameId, int schemaVersion, size_t bytes, const char* label, unsigned rows) {
@@ -494,7 +550,23 @@ class ProtoCore {
   void handle_command(JsonDocument& doc) {
     const char* cmd = doc["cmd"] | "";
 
-    if (strcmp(cmd, "get_info") == 0) {
+    if (strcmp(cmd, "get_ppa_benchmark") == 0) {
+      if (doc.size() != 1 || !ppa_benchmark) { reply_error(-1, 0, "PPA benchmark unavailable"); return; }
+      const auto value = ppa_benchmark(); JsonDocument reply;
+      reply["type"] = "ppa_benchmark"; reply["schema"] = 1; reply["status"] = value.status;
+      reply["width"] = value.width; reply["height"] = value.height; reply["samples"] = value.samples;
+      reply["cpuMedianUs"] = value.cpuMedianUs; reply["ppaMedianUs"] = value.ppaMedianUs;
+      reply["bitExact"] = value.bitExact; reply["resourcesRetained"] = value.resourcesRetained;
+      reply["isolated"] = true; reply["productionPpaActive"] = false;
+      std::string output; serializeJson(reply, output); output.push_back('\n'); emit(output.c_str()); return;
+    } else if (strcmp(cmd, "get_graphics") == 0) {
+      if (doc.size() != 1) { reply_error(-1, 0, "invalid graphics telemetry options"); return; }
+      reply_graphics(); return;
+    } else if (strcmp(cmd, "get_hardware") == 0) {
+      if (doc.size() != 1) { reply_error(-1, 0, "invalid hardware diagnostic options"); return; }
+      reply_hardware();
+      return;  // Diagnostics do not establish/renew a provider-host lease.
+    } else if (strcmp(cmd, "get_info") == 0) {
       if (!doc["heartbeat"].isNull()) {
         if (!doc["heartbeat"].is<bool>()) { reply_error(-1, 0, "invalid heartbeat"); return; }
       }

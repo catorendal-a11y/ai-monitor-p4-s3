@@ -8,6 +8,9 @@
 #include "ui/brightness_fade.h"
 #include "ui/quota_notifications.h"
 #include "ui/nova_state.h"
+#include "diagnostics/rotation.h"
+#include "companions/manifest.h"
+#include "companions/frame_cache.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -784,7 +787,145 @@ static void nova_uses_selected_provider_token_sources() {
   CHECK(state.evaluate(snapshot, 100, false, warning) == NovaMood::working);  // legacy aggregate signal
 }
 
+static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
+  aim::ProtoCore core;
+  diagnostics::HardwareBaseline value{};
+  value.flashBytes = 16u * 1024u * 1024u; value.psramSize = 32u * 1024u * 1024u;
+  value.psramTotal = 30u * 1024u * 1024u; value.hostedCompiled = true;
+  value.hostedVersion = "2.12.13"; value.sdkVersion = "test-sdk";
+  value.ppaSupported = true; value.applicationBytes = 4500000; value.partitionBytes = 6553600;
+  value.display.drawBytes = 1536000; value.display.rotationBytes = 768000;
+  value.display.framebufferBytes = 1536000; value.display.drawCount = value.display.framebufferCount = 2;
+  core.hardware = [&] { return value; };
+  unsigned writes = 0; core.apply_brightness = [&](uint8_t, bool) { ++writes; return true; };
+  const auto revision = core.snapshot_revision();
+  feed(core, "{\"cmd\":\"get_hardware\"}\n");
+  JsonDocument reply; CHECK(!deserializeJson(reply, core.out()));
+  CHECK(reply["type"] == "hardware" && reply["schema"] == 1);
+  CHECK(reply["boardId"] == board_profile::id);
+  CHECK(reply["psram"]["sizeBytes"].as<uint32_t>() == value.psramSize);
+  CHECK(reply["psram"]["heapTotal"].as<uint32_t>() == value.psramTotal);
+  CHECK(reply["hosted"]["compiled"] == true && reply["hosted"]["probeState"] == "not-probed");
+  CHECK(reply["hosted"]["detectedChip"].isNull() && reply["hosted"]["coprocessorVersion"].isNull());
+  CHECK(reply["ppa"]["supported"] == true && reply["ppa"]["active"] == false);
+  CHECK(core.snapshot_revision() == revision && writes == 0);
+  core.clear_out(); feed(core, "{\"cmd\":\"get_hardware\",\"probeC6\":true}\n");
+  CHECK(core.out().find("invalid hardware diagnostic options") != std::string::npos);
+  std::string excessive(5000, 'x'); value.sdkVersion = excessive.c_str();
+  core.clear_out(); feed(core, "{\"cmd\":\"get_hardware\"}\n");
+  CHECK(core.out().find("hardware reply exceeds limit") != std::string::npos);
+}
+
+static void graphics_measurements_preserve_rotation_and_do_not_invent_fps() {
+  const uint16_t pixels[] = {1,2,3,4,5,6}; uint16_t output[6] = {};
+  CHECK(diagnostics::rotate_to_panel(pixels,6,output,6,3,2));
+  const uint16_t expected[] = {3,6,2,5,1,4};
+  for (unsigned i=0;i<6;++i) CHECK(output[i]==expected[i]);
+  CHECK(!diagnostics::rotate_to_panel(pixels,6,output,5,3,2));
+  CHECK(!diagnostics::rotate_to_panel(pixels,6,output,6,0,2));
+  CHECK(!diagnostics::rotate_to_panel(pixels,6,output,6,0xffffffffu,2));
+  CHECK(!diagnostics::rotate_to_panel(output,6,output,6,3,2));
+  diagnostics::GraphicsSnapshot snapshot; snapshot.enabled = true;
+  snapshot.counters.add(384000,1200,600); snapshot.counters.add(500,50,10);
+  CHECK(snapshot.counters.flushCalls==2 && snapshot.counters.pixels==384500);
+  CHECK(snapshot.counters.maxRotateUs==1200 && snapshot.counters.submitUs==610);
+  snapshot.counters.pixels=UINT64_MAX; snapshot.counters.add(1,0,0);
+  CHECK(snapshot.counters.saturated && snapshot.counters.pixels==UINT64_MAX);
+  aim::ProtoCore core; core.graphics = [&] { return snapshot; };
+  const auto revision=core.snapshot_revision();
+  feed(core,"{\"cmd\":\"get_graphics\"}\n");
+  JsonDocument data; CHECK(!deserializeJson(data,core.out()));
+  CHECK(data["type"]=="graphics" && data["enabled"]==true);
+  CHECK(data["pixelsSubmitted"].as<uint64_t>()==UINT64_MAX);
+  CHECK(data["displayRefreshHz"].isNull() && data["ppaActive"]==false);
+  CHECK(core.snapshot_revision()==revision);
+  core.clear_out(); feed(core,"{\"cmd\":\"get_graphics\",\"enablePPA\":true}\n");
+  CHECK(core.out().find("invalid graphics telemetry options")!=std::string::npos);
+}
+
+static bool test_hash(const uint8_t*,size_t,const char* expected) { return expected[0]=='a'; }
+static bool test_decode_failure(companions::Codec,const uint8_t*,size_t,uint8_t* output,size_t capacity) {
+  memset(output,0,capacity);
+  return false;
+}
+static bool test_decode(companions::Codec,const uint8_t* input,size_t length,uint8_t* output,size_t capacity) {
+  if (length!=capacity) return false;
+  memcpy(output,input,length);
+  return true;
+}
+static void companion_manifests_and_preallocated_cache_fail_safely() {
+  const std::string hash(64,'a');
+  const std::string frame="{\"pose\":\"work\",\"file\":\"work.raw\",\"width\":2,\"height\":1,\"originX\":28,\"originY\":0,"
+    "\"encodedBytes\":6,\"decodedBytes\":6,\"encodedSha256\":\""+hash+"\",\"decodedSha256\":\""+hash+"\"}";
+  const std::string valid="{\"version\":1,\"name\":\"Test robot\",\"format\":\"RGB565A8\",\"codec\":\"raw\",\"fallback\":\"work\",\"frames\":["+frame+"]}";
+  companions::Manifest manifest;
+  const auto parse=[&](const std::string& data) { return companions::parse_manifest(reinterpret_cast<const uint8_t*>(data.data()),data.size(),manifest); };
+  CHECK(parse(valid)); CHECK(manifest.resolve(companions::Pose::attention)==manifest.find(companions::Pose::work));
+  CHECK(!parse(valid+"{}")); CHECK(!parse(valid+"x"));
+  std::string changed=valid; changed.replace(changed.find("\"version\":1"),11,"\"version\":true"); CHECK(!parse(changed));
+  changed=valid; changed.replace(changed.find("work.raw"),8,"../work.raw"); CHECK(!parse(changed));
+  for (const char* filename:{"WORK.raw","con.raw","com1.raw","lpt9.raw"}) {
+    changed=valid; changed.replace(changed.find("work.raw"),8,filename); CHECK(!parse(changed));
+  }
+  changed=valid; changed.replace(changed.find("\"version\":1"),11,"\"version\":1,\"version\":1"); CHECK(!parse(changed));
+  changed=valid; changed.replace(changed.find("\"width\":2"),9,"\"width\":65535"); CHECK(!parse(changed));
+  CHECK(parse(valid));
+  uint8_t pool[12]{}; const uint8_t source[]={1,2,3,4,5,6}; companions::FrameCache cache;
+  CHECK(cache.initialize(pool,sizeof(pool),6)); CHECK(!cache.initialize(pool,sizeof(pool),6));
+  const auto& spec=*manifest.find(companions::Pose::work);
+  const int first=cache.load(spec,manifest.codec,source,6,test_hash,test_decode);
+  CHECK(first==0 && cache.pin(first));
+  const auto original=cache.slot(first)->pixels[0];
+  auto invalid=spec; invalid.encodedSha256[0]='b';
+  CHECK(cache.load(invalid,manifest.codec,source,6,test_hash,test_decode)==-1);
+  CHECK(cache.slot(first)->pixels[0]==original && cache.slot(first)->valid);
+  invalid=spec; invalid.decodedSha256[0]='b';
+  CHECK(cache.load(invalid,manifest.codec,source,6,test_hash,test_decode)==-1);
+  CHECK(cache.slot(first)->pixels[0]==original && cache.slot(first)->valid);
+  CHECK(cache.load(spec,manifest.codec,source,6,test_hash,test_decode_failure)==-1);
+  CHECK(cache.slot(first)->pixels[0]==original && cache.slot(first)->valid);
+  const int second=cache.load(spec,manifest.codec,source,6,test_hash,test_decode);
+  CHECK(second==1 && cache.pin(second));
+  CHECK(cache.load(spec,manifest.codec,source,6,test_hash,test_decode)==-1);
+  cache.retire(first); cache.clear_unpinned(); CHECK(cache.slot(first)==nullptr && cache.slot(second)!=nullptr);
+  invalid=spec; invalid.decodedBytes=7;
+  CHECK(cache.load(invalid,manifest.codec,source,6,test_hash,test_decode)==-1);
+  const uint8_t invalidUtf8[]={ '{','"','x','"',':','"',0xc0,0x80,'"','}' };
+  CHECK(!serialization::strict_object(invalidUtf8,sizeof(invalidUtf8)));
+  for (const char* input:{"{x:1}","{\"x\":1,}","{\"x\":[1,]}","{\"x\":01}","{\"x\":+1}",
+                         "{\"x\":NaN}","{\"x\":1.}","{\"x\":1e}","{\"x\":\"\\q\"}",
+                         "{\"x\":\"\\uD800\"}","{\"x\":\"\\uDC00\"}","{/*comment*/\"x\":1}"})
+    CHECK(!serialization::strict_object(reinterpret_cast<const uint8_t*>(input),strlen(input)));
+  const char* validJson="{\"x\":[null,true,false,-0.5e+2,\"\\uD83D\\uDE00\"],\"y\":{\"x\":0}}";
+  CHECK(serialization::strict_object(reinterpret_cast<const uint8_t*>(validJson),strlen(validJson)));
+}
+
+static void ppa_benchmark_queries_are_read_only() {
+  aim::ProtoCore core;
+  uint32_t now=100;
+  core.tick=[&] { return now; };
+  core.ppa_benchmark=[] {
+    diagnostics::PpaBenchmark result;
+    result.status="timeout-resources-retained";
+    result.resourcesRetained=true;
+    return result;
+  };
+  const auto revision=core.snapshot_revision();
+  feed(core,"{\"cmd\":\"get_ppa_benchmark\"}\n");
+  JsonDocument response; CHECK(!deserializeJson(response,core.out()));
+  CHECK(response["type"]=="ppa_benchmark");
+  CHECK(response["resourcesRetained"]==true && response["bitExact"]==false);
+  CHECK(response["productionPpaActive"]==false && response["isolated"]==true);
+  CHECK(core.snapshot_revision()==revision);
+  core.clear_out(); feed(core,"{\"cmd\":\"get_ppa_benchmark\",\"run\":true}\n");
+  CHECK(core.out().find("PPA benchmark unavailable")!=std::string::npos);
+}
+
 int main() {
+  ppa_benchmark_queries_are_read_only();
+  companion_manifests_and_preallocated_cache_fail_safely();
+  graphics_measurements_preserve_rotation_and_do_not_invent_fps();
+  hardware_baseline_is_read_only_bounded_and_never_guesses_radio();
   text_sanitization_collapses_utf8_and_bounds_malformed_input();
   nova_uses_selected_provider_token_sources();
   const char* activityKeys[] = {"codex", "zcode", "claude", "gemini", "copilot", "cursor", "antigravity", "opencode"};
