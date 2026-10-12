@@ -63,6 +63,11 @@ class InsightsUiTests(unittest.TestCase):
                 self.assertIs(sampler.worker,worker)
                 self.window._status_finished((self.window.status_epoch,data))
                 self.assertIn('TOKEN READER STALLED',self.window.token_state.text())
+                self.assertIn('Quit and reopen',self.window.token_state.text())
+                self.assertIn('Restart host too',self.window.token_state.text())
+                health['local_reader']='ready'
+                self.window._status_finished((self.window.status_epoch,data))
+                self.assertNotIn('Restart host',self.window.token_state.text())
         finally:
             release.set(); sampler.close(); sampler.worker.join(timeout=2)
 

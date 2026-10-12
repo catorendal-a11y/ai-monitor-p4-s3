@@ -14,7 +14,7 @@ that its hardware, security or software has been validated here. USB remains the
   saving 1,046,664 bytes (23.8%) without dropping nontransparent source pixels.
 - Apply a recovered first brightness load once, while preserving any explicit user change.
 - Report a local reader taking more than 15 seconds. USB and quota polling continue; the app
-  recommends restarting the host if activity does not resume. It does not create replacement
+  recommends restarting a stalled host, or quitting/reopening a stalled desktop monitor. It does not create replacement
   threads or claim to recover an indefinitely blocked reader automatically.
 - Include free PSRAM in the bounded device information reply, alongside existing free heap.
 

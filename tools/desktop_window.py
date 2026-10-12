@@ -1383,7 +1383,11 @@ class MonitorWindow(QMainWindow):
                 elif counts['completed']:
                     self.token_state.setText('SESSION EVENTS: turn complete')
                     self._show_robot(False)
-            if data.get('reader_state')=='stalled' or (health and health.get('local_reader')=='stalled'):
+            if data.get('reader_state')=='stalled':
+                recovery='DESKTOP TOKEN READER STALLED / Quit and reopen AI Monitor.'
+                if health and health.get('local_reader')=='stalled': recovery+=' Restart host too.'
+                self.token_state.setText(recovery)
+            elif health and health.get('local_reader')=='stalled':
                 self.token_state.setText('TOKEN READER STALLED / Restart host to retry local activity.')
         self.refresh_tray(poll=False)
         if self.auto_start_pending:
