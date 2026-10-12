@@ -30,6 +30,8 @@ static uint32_t testSaveRevision = 0;
 static std::map<std::string, uint8_t> testWarningRules;
 static std::map<std::string, app_settings::NovaWindow> testNovaWindows;
 static bool testNovaSaveSuccess = true;
+static bool testInitialBrightnessPending = false, testBrightnessOverridden = false;
+static uint8_t testInitialBrightness = 160;
 #define CHECK(condition) do { if (!(condition)) { \
   std::cerr << __func__ << ":" << __LINE__ << ": " #condition "\n"; ++failures; \
 } } while (false)
@@ -62,12 +64,20 @@ void set_nova_window(const char* provider, NovaWindow value) {
   testNovaWindows[provider] = value; report_save(testNovaSaveSuccess);
 }
 void set_appearance(Appearance value) { testAppearance = normalize_appearance(value); report_save(true); }
+bool take_initial_brightness(uint8_t& value) {
+  if (!testInitialBrightnessPending) return false;
+  testInitialBrightnessPending = false;
+  if (testBrightnessOverridden) return false;
+  value = testInitialBrightness; return true;
+}
+void note_brightness_override() { testBrightnessOverridden = true; }
 }
 void display_set_brightness(uint8_t value) { actualBrightness = value; }
 uint8_t display_get_brightness() { return selectedBrightness; }
 uint8_t display_get_applied_brightness() { return actualBrightness; }
 void display_remember_brightness(uint8_t value) { selectedBrightness = value; }
 void display_apply_brightness(uint8_t value, bool persist) {
+  app_settings::note_brightness_override();
   selectedBrightness = actualBrightness = value;
   lastPersisted = persist;
   if (persist) app_settings::report_save(true);
@@ -598,6 +608,14 @@ int main(int argc, char** argv) {
   lv_display_set_color_format(display, LV_COLOR_FORMAT_XRGB8888);
   lv_display_set_buffers(display, drawBuffer, nullptr, sizeof(drawBuffer), LV_DISPLAY_RENDER_MODE_FULL);
   lv_display_set_flush_cb(display, flush);
+  testInitialBrightnessPending = true; testInitialBrightness = 90;
+  idle_dim_update();
+  CHECK(selectedBrightness == 90 && actualBrightness == 90 && !lastPersisted);
+  display_apply_brightness(110, false);
+  testInitialBrightnessPending = true; testInitialBrightness = 30;
+  idle_dim_update();
+  CHECK(selectedBrightness == 110);  // A user override wins over recovered NVS.
+  display_apply_brightness(160, false); idle_dim_touch(true); idle_dim_touch(false);
   dashboard_init();
 #if defined(AIM_BOARD_WAVESHARE_S3)
   CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "AI MONITOR / S3") == 0);
@@ -1110,7 +1128,7 @@ int main(int argc, char** argv) {
   screenshot(screenshots, "nova-low");
   sample.views[0].rows[1].usedPercent = 5; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::critical);
-  CHECK(nova_ui::drawnPose == &nova_assets::critical);
+  CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::critical);
   const auto requestsBefore = requestedRefreshes;
   lv_obj_send_event(nova_ui::updateButton, LV_EVENT_CLICKED, nullptr);
   CHECK(requestedRefreshes == requestsBefore + 1);
@@ -1173,7 +1191,7 @@ int main(int argc, char** argv) {
   screenshot(screenshots, "settings-appearance-ocean");
   close_appearance(nullptr); ui_settings_hide(); ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
-  CHECK(nova_ui::drawnPose == &nova_assets::orbit_work || nova_ui::drawnPose == &nova_assets::orbit_blink);
+  CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_work || lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_blink);
   screenshot(screenshots, "orbit-ocean");
   CHECK((framebuffer[120 * 800 + 50] & 0xffffffu) == ui_theme::surface);
   nova_ui::show_dashboard(nullptr); dashboard_update();
@@ -1212,6 +1230,18 @@ int main(int argc, char** argv) {
   test_nova_readability(screenshots);
   test_stable_touch_targets(screenshots);
   test_reported_session_poses(screenshots);
+  auto* rendered = lv_image_create(lv_screen_active());
+  CompanionRenderer cropRenderer;
+  const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,
+      &nova_assets::critical, &nova_assets::sleep, &nova_assets::blink};
+  for (bool orbit : {false, true}) for (const auto* pose : poses) {
+    cropRenderer.render(rendered, orbit, pose, -40, -2);
+    lv_obj_update_layout(rendered);
+    CHECK(lv_image_get_src(rendered) == nova_assets::companion_pose(orbit, pose));
+    CHECK(lv_obj_get_x(rendered) == -40 + (orbit ? nova_assets::orbit_origin_x : nova_assets::nova_origin_x));
+    CHECK(lv_obj_get_y(rendered) == -2 + (orbit ? nova_assets::orbit_origin_y : nova_assets::nova_origin_y));
+  }
+  lv_obj_delete(rendered);
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

@@ -81,6 +81,7 @@ void display_remember_brightness(uint8_t brightness) {
   app_settings::set_brightness(brightness);
 }
 void display_apply_brightness(uint8_t brightness, bool persist) {
+  app_settings::note_brightness_override();
   selected_brightness = brightness;
   display_set_brightness(brightness);
   if (persist) display_remember_brightness(brightness);

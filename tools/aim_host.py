@@ -568,6 +568,11 @@ class Panel:
             history=getattr(self,'history',None)
             if history is not None:
                 status.data['history']={'enabled':history.enabled,'error':history.last_error}
+            if isinstance(self.token_reporter, TokenSampler):
+                state=self.token_reporter.read_state()
+                if state=='stalled' and status.data.get('local_reader')!='stalled':
+                    LOG('Local token read exceeded 15 seconds; USB continues. Restart host if activity does not resume.')
+                status.data['local_reader']=state
             status.update('connected', self.name)
 
     def report_tokens(self):

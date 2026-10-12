@@ -66,6 +66,7 @@ static void ai_monitor_task(void*) {
   static ProtoCore core;  // ~13 KB state in .bss, off the task stack
   core.tick = [] { return millis(); };
   core.heap = [] { return ESP.getFreeHeap(); };
+  core.psram_free = [] { return ESP.getFreePsram(); };
   core.firmware_version = FW_VERSION;
   core.boot_id = esp_random();
   core.brightness = [] { return brightness_percent(display_get_brightness()); };

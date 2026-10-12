@@ -133,6 +133,7 @@ uint8_t display_get_brightness() { return s_brightness.load(std::memory_order_re
 uint8_t display_get_applied_brightness() { return s_appliedBrightness <= 255 ? s_appliedBrightness : 0; }
 
 void display_apply_brightness(uint8_t brightness, bool persist) {
+  app_settings::note_brightness_override();
   s_brightness.store(brightness, std::memory_order_relaxed);
   display_set_brightness(brightness);
   if (persist) display_remember_brightness(brightness);

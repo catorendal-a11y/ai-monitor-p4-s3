@@ -8,6 +8,9 @@
 namespace app_settings {
 uint8_t brightness();
 void set_brightness(uint8_t value);
+// Apply a recovered first NVS load once, unless the user already changed it.
+bool take_initial_brightness(uint8_t& value);
+void note_brightness_override();
 
 constexpr uint8_t normalize_dim_minutes(uint8_t minutes) {
   return minutes == 0 || minutes == 1 || minutes == 5 || minutes == 10 ? minutes : 5;

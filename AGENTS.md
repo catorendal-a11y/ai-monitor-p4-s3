@@ -7,6 +7,7 @@
 - Hardware initialization: inspect display/touch sources before changing board pins.
 - `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
 - `src/ui/`: state/format/history helpers, theme and generated assets.
+- `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions; no runtime image allocation.
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/token_activity.py`: read-only numeric token activity.

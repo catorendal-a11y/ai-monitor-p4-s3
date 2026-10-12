@@ -6,6 +6,8 @@ This release adds clearer connection checks, optional numeric history and explic
 - Optional local history records observed token increases and quota snapshots for up to 30 days. Daily token/quota charts, numeric CSV export and reset-aware pace estimates are available in History. Collection starts off and uses a bounded background writer.
 - Claude Code session-event linking preserves other hooks/statuslines and never makes permission decisions. NOVA/ORBIT and the desktop distinguish Working, Needs you, Turn complete and Session error. Removal invalidates old events; expired/unsupported events fall back to normal token behavior.
 - Keep control positions stable, reject stale setup results, separate new baselines from observed increases and surface history storage failures.
+- Crop transparent companion margins with a shared renderer, saving 1,046,664 bytes of frame data while retaining the original pose origins. Recover brightness after a transient initial NVS failure without overriding a user's later change.
+- Report stalled local token readers and expose free PSRAM for device diagnostics. A permanently blocked reader still requires a host restart; long hardware soak and physical S3 testing remain separate work.
 
 Update existing displays using Application update to preserve preferences. Session events require the updated firmware; old firmware retains token/quota compatibility. Codex/ZCode and other providers still use recorded token activity, not live session hooks. S3 remains experimental without physical hardware validation. Windows executables remain unsigned; SmartScreen reputation is not guaranteed.
 

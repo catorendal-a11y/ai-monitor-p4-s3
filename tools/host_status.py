@@ -79,6 +79,7 @@ def read_status(root, pids):
             history=data['history']
             if not isinstance(history,dict) or type(history.get('enabled')) is not bool: return None
             if history.get('error') is not None and history['error'] not in ERRORS: return None
+        if data.get('local_reader','starting') not in ('starting','reading','ready','unavailable','stalled'): return None
         return data
     except (ValueError, OSError, TypeError):
         return None

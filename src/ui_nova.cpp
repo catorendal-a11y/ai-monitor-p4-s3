@@ -8,6 +8,7 @@
 #include "ui/idle_dim.h"
 #include "ui/nova_state.h"
 #include "ui/nova_assets.h"
+#include "ui/companion_renderer.h"
 #include "ui/quota_alert.h"
 #include "ui/quota_window.h"
 #include "ui/theme.h"
@@ -33,7 +34,8 @@ static NovaState state;
 static NovaMood mood = NovaMood::waiting;
 static uint8_t page = 0, pageCount = 1;
 static uint32_t lastRevision = UINT32_MAX;
-static const lv_image_dsc_t* drawnPose = nullptr;
+static CompanionRenderer renderer;
+static int motionY = 0;
 static uint32_t previousMotion = 0;
 
 static void text(lv_obj_t* label, const char* value) {
@@ -191,15 +193,13 @@ void update() {
     case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
   }
   if ((mood == NovaMood::ready || mood == NovaMood::working || mood == NovaMood::session_working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
-  pose = nova_assets::companion_pose(companion == app_settings::Companion::orbit, pose);
-  if (pose != drawnPose) { drawnPose = pose; lv_image_set_src(figure, pose); }
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
   if (now - previousMotion >= 160u) {
     previousMotion = now;
     const unsigned phase = now % 3200u;
-    const int y = -static_cast<int>((phase < 1600u ? phase : 3200u - phase) * 3u / 1600u);
-    if (lv_obj_get_y(figure) != y) lv_obj_set_y(figure, y);
+    motionY = -static_cast<int>((phase < 1600u ? phase : 3200u - phase) * 3u / 1600u);
   }
+  renderer.render(figure, companion == app_settings::Companion::orbit, pose, -40, motionY);
   text(title, heading); text(subtitle, message);
   const uint32_t stageColor = mood == NovaMood::attention ? 0xFFC857 :
       (mood == NovaMood::session_error ? 0xFF5252 : ui_theme::border);

@@ -4,6 +4,7 @@ os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
 from pathlib import Path
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest.mock import Mock,patch
@@ -36,6 +37,34 @@ class InsightsUiTests(unittest.TestCase):
     def report(self):
         return [dict(provider='copilot',activity='readable',quota='unsupported',display='connected',
                      sessions='unsupported',next_step='Fixture next action')]
+
+    def test_blocked_numeric_sampler_does_not_delay_fresh_health_or_create_workers(self):
+        from token_activity import TokenSampler
+        entered,release=threading.Event(),threading.Event()
+        sampler=TokenSampler(home=self.root,providers=['copilot'],activity_dir=self.root/'tools/activity')
+        def block():
+            entered.set(); release.wait(3); return None
+        sampler.reporter.poll=block
+        try:
+            sampler.poll(); self.assertTrue(entered.wait(1))
+            with sampler.condition: sampler.read_started-=16
+            health={'state':'connected','board':'guition-p4','port':'COM9999','providers':{},'local_reader':'stalled'}
+            with patch.object(control,'owned_hosts',return_value=[]),patch.object(desktop,'read_status',return_value=health), \
+                 patch.object(desktop.desktop,'connection_summary',return_value='Fixture connected'), \
+                 patch.object(desktop.desktop,'recent_log',return_value=''):
+                start=time.monotonic()
+                data=desktop.collect_status(self.root,self.window.config,(),sampler,True)
+                self.assertLess(time.monotonic()-start,.2)
+                self.assertIs(data['health'],health)
+                self.assertEqual(data['reader_state'],'stalled')
+                self.window.token_reporter=sampler
+                worker=sampler.worker
+                for _ in range(10): self.window._reset_tokens()
+                self.assertIs(sampler.worker,worker)
+                self.window._status_finished((self.window.status_epoch,data))
+                self.assertIn('TOKEN READER STALLED',self.window.token_state.text())
+        finally:
+            release.set(); sampler.close(); sampler.worker.join(timeout=2)
 
     def test_history_selection_clears_previous_export_while_worker_is_pending(self):
         view=self.window.history_view
@@ -90,6 +119,9 @@ class InsightsUiTests(unittest.TestCase):
         self.assertEqual(window.robot_pose,'attention'); self.assertFalse(window.nova.pixmap().isNull())
         data['sessions']=None; data['working']=False
         window._status_finished((window.status_epoch,data)); self.assertEqual(window.robot_pose,'done')
+        data['health']['local_reader']='stalled'
+        window._status_finished((window.status_epoch,data))
+        self.assertIn('TOKEN READER STALLED',window.token_state.text())
 
     def test_history_chart_metrics_paint_without_shadowing_qt_methods(self):
         view=self.window.history_view

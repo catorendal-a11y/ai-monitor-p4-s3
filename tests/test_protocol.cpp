@@ -306,6 +306,7 @@ static void view_mode_and_firmware_identity() {
   CHECK(core.out().find(std::string("\"brightnessControl\":\"") + board_profile::brightness_control + "\"") != std::string::npos);
   core.tick = [] { return uint32_t{0xffffffffu}; };
   core.heap = [] { return uint32_t{0xffffffffu}; };
+  core.psram_free = [] { return uint32_t{0xffffffffu}; };
   core.boot_id = 0xffffffffu;
   feed(core, "{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":255,\"idleSeconds\":4294967295,\"delta\":18446744073709551615}\n");
   core.clear_out();
@@ -313,6 +314,7 @@ static void view_mode_and_firmware_identity() {
   JsonDocument identity;
   CHECK(!deserializeJson(identity, core.out()));
   CHECK(identity["boardId"] == board_profile::id);
+  CHECK(identity["psramFree"].as<uint32_t>() == 0xffffffffu);
   feed(core, "{\"cmd\":\"set_views\",\"views\":[\"codex\",\"zcode\"],\"mode\":\"automatic\",\"active\":1,\"interval\":2}\n");
   CHECK(core.snapshot().activeView == 1);
   CHECK(core.snapshot().automaticViews);

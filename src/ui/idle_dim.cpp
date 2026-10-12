@@ -12,6 +12,8 @@ static BrightnessFade fade;
 static const char* mode = "NORMAL";
 const char* idle_dim_mode() { return mode; }
 void idle_dim_update() {
+  uint8_t recovered = 0;
+  if (app_settings::take_initial_brightness(recovered)) display_apply_brightness(recovered, false);
   const uint32_t now = millis();
   const uint8_t selected = display_get_brightness();
   const uint8_t base = nightTouched && now - nightLastTouch < 60000u ? selected :

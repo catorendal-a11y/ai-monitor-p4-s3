@@ -16,6 +16,7 @@ static const char* KEY_DIM_MIN = "dim_min";
 static uint8_t s_dimMinutes = 5;  // default: dim after 5 idle minutes
 static uint8_t s_brightness = DISPLAY_DEFAULT_BRIGHTNESS, s_savedBrightness = DISPLAY_DEFAULT_BRIGHTNESS;
 static bool s_loaded = false;
+static bool s_initialBrightnessConsumed = false, s_brightnessOverridden = false;
 static bool s_loadFailed = false;
 static uint32_t s_loadAttemptMs = 0;
 static uint8_t s_warningPercent = 25;
@@ -125,6 +126,14 @@ uint8_t dim_minutes() {
 }
 
 uint8_t brightness() { ensure_loaded(); return s_brightness; }
+bool take_initial_brightness(uint8_t& value) {
+  if (s_initialBrightnessConsumed || !ensure_loaded()) return false;
+  s_initialBrightnessConsumed = true;
+  if (s_brightnessOverridden) return false;
+  value = s_brightness;
+  return true;
+}
+void note_brightness_override() { s_brightnessOverridden = true; }
 void set_brightness(uint8_t value) {
   if (!ensure_loaded(true)) { report_save(false); return; }
   s_brightness = value;

@@ -16,11 +16,19 @@ int main() {
   using namespace app_settings;
   fake_nvs::values["dim_min"] = {10}; fake_nvs::values["brightness"] = {90}; fake_nvs::fail_open = true;
   CHECK(dim_minutes() == 5 && !s_loaded && save_status() == SaveStatus::failed);
+  uint8_t recovered = 0;
+  CHECK(!take_initial_brightness(recovered));
   set_dim_minutes(5); CHECK(save_status() == SaveStatus::failed && fake_nvs::writes == 0);
   set_brightness(DISPLAY_DEFAULT_BRIGHTNESS); CHECK(save_status() == SaveStatus::failed && fake_nvs::writes == 0);
   fake_nvs::fail_open = false; settingsTick = 1001;
   CHECK(dim_minutes() == 10 && s_loaded);
   CHECK(brightness() == 90);
+  const auto writesBeforeRecovery = fake_nvs::writes;
+  CHECK(take_initial_brightness(recovered) && recovered == 90);
+  CHECK(!take_initial_brightness(recovered) && fake_nvs::writes == writesBeforeRecovery);
+  s_initialBrightnessConsumed = false;
+  note_brightness_override();
+  CHECK(!take_initial_brightness(recovered));  // Preserve an explicit action before recovery.
   set_brightness(DISPLAY_DEFAULT_BRIGHTNESS);
   CHECK(save_status() == SaveStatus::saved && fake_nvs::values["brightness"][0] == DISPLAY_DEFAULT_BRIGHTNESS);
   const auto brightnessWrites = fake_nvs::writes;
@@ -128,6 +136,12 @@ int main() {
   CHECK(warning_for("codex", "Session", 300) == 30);
   set_warning_for("unknown", "Session", 300, 10); CHECK(save_status() == SaveStatus::failed);
   set_warning_for("codex", "Session", 300, 51); CHECK(save_status() == SaveStatus::failed);
+  s_loaded = false; s_initialBrightnessConsumed = false; s_brightnessOverridden = false;
+  fake_nvs::fail_open = true; settingsTick += 1001;
+  CHECK(!take_initial_brightness(recovered));
+  note_brightness_override();  // A temporary user change while NVS is unavailable.
+  fake_nvs::fail_open = false; settingsTick += 1001;
+  CHECK(!take_initial_brightness(recovered) && s_loaded);
   if (failures) return EXIT_FAILURE;
   std::cout << "NVS persistence, failure/retry, window identity and migration checks passed\n";
 }

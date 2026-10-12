@@ -17,11 +17,25 @@ function emit(name, pixels, width, height, format, stride) {
   cpp.push('};', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${name}_pixels), ${name}_pixels, nullptr, nullptr };`);
 }
 (async () => {
+  const crops = {};
+  for (const robot of ['nova','orbit']) {
+    let left=430,top=284,right=-1,bottom=-1;
+    for (const pose of names) {
+      const {data,info}=await sharp(path.join(root,'assets',robot,pose+'.svg')).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+      for (let y=0;y<info.height;y++) for (let x=0;x<info.width;x++) if (data[(y*info.width+x)*info.channels+3]) {
+        left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);
+      }
+    }
+    if (right<left || bottom<top) throw new Error('Empty companion artwork');
+    crops[robot]={left,top,width:right-left+1,height:bottom-top+1};
+    header.push(`inline constexpr int16_t ${robot}_origin_x = ${left};`, `inline constexpr int16_t ${robot}_origin_y = ${top};`);
+  }
   for (const robot of ['nova','orbit']) for (const pose of [...names,'thumb']) {
     const name = robot === 'nova' && pose !== 'thumb' ? pose : robot + '_' + pose;
     const file = path.resolve(source,'..',robot, (pose === 'thumb' ? 'work' : pose) + '.svg');
     let pipeline = sharp(file);
     if (pose === 'thumb') pipeline = pipeline.resize(144,95);
+    else pipeline = pipeline.extract(crops[robot]);
     const {data, info} = await pipeline.ensureAlpha().raw().toBuffer({resolveWithObject:true});
     const pixelCount = info.width * info.height;
     const rgb565 = Buffer.alloc(pixelCount * 3);

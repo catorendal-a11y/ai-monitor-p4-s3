@@ -1,6 +1,10 @@
 #pragma once
 #include <lvgl.h>
 namespace nova_assets {
+inline constexpr int16_t nova_origin_x = 28;
+inline constexpr int16_t nova_origin_y = 0;
+inline constexpr int16_t orbit_origin_x = 58;
+inline constexpr int16_t orbit_origin_y = 17;
 extern const lv_image_dsc_t work;
 extern const lv_image_dsc_t done;
 extern const lv_image_dsc_t low;

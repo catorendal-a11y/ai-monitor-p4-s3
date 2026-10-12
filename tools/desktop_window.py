@@ -143,13 +143,14 @@ class ReadWorker(QRunnable):
         signals.finished.emit(result)
 
 
-def collect_status(root, config, secrets, reporter, tokens):
+def collect_status(root, config, secrets, reporter, tokens, asynchronous=True):
     processes = control.owned_hosts(root)
     health = read_status(root, {process.pid for process in processes})
     sample = None
     if tokens:
         if reporter is None:
-            reporter = control.host.TokenReporter(providers=config['providers'], activity_dir=root/'tools/activity')
+            reader = control.host.TokenSampler if asynchronous else control.host.TokenReporter
+            reporter = reader(providers=config['providers'], activity_dir=root/'tools/activity')
             reporter.poll_seconds = config['token_poll_s']
         sample = reporter.poll()
     working = bool(tokens and processes and reporter.last_use is not None and
@@ -157,6 +158,7 @@ def collect_status(root, config, secrets, reporter, tokens):
     return {'running': bool(processes), 'summary': desktop.connection_summary(root, processes),
             'health': health, 'log': desktop.recent_log(root, secrets) if tokens else None,
             'sample': sample, 'reporter': reporter, 'working': working,
+            'reader_state':reporter.read_state() if isinstance(reporter,control.host.TokenSampler) else None,
             'sessions': __import__('session_activity').summary(root/'tools/activity',config['providers']) if tokens else None}
 
 
@@ -406,7 +408,7 @@ class MonitorWindow(QMainWindow):
         if self.monitor_enabled:
             if was_hidden:
                 self.status_epoch += 1
-                self.token_reporter = None  # Resume with a baseline, not an accumulated hidden-window activity burst.
+                self._reset_tokens()  # Resume with a baseline without replacing a blocked worker.
                 self.refresh_status()
             self.timer.start()
 
@@ -1080,7 +1082,7 @@ class MonitorWindow(QMainWindow):
         self.live_connected = False
         self.status_epoch += 1
         self.cached_health = None
-        self.token_reporter = None
+        self._reset_tokens()
         self._apply_preferences()
         self._update_setup_progress()
         self.notice.setText('Settings saved. Existing keys were preserved unless you explicitly changed or cleared them.')
@@ -1272,14 +1274,24 @@ class MonitorWindow(QMainWindow):
         self.robot_pose=pose; self.robot_working=False
         self.nova.setPixmap(self.session_pixmaps[pose])
 
+    def _reset_tokens(self):
+        if isinstance(self.token_reporter,control.host.TokenSampler):
+            self.token_reporter.configure(self.config['providers'])
+            self.token_reporter.poll_seconds=self.config['token_poll_s']
+        else: self.token_reporter=None
+
     def refresh_status(self):
         if self.closed or self.status_worker is not None: return
+        if not self.hidden_to_tray and self.token_reporter is None:
+            reader=control.host.TokenSampler if self.monitor_enabled else control.host.TokenReporter
+            self.token_reporter=reader(providers=self.config['providers'],activity_dir=self.root/'tools/activity')
+            self.token_reporter.poll_seconds=self.config['token_poll_s']
         epoch = self.status_epoch
         config = dict(self.config, providers=list(self.config['providers']))
         root, secrets, reporter = self.root, tuple(self.secrets), self.token_reporter
         tokens = not self.hidden_to_tray
         def read():
-            try: data = collect_status(root, config, secrets, reporter, tokens)
+            try: data = collect_status(root, config, secrets, reporter, tokens, self.monitor_enabled)
             except Exception: data = None
             # Failed reads belong to the same generation as successful reads.
             # An old failure must not clear a new setup's verified connection.
@@ -1371,6 +1383,8 @@ class MonitorWindow(QMainWindow):
                 elif counts['completed']:
                     self.token_state.setText('SESSION EVENTS: turn complete')
                     self._show_robot(False)
+            if data.get('reader_state')=='stalled' or (health and health.get('local_reader')=='stalled'):
+                self.token_state.setText('TOKEN READER STALLED / Restart host to retry local activity.')
         self.refresh_tray(poll=False)
         if self.auto_start_pending:
             self.auto_start_pending = False
@@ -1398,6 +1412,7 @@ class MonitorWindow(QMainWindow):
         self.timer.stop()
         self.tray_timer.stop()
         self.closed = True
+        if isinstance(self.token_reporter,control.host.TokenSampler): self.token_reporter.close()
         if self.live_sampler is not None: self.live_sampler.close()
         if self.tray is not None: self.tray.hide()
         event.accept()  # The independent background host is deliberately left running.

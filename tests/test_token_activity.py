@@ -24,6 +24,9 @@ class TokenActivityTests(unittest.TestCase):
             try:
                 self.assertIsNone(sampler.poll())
                 self.assertTrue(entered.wait(1))
+                self.assertEqual(sampler.read_state(), 'reading')
+                with sampler.condition: sampler.read_started -= 16
+                self.assertEqual(sampler.read_state(), 'stalled')
                 serial = FakeSerial([b'{"type":"info"}\n'])
                 panel = panel_with(serial); panel.tokens_supported = True; panel.token_reporter = sampler
                 started = time.monotonic()
@@ -40,6 +43,7 @@ class TokenActivityTests(unittest.TestCase):
                 self.assertIsNotNone(result)
                 self.assertEqual(result['sources'], 0)  # stale ZCode work was not published
                 self.assertFalse(result['seen'])
+                self.assertEqual(sampler.read_state(), 'ready')
             finally:
                 release.set(); sampler.close(); sampler.worker.join(timeout=2)
             self.assertFalse(sampler.worker.is_alive())

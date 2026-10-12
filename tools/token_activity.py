@@ -25,6 +25,8 @@ class TokenSampler:
         self.generation = 0
         self.result = None
         self.requested = self.busy = self.closed = False
+        self.read_started = None
+        self.read_failed = False
         self.next_poll = 0
         self.worker = threading.Thread(target=self._read, daemon=True, name='aim-local-counts')
         self.worker.start()
@@ -32,6 +34,10 @@ class TokenSampler:
     @property
     def poll_seconds(self):
         with self.condition: return self.reporter.poll_seconds
+
+    @property
+    def last_use(self):
+        with self.condition: return self.reporter.last_use
 
     @poll_seconds.setter
     def poll_seconds(self, value):
@@ -54,6 +60,12 @@ class TokenSampler:
                 self.condition.notify()
             return result
 
+    def read_state(self):
+        with self.condition:
+            if self.busy:
+                return 'stalled' if time.monotonic()-self.read_started>=15 else 'reading'
+            return 'unavailable' if self.read_failed else ('ready' if self.read_started is not None else 'starting')
+
     def _read(self):
         while True:
             with self.condition:
@@ -61,6 +73,7 @@ class TokenSampler:
                 if self.closed: return
                 self.requested = False
                 self.busy = True
+                self.read_started = time.monotonic()
                 reporter, generation = self.reporter, self.generation
             try:
                 value = reporter.poll()
@@ -74,9 +87,13 @@ class TokenSampler:
                     if current and self.history is not None:
                         try: self.history.record_tokens(reporter.deltas)
                         except (OSError,ValueError,TypeError): pass  # Optional history never suppresses activity delivery.
-            except Exception: value = None  # No source content or exceptions are exported.
+            except Exception:
+                value = None  # No source content or exceptions are exported.
+                failed = True
+            else: failed = False
             with self.condition:
                 self.busy = False
+                if generation == self.generation: self.read_failed = failed
                 if self.closed: return
                 if generation == self.generation and value is not None: self.result = value
 
