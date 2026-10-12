@@ -11,6 +11,7 @@
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/aim_control.py`: console setup, scoped host controls and verified firmware installation.
+- `tools/aim_events.py`: small, silent, explicitly enabled Claude event observer; no model, host or serial control.
 - `tools/aim_desktop.py`, `tools/desktop_window.py`, `tools/desktop_support.py`: graphical NOVA control panel and validated actions. Qt mutations stay on the main thread; blocking actions use one worker.
 - Desktop tests use an offscreen Qt window with synthetic configuration, without provider requests or hardware writes.
 - `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.

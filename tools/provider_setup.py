@@ -12,11 +12,11 @@ from telemetry_bridge import write_record
 def claude_command(root, option='--claude-statusline'):
     if option not in ('--claude-statusline','--claude-event'): raise ValueError('Unsupported Claude integration')
     if getattr(sys, 'frozen', False):
-        helper = root / 'AI-Monitor-Console.exe'
+        helper = root / ('AI-Monitor-Events.exe' if option=='--claude-event' else 'AI-Monitor-Console.exe')
         if not helper.is_file(): raise ValueError('Console helper missing. Reinstall the complete release.')
         command = [str(helper), option]
     else:
-        command = [sys.executable, str(root / 'tools/aim_control.py'), option]
+        command = [sys.executable, str(root / ('tools/aim_events.py' if option=='--claude-event' else 'tools/aim_control.py')), option]
     if os.name == 'nt':
         expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + arg.replace("'", "''") + "'" for arg in command)
         if option=='--claude-event':

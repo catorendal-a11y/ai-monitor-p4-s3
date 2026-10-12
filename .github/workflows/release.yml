@@ -125,6 +125,8 @@ jobs:
           $package = Get-ChildItem work/windows-release -Directory | Select-Object -First 1
           & (Join-Path $package.FullName 'AI-Monitor-Console.exe') --check
           if ($LASTEXITCODE -ne 0) { throw 'Portable host failed.' }
+          & (Join-Path $package.FullName 'AI-Monitor-Events.exe') --check
+          if ($LASTEXITCODE -ne 0) { throw 'Portable event observer failed.' }
           $gui = Start-Process -FilePath (Join-Path $package.FullName 'AI-Monitor.exe') -ArgumentList '--gui-check' -WindowStyle Hidden -Wait -PassThru
           if ($gui.ExitCode -ne 0) { throw 'Portable GUI assets or runtime failed.' }
           & (Join-Path $package.FullName 'firmware-flasher.exe') --chip esp32p4 image-info (Join-Path $package.FullName 'firmware/guition-p4/application.bin')

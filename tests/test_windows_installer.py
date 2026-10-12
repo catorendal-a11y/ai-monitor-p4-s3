@@ -16,6 +16,7 @@ class InstallerTests(unittest.TestCase):
         self.package = Path(self.directory.name)
         files = {'src/config.h': '#define FW_VERSION "v1.16.0"',
                  'AI-Monitor.exe': 'gui', 'AI-Monitor-Console.exe': 'host',
+                 'AI-Monitor-Events.exe':'events', 'event-runtime/base_library.zip':'event runtime',
                  'firmware-flasher.exe': 'flasher', '_internal/PySide6/Qt6Core.dll': 'runtime'}
         for name, text in files.items():
             path = self.package/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(text)

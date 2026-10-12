@@ -29,7 +29,7 @@ class SessionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name); (root/'tools').mkdir()
             observed=root/'observed.txt'
-            (root/'tools/aim_control.py').write_text(
+            (root/'tools/aim_events.py').write_text(
                 'import sys\nfrom pathlib import Path\n'
                 f'Path({str(observed)!r}).write_text(str(len(sys.stdin.read())))\n'
                 'print("fixture output"); print("fixture error",file=sys.stderr); sys.exit(7)\n')

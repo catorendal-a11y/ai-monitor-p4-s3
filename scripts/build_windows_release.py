@@ -86,6 +86,12 @@ def build_package(output, package, version, args):
             '--add-data', str(ROOT / 'assets/desktop') + os.pathsep + 'assets/desktop',
             str(ROOT / 'tools/aim_desktop.py'))
         shutil.copytree(gui_dist / 'AI-Monitor', package, dirs_exist_ok=True)
+        events_dist=scratch/'events-dist'
+        build_desktop(*common,'--distpath',str(events_dist),'--onedir','--console',
+            '--contents-directory','event-runtime','--name','AI-Monitor-Events',
+            '--paths',str(ROOT/'tools'),'--exclude-module','PySide6','--exclude-module','esptool',
+            str(ROOT/'tools/aim_events.py'))
+        shutil.copytree(events_dist/'AI-Monitor-Events',package,dirs_exist_ok=True)
         run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Console', '--paths', str(ROOT / 'tools'),
             '--exclude-module', 'esptool', '--exclude-module', 'PySide6',
             str(ROOT / 'tools/aim_control.py'))

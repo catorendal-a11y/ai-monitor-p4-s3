@@ -394,15 +394,8 @@ def main(argv=None):
     if args.claude_event:
         # Observational hooks must stay silent and never block/inject context.
         # The JSON may contain text; discard it and retain only hashed ID/state.
-        from session_activity import claude_event,link_marker
-        try:
-            if 'claude' not in local_config()['providers']: return 0
-            marker=link_marker(ROOT/'tools/activity')
-            if not marker['enabled']: return 0
-            raw = sys.stdin.buffer.read(65537)
-            if len(raw)<=65536: claude_event(json.loads(raw), ROOT/'tools/activity',generation=marker['generation'])
-        except (ValueError,OSError,TypeError,RecursionError): pass
-        return 0
+        from aim_events import receive
+        return receive(ROOT)
     if args.ingest or args.claude_statusline:
         from telemetry_bridge import ingest, claude_statusline
         try:

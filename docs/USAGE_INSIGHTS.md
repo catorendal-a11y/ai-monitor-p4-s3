@@ -51,7 +51,8 @@ Only selected providers contribute. Without fresh events, normal token/quota beh
 Running/waiting records expire after 15 minutes; terminal states after 30 seconds.
 Events report the latest session state, not a complete inventory of concurrently running tools.
 
-The helper retains only an allowed state, receipt time and hashed session ID from hook input.
+The bundled `AI-Monitor-Events.exe` helper starts directly from its small `event-runtime` folder;
+keep the complete installation together. It retains only an allowed state, receipt time and hashed session ID from hook input.
 It suppresses output, always exits successfully, never approves permissions, and opens no network
 listener. Claude's global `disableAllHooks` setting is preserved and reported instead of bypassed.
 **Remove session events** removes this installation's own hooks and invalidates previous events.

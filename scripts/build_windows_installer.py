@@ -29,7 +29,8 @@ def verify_package(package: Path) -> str:
     for file in actual:
         if file.name.startswith('aim_host.invalid-') or file.name in {'aim_host.json', 'aim_host.status.json', 'aim_host.log', 'auth.json', 'credentials.json'} or file.suffix in {'.db', '.sqlite', '.jsonl', '.lnk'}:
             raise ValueError('Private runtime file in package')
-    for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll'):
+    for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'AI-Monitor-Events.exe',
+                 'event-runtime/base_library.zip', 'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll'):
         if not (package/name).is_file():
             raise ValueError('Incomplete application runtime')
     return version
