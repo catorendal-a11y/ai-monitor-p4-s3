@@ -34,7 +34,7 @@ from host_security import open_provider_request, read_local_json, safe_text, ser
 import queue
 import subprocess
 import threading
-from process_runtime import stop_child
+from process_runtime import ChildCleanupError, start_child, stop_child
 from project_version import HOST_VERSION, numeric_version
 
 import serial
@@ -690,9 +690,13 @@ class FetchPool:
             return None, provider_failure(provider, error)
         environment = dict(os.environ)
         environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
-        process = subprocess.Popen(self.command(provider), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, env=environment,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        try:
+            process = start_child(self.command(provider), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, env=environment,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        except ChildCleanupError:
+            self.cleanup_failed=True
+            raise
         self.process = process
         replies = queue.Queue(maxsize=1)
         def read():

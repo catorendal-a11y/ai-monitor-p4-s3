@@ -8,6 +8,7 @@ This release adds clearer connection checks, optional numeric history and explic
 - Keep control positions stable, reject stale setup results, separate new baselines from observed increases and surface history storage failures.
 - Crop transparent companion margins with a shared renderer, saving 1,046,664 bytes of frame data while retaining the original pose origins. Recover brightness after a transient initial NVS failure without overriding a user's later change.
 - Report stalled local token readers and expose free PSRAM for device diagnostics. A permanently blocked reader still requires a host restart; long hardware soak and physical S3 testing remain separate work.
+- Contain Windows quota helpers and Codex app-server subprocesses before they begin execution. Kill-on-close Job Objects clean up ordinary descendants on owner exit; failed cleanup prevents another quota worker from starting. Existing interactive client installation/sign-in remains separate.
 
 Update existing displays using Application update to preserve preferences. Session events require the updated firmware; old firmware retains token/quota compatibility. Codex/ZCode and other providers still use recorded token activity, not live session hooks. S3 remains experimental without physical hardware validation. Windows executables remain unsigned; SmartScreen reputation is not guaranteed.
 

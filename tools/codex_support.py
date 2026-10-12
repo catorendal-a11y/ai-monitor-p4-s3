@@ -6,7 +6,7 @@ import queue
 import subprocess
 import threading
 import time
-import psutil
+from process_runtime import start_child, stop_child
 from host_security import allowed_executable, path_executable, powershell_executable
 from project_version import HOST_VERSION, numeric_version
 
@@ -89,7 +89,7 @@ def setup_codex(ask=input):
 
 
 def read_rate_limits(command, timeout=20):
-    process = subprocess.Popen(command + ['app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    process = start_child(command + ['app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     replies = queue.Queue(maxsize=64)
     def read():
@@ -129,20 +129,7 @@ def read_rate_limits(command, timeout=20):
         send({'method':'account/rateLimits/read','id':2})
         return response(2)
     finally:
-        children = []
-        if process.poll() is None:
-            try: children = psutil.Process(process.pid).children(recursive=True)
-            except psutil.Error: pass
-        for child in children:
-            try: child.terminate()
-            except psutil.NoSuchProcess: pass
-        if process.poll() is None: process.terminate()
-        try: process.wait(timeout=3)
-        except subprocess.TimeoutExpired: process.kill(); process.wait(timeout=3)
-        _, alive = psutil.wait_procs(children, timeout=3)
-        for child in alive:
-            try: child.kill()
-            except psutil.NoSuchProcess: pass
+        stop_child(process)
         worker.join(timeout=1)
         for stream in [process.stdin, process.stdout]:
             if stream:

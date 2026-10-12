@@ -96,8 +96,8 @@ class CodexOnboardingTests(unittest.TestCase):
         result={'rateLimits':{'limitId':'codex','primary':{'usedPercent':25,'windowDurationMins':300,'resetsAt':2000000000}}}
         incoming=[{'id':1,'result':{}},{'method':'account/updated','params':{'private':'not exported'}},{'id':2,'result':result}]
         process=Mock(pid=123456); process.stdin=RetainedBuffer(); process.stdout=RetainedBuffer(b''.join(json.dumps(v).encode()+b'\n' for v in incoming))
-        process.poll.return_value=None
-        with patch.object(support.subprocess,'Popen',return_value=process), patch.object(support.psutil,'Process',return_value=Mock(children=Mock(return_value=[]))):
+        process.poll.side_effect=[None,None,0]
+        with patch.object(support,'start_child',return_value=process), patch('process_runtime.psutil.Process',return_value=Mock(children=Mock(return_value=[]))):
             self.assertEqual(support.read_rate_limits(['official-cli']),result)
         methods=[json.loads(line)['method'] for line in process.stdin.getvalue().splitlines()]
         self.assertEqual(methods,['initialize','initialized','account/rateLimits/read'])
@@ -120,9 +120,10 @@ class CodexOnboardingTests(unittest.TestCase):
         incoming=[{'id':1,'result':{}},{'id':2,'error':{'message':'private authentication detail'}}]
         process=Mock(pid=123456);process.stdin=RetainedBuffer();process.stdout=RetainedBuffer(b''.join(json.dumps(v).encode()+b'\n' for v in incoming));process.poll.return_value=None
         child=Mock()
-        with patch.object(support.subprocess,'Popen',return_value=process), \
-                patch.object(support.psutil,'Process',return_value=Mock(children=Mock(return_value=[child]))), \
-                patch.object(support.psutil,'wait_procs',return_value=([child],[])):
+        process.poll.side_effect=[None,None,0]
+        with patch.object(support,'start_child',return_value=process), \
+                patch('process_runtime.psutil.Process',return_value=Mock(children=Mock(return_value=[child]))), \
+                patch('process_runtime.psutil.wait_procs',return_value=([child],[])):
             with self.assertRaises(RuntimeError) as caught: support.read_rate_limits(['node-fixture','codex.js'])
         self.assertNotIn('private authentication detail',str(caught.exception))
         child.terminate.assert_called_once();process.terminate.assert_called_once()

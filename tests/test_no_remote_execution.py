@@ -84,11 +84,11 @@ class NoRemoteExecutionTests(unittest.TestCase):
                     {'method': 'turn/start', 'params': {'prompt': MARKER}}, {'id': 2, 'result': result}]
         process = Mock(pid=123456); process.stdin = RetainedBuffer()
         process.stdout = RetainedBuffer(b''.join(json.dumps(item).encode() + b'\n' for item in incoming))
-        process.poll.return_value = None
+        process.poll.side_effect = [None,None,0]
         with patch.object(host, 'codex_command', return_value=['official-client-fixture']), \
-                patch.object(codex.subprocess, 'Popen', return_value=process) as spawn, \
+                patch.object(codex, 'start_child', return_value=process) as spawn, \
                 patch.object(codex.subprocess, 'run') as run, patch.object(host.os, 'system') as shell, \
-                patch.object(codex.psutil, 'Process', return_value=Mock(children=Mock(return_value=[]))):
+                patch('process_runtime.psutil.Process', return_value=Mock(children=Mock(return_value=[]))):
             rows, notice = host.fetch_codex()
         self.assertIsNone(notice); self.assertEqual(rows[0]['usedPercent'], 12)
         self.assertEqual(spawn.call_args.args[0], ['official-client-fixture', 'app-server'])

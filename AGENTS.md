@@ -10,6 +10,7 @@
 - `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions; no runtime image allocation.
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
+- `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/aim_control.py`: console setup, scoped host controls and verified firmware installation.
 - `tools/aim_events.py`: small, silent, explicitly enabled Claude event observer; no model, host or serial control.

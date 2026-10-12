@@ -17,6 +17,9 @@ that its hardware, security or software has been validated here. USB remains the
   recommends restarting a stalled host, or quitting/reopening a stalled desktop monitor. It does not create replacement
   threads or claim to recover an indefinitely blocked reader automatically.
 - Include free PSRAM in the bounded device information reply, alongside existing free heap.
+- Contain Windows quota workers and read-only Codex app-server processes in kill-on-close
+  Job Objects before resuming their primary thread. Unconfirmed startup cleanup blocks retry.
+  Normal subprocess descendants remain contained even after their original parent exits.
 
 Cropping reduces flash data; it does not reduce the display framebuffer, prove a runtime RAM
 improvement, or compress/decode frames into PSRAM. Native tests cover both board interfaces and
@@ -26,9 +29,10 @@ pose origins. Real P4 operation and physical S3 validation are separate checks.
 
 1. Physical gesture tests: drag out/back in, failed touch read, reordered providers while held.
 2. Long P4 soak: resets, reconnects, free heap/PSRAM trends, touch and backlight behavior.
-3. Windows Job Objects with kill-on-close for explicitly owned quota workers and descendants.
-   Existing cleanup uses scoped process enumeration; it cannot guarantee containment after every
-   unexpected parent exit. Never terminate unrelated processes by name.
+3. Verify the packaged Job Object path in a fresh Windows installation. Source-level tests cover
+   exited parents, abrupt owner death, nested jobs, denied assignment and unrelated processes.
+   Non-Windows source installations retain scoped process enumeration. Job Objects control
+   process lifetime; they do not reduce filesystem or network permissions.
 4. Enforceable process deadlines for local readers if bounded I/O still proves insufficient.
 
 ## Optional extensions requiring separate evaluation
