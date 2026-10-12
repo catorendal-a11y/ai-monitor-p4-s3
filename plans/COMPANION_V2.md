@@ -163,11 +163,40 @@ Dependencies: E and H. Rollback: built-ins; ignore invalid staging; no activatio
 
 ## Execution and review
 
-Order is A -> B -> C -> D -> E -> F -> G -> H -> I as requested. Synthetic fixture authoring may
+The latest product direction moves standalone C6/ESP-Hosted bring-up early, alongside B/C, once
+the board revision's wiring is verified. It does not depend on Claude or permission UI. Secure
+Claude transport integration still follows F/G; SD packs remain later. Synthetic fixture authoring may
 proceed while hardware is unavailable, but phases retain their physical exit gates. Reviewer checks
 dependency correctness, missing hardware assumptions, privacy, cancellation, bounds and rollback.
 If a probe exposes incompatible hardware/SDK, amend this plan with the evidence rather than silently
-flashing C6 or substituting a different radio path. Publication is a separate final step on hold.
+flashing C6 or substituting a different radio path. Push is authorized; releases remain a separate step.
+
+## Additional v2 product domains
+
+After the foundations, implement live activity (THINKING, EDITING, SEARCHING, BUILDING, TESTING,
+WAITING, FAILED, DONE) in a distinct bounded domain, with synthetic lifecycle tests. Do not infer
+these states from quota decreases or invent tool detail absent from a provider's events.
+Multi-Agent View consumes live session/provider identity and state without adding it to `aim::Snapshot`.
+Permission states are NONE, RECEIVED, DISPLAYED, HOLDING, SENT, ACKNOWLEDGED, DENIED, EXPIRED,
+CANCELLED and ERROR; security and prompt revision/epoch checks govern every transition.
+
+Task-finished/needs-attention events, session timer, bounded activity timeline and notification center
+must deduplicate and expire events; companion reactions consume these events independently of renderer
+and transport. Numeric usage history already exists locally; extend it with reliable session/active-time
+metrics only when source events establish them, preserving explicit opt-in and transcript exclusion.
+
+Build/test status, Git/project status, daily summary, audio, microSD packs and configurable layouts
+follow later. No Wi-Fi host, web dashboard, camera, voice assistant, cloud account or full transcripts.
+
+## Current implementation checkpoint
+
+Source fixes and regression validation are recorded in `docs/V2_VALIDATION.md`. B exposes read-only
+metrics but physical collection, SD/C6 detection and initialization checkpoints remain pending.
+C provides instrumentation and an isolated compiled benchmark, not measured P4 performance.
+D has exact host compression sizes; target decode timing and final runtime format remain pending.
+E has tested manifest/cache scaffolding and built-in rendering; runtime PSRAM/LVGL/SD binding remains
+pending. F/G/H/I and the additional live product domains are not implemented by this foundation push.
+Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
 
 Primary references: [Claude Desktop Hardware Buddy](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md),
 [ESP-Hosted](https://github.com/espressif/esp-hosted-mcu),
