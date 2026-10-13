@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "measurementDate": "2026-10-13",
+  "mode": "physical P4; isolated developer test firmware",
+  "board": "JC4880P443C_I_W_Y",
+  "firmwareSourceCommit": "8bc04c001de9d7023c6e6f9c4cea11f4b8e97cb3",
+  "sdkVersion": "v5.5.5",
+  "cpuMHz": 360,
+  "images": {
+    "esp32p4-ppa-benchmark": {
+      "applicationBytes": 4623440,
+      "sha256": "3a2881e85166ed1eadc049cb2a2dafde378cca8884a3a5cb41dfdef9eacf3864"
+    },
+    "esp32p4-c6-probe": {
+      "applicationBytes": 693744,
+      "sha256": "151b3cbbf53e2eece75e428df6748a15f2591cfaf83b02e98999e76e0036dd7b"
+    }
+  },
+  "physicalFlashBytes": 16777216,
+  "physicalPsramBytes": 33554432,
+  "displayAllocation": {
+    "width": 800,
+    "height": 480,
+    "drawBytes": 1536000,
+    "drawCount": 2,
+    "rotationBytes": 768000,
+    "framebufferBytes": 1536000,
+    "framebufferCount": 2,
+    "bounceBytes": 0,
+    "color": "RGB565"
+  },
+  "ppa": {
+    "type": "ppa_benchmark",
+    "schema": 1,
+    "status": "passed",
+    "width": 800,
+    "height": 480,
+    "samples": 8,
+    "cpuMedianUs": 23963,
+    "ppaMedianUs": 14744,
+    "bitExact": true,
+    "resourcesRetained": false,
+    "isolated": true,
+    "productionPpaActive": false
+  },
+  "graphics": {
+    "durationMs": 10203,
+    "flushCalls": 13,
+    "pixelsSubmitted": 1294650,
+    "rotationUs": 78829,
+    "submissionUs": 61490,
+    "meanRotationUs": 6063.7692307692305,
+    "meanSubmissionUs": 4730.0,
+    "displayRefreshHz": null,
+    "meaning": "CPU rotation and driver submission; not physical display FPS or DMA completion"
+  },
+  "workload": "Boot screen, no host/provider requests",
+  "c6": {
+    "type": "c6_probe",
+    "schema": 1,
+    "stage": "completed",
+    "error": 0,
+    "hostVersion": "2.12.13",
+    "coprocessorResponded": true,
+    "coprocessorVersion": "2.12.22",
+    "configuredSlaveTarget": "esp32c6",
+    "detectedChip": "esp32c6",
+    "controllerEnableConfirmed": true,
+    "deadlineExceeded": false,
+    "retryAllowed": false
+  },
+  "limitations": [
+    "PPA tested on isolated aligned full-frame buffers, not production presentation",
+    "Flush counters are not physical scanout FPS",
+    "Bluetooth controller RPC is not HCI/GATT/pairing validation",
+    "No Claude transport, C6 firmware update, SD test or provider request"
+  ],
+  "productionPpaActive": false
+}

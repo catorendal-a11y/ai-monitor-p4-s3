@@ -88,12 +88,22 @@ def validate_hardware(data,board_id):
 
 def collect(panel,board_id):
     board=get_board(board_id)
-    panel.send_line('{"cmd":"get_info"}')
-    info=panel.wait_for('info')
+    # Opening USB can restart the board. Keep the same connection while waiting
+    # for its bounded initialization; identity mismatch is never retried.
+    for attempt in range(3):
+        panel.send_line('{"cmd":"get_info"}')
+        try:
+            info=panel.wait_for('info',seconds=3)
+            break
+        except TimeoutError:
+            if attempt == 2: raise
     if not matches_info(board,info): raise ValueError('Device identity mismatch')
     panel.send_line('{"cmd":"get_hardware"}')
     try: reply=panel.wait_for('hardware',seconds=3)
     except RuntimeError:
         return dict(schema=1,identitySource='firmware-report',boardId=board.id,chip=board.chip,
             telemetry='unavailable-in-installed-firmware',hosted=dict(probeState='not-probed'),ppa=dict(active=False))
-    return dict(schema=1,identitySource='firmware-report',telemetry='available',hardware=validate_hardware(reply,board_id))
+    hardware=validate_hardware(reply,board_id)
+    if 'bootId' in info and (type(info['bootId']) is not int or info['bootId']!=hardware['bootId']):
+        raise ValueError('Device restarted during telemetry collection')
+    return dict(schema=1,identitySource='firmware-report',telemetry='available',hardware=hardware)

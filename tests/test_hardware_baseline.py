@@ -22,6 +22,19 @@ def fixture():
 
 
 class HardwareBaselineTests(unittest.TestCase):
+    def test_collection_waits_for_slow_boot_on_same_port_and_has_a_fixed_limit(self):
+        panel=Mock(); panel.wait_for.side_effect=[TimeoutError('booting'),
+            dict(boardId='guition-p4',chip='esp32p4',bootId=17),fixture()]
+        self.assertEqual(collect(panel,'guition-p4')['telemetry'],'available')
+        self.assertEqual(panel.send_line.call_count,3)
+        panel=Mock(); panel.wait_for.side_effect=TimeoutError('not available')
+        with self.assertRaises(TimeoutError): collect(panel,'guition-p4')
+        self.assertEqual(panel.send_line.call_count,3)
+
+    def test_reboot_between_identity_and_hardware_cannot_produce_a_measurement(self):
+        panel=Mock(); panel.wait_for.side_effect=[dict(boardId='guition-p4',chip='esp32p4',bootId=18),fixture()]
+        with self.assertRaisesRegex(ValueError,'restarted'): collect(panel,'guition-p4')
+
     def test_presentation_distinguishes_snapshot_unknown_radio_and_bad_data(self):
         data=fixture()
         text=hardware_text(dict(state='connected',board='guition-p4',hardware=data))

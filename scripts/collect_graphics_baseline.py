@@ -9,6 +9,7 @@ from board_profiles import BOARDS
 from aim_host import Panel
 from hardware_baseline import collect
 from graphics_baseline import validate_graphics,interval
+from ppa_baseline import validate_ppa
 from host_security import serial_port
 
 
@@ -18,6 +19,7 @@ def main():
     parser.add_argument('--port',required=True)
     parser.add_argument('--seconds',type=int,default=10)
     parser.add_argument('--output',required=True,type=Path)
+    parser.add_argument('--ppa',action='store_true',help='Also read the isolated boot-time PPA benchmark; never starts it')
     args=parser.parse_args()
     if not 1<=args.seconds<=60: parser.error('Use an interval of 1-60 seconds')
     port=serial_port(args.port)
@@ -33,6 +35,9 @@ def main():
         last=sample(); measurement=interval(first,last)
         if measurement is None: raise ValueError('Invalid graphics interval or reboot')
         result=dict(schema=1,baseline=baseline,first=first,last=last,interval=measurement)
+        if args.ppa:
+            panel.send_line('{"cmd":"get_ppa_benchmark"}')
+            result['ppa']=validate_ppa(panel.wait_for('ppa_benchmark',seconds=3))
         args.output.parent.mkdir(parents=True,exist_ok=True)
         args.output.write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
         print('Graphics interval saved. Physical scanout FPS and PPA performance are not measured by these counters.')

@@ -7,7 +7,7 @@ The user identified the PCB as JC4880P443C_I_W_Y; microSD presence is still unco
 Continue incremental implementation; verify this revision's wiring before active C6/SD initialization.
 Runtime detection and physical exit gates remain pending actual measurements.
 
-## Starting point
+## Historical starting point
 
 Canonical Git root is this project directory, branch `codex/usage-insights`. Local HEAD `22c5790`
 contains the initial brightness recovery fix, transparent global crops, origin-preserving renderer,
@@ -192,9 +192,14 @@ follow later. No Wi-Fi host, web dashboard, camera, voice assistant, cloud accou
 
 Source fixes and regression validation are recorded in `docs/V2_VALIDATION.md`. B exposes read-only
 metrics and initialization checkpoints; P4 physical collection and application flash succeeded.
-PC diagnostics reads a capability-negotiated snapshot through the existing host. SD/C6 detection remains pending.
-The standalone C6 build and physical gate are documented in `docs/C6_BRINGUP.md`.
-C provides instrumentation and an isolated compiled benchmark, not measured P4 performance.
+PC diagnostics reads a capability-negotiated snapshot through the existing host. Production SD/C6
+initialization remains disabled; standalone runtime C6 detection has now succeeded.
+The standalone C6 test physically detected the coprocessor, read host/slave versions and confirmed
+controller init/enable RPC; production radio initialization, HCI and secure BLE remain pending.
+Results and limits are documented in `docs/C6_BRINGUP.md` and `docs/P4_HARDWARE_BENCHMARKS.md`.
+C now has physical CPU/PPA rotation and normal flush-counter measurements. PPA matched every
+pixel in eight trials and was 1.625x faster for isolated full-frame rotation. Production remains on
+CPU pending partial-region, DMA/cache/scanout/soak checks. Bandwidth/buffer comparisons remain pending.
 D has exact host compression sizes; target decode timing and final runtime format remain pending.
 E has tested manifest/cache scaffolding and built-in rendering; runtime PSRAM/LVGL/SD binding remains
 pending. F now has a tested bounded parser and permission state machine; firmware publication and

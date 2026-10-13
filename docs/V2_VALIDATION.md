@@ -155,4 +155,15 @@ host/status/desktop presentation path both passed on COM6. Serialized applicatio
 
 The installed EMBER host was identified as the COM6 owner and stopped only for this test;
 its GUI was reopened afterwards. No provider configuration or credentials were replaced.
-Physical S3, C6/BLE, SD, permission UI, touch fault injection and long-term soak remain pending.
+Physical S3, BLE, SD, permission UI, touch fault injection and long-term soak remain pending.
+The later standalone C6 test is recorded below.
+
+## Physical v2 diagnostic checkpoint
+
+The standalone C6 and isolated PPA tests were subsequently run on the identified P4, with backup,
+application-only writes, byte verification and restoration of production USB operation. C6 presence,
+host/slave versions and controller init/enable RPC are now measured. PPA/CPU full-frame rotation
+matched byte-for-byte in all eight trials; graphics chunk counters were also collected.
+[Hardware benchmark results](P4_HARDWARE_BENCHMARKS.md) distinguish these measurements from
+unverified HCI/GATT, production acceleration, scanout FPS, SD and target asset decoding.
+The bounded collectors and boot-correlation fixes passed all 324 Python regressions.
