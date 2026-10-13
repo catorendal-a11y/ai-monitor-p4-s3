@@ -133,13 +133,26 @@ reporting verified startup. USB re-enumeration retries are bounded and never sel
 or repeat a write. An unconfirmed boot explicitly reports that writing finished and directs the
 user to reconnect USB and check the connection; it does not advise erasing device settings.
 
-The follow-up source passed 306 of 312 Python tests. The six errors occurred when Windows denied
-the per-user local IPC server inside the restricted execution environment; those tests remain
-unverified here. The 36 desktop action/UI tests and nine board/flasher tests passed. Strict native
-protocol tests and real LVGL UI regressions for both board identities passed.
+After enabling full execution access, all **313 Python regressions** passed, including the real
+per-user Windows IPC/tray tests previously blocked by the sandbox. Strict native protocol tests
+for both board identities, settings/live-agent tests and real LVGL UI regressions also passed.
+The asynchronous UI tests wait for bounded timer progress while a worker remains pending rather
+than assuming a fixed number of Windows timer callbacks within 70 milliseconds.
 
-The current cross-build could not run the ESP32 toolchain in this execution environment
-(Windows reported Illegal System DLL Relocation). GitHub DNS access was also unavailable.
-These environmental failures are not a successful firmware build, release, or physical test of
-the follow-up changes. The hardware-diagnostics advertisement and post-flash boot verification
-still require a fresh firmware build and physical installation test before publication.
+Both production firmware builds passed. P4 linker flash usage is **4,570,048 / 6,553,600 bytes**;
+S3 is **4,619,502 / 6,553,600 bytes**. Static RAM is unchanged at 100,068 and 107,460 bytes,
+respectively. A fresh Windows portable package was built from this source with both firmware
+images and hash-verified corresponding Qt sources. Its packaged GUI/runtime/flasher checks passed.
+This is not a fresh-PC installation test or a claim that the binaries are signed.
+
+The updated P4 application was physically installed through the desktop flasher function.
+Before writing, both firmware identity and ROM chip were verified, the partition table matched,
+and the existing application was backed up locally. Only the application partition was written.
+The flasher verified the write, performed watchdog reset and confirmed the selected board booted.
+The running firmware advertised hardware diagnostics. Direct collection and the asynchronous
+host/status/desktop presentation path both passed on COM6. Serialized application size is now
+**4,604,320 bytes**, leaving **1,949,280 bytes** in its application partition.
+
+The installed EMBER host was identified as the COM6 owner and stopped only for this test;
+its GUI was reopened afterwards. No provider configuration or credentials were replaced.
+Physical S3, C6/BLE, SD, permission UI, touch fault injection and long-term soak remain pending.

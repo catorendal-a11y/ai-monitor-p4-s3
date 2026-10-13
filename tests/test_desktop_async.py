@@ -97,8 +97,9 @@ class BackgroundFlowTests(unittest.TestCase):
             self.wait_until(entered.is_set)
             try:
                 for _ in range(20): self.window.refresh_status()
-                QTest.qWait(80)
-                self.assertGreater(len(self.ticks), 3)
+                ticks_before = len(self.ticks)
+                self.wait_until(lambda: len(self.ticks) >= ticks_before + 4, seconds=0.5)
+                self.assertIsNotNone(self.window.status_worker)
                 self.assertEqual(len(calls), 1)
                 self.assertNotEqual(calls[0], threading.get_ident())
                 self.window.status_epoch += 1  # A saved setup or tray transition.
@@ -119,7 +120,9 @@ class BackgroundFlowTests(unittest.TestCase):
             self.window.rescan(); self.wait_until(entered.is_set)
             try:
                 self.window.port.setCurrentText('COM9999')
-                QTest.qWait(70); self.assertGreater(len(self.ticks), 3)
+                ticks_before = len(self.ticks)
+                self.wait_until(lambda: len(self.ticks) >= ticks_before + 4, seconds=0.5)
+                self.assertIsNotNone(self.window.scan_worker)
             finally: release.set()
             self.wait_until(lambda: self.window.scan_worker is None)
         self.assertEqual(self.window.port.currentText(), 'COM9999')

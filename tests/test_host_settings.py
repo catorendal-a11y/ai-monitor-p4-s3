@@ -17,6 +17,13 @@ from token_activity import TokenReporter
 
 
 class HostSettingsTests(unittest.TestCase):
+    def test_explicit_hardware_wait_is_not_consumed_as_unsolicited_diagnostics(self):
+        panel = host.Panel.__new__(host.Panel)
+        panel._rx = bytearray(b'{"type":"hardware","schema":1}\n')
+        panel.name = 'COM9999'
+        panel.hardware_pending = False
+        self.assertEqual(panel.wait_for('hardware'), {'type': 'hardware', 'schema': 1})
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name); (self.root/'tools').mkdir()

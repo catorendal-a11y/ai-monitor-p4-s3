@@ -630,7 +630,9 @@ class Panel:
                     continue  # boot messages and debug logs
                 if not isinstance(message, dict):
                     continue
-                if self.handle_event(message):
+                # A development collector explicitly waits for hardware. Only
+                # unsolicited diagnostics belong to the asynchronous host path.
+                if not (message_type == 'hardware' and message.get('type') == 'hardware') and self.handle_event(message):
                     continue
                 if frame_id is not None and message.get("frameId") != frame_id:
                     continue
