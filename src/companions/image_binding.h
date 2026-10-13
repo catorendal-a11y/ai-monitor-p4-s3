@@ -14,7 +14,10 @@ class ImageBinding {
   ImageBinding& operator=(const ImageBinding&)=delete;
   ~ImageBinding() { detach(); }
   bool activate(lv_obj_t* target,FrameCache& cache,unsigned index,int x,int y) {
-#if LV_USE_OS != LV_OS_NONE || LV_DRAW_SW_DRAW_UNIT_CNT != 1
+#if LV_USE_OS != LV_OS_NONE || LV_DRAW_SW_DRAW_UNIT_CNT != 1 || !LV_USE_DRAW_SW || \
+    LV_USE_DRAW_VG_LITE || LV_USE_DRAW_DAVE2D || LV_USE_DRAW_PXP || LV_USE_DRAW_DMA2D || \
+    LV_USE_DRAW_EVE || LV_USE_DRAW_G2D || LV_USE_DRAW_NANOVG || LV_USE_DRAW_OPENGLES || \
+    LV_USE_DRAW_SDL || LV_USE_DRAW_PPA || LV_USE_DRAW_NEMA_GFX || LV_USE_NEMA_GFX
     (void)target;(void)cache;(void)index;(void)x;(void)y;
     return false; // Unsupported lifetime model is closed, never guessed safe.
 #else

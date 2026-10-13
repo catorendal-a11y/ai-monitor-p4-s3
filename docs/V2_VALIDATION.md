@@ -183,3 +183,16 @@ tests for both board identities passed. Both production firmware builds passed a
 renderer change. Production images still use built-in assets; the cached LVGL path is not physically
 enabled. After each standalone asset/cache experiment, the original application was restored,
 its boot verified, and the installed host confirmed connected on COM6.
+
+## Permission UI checkpoint
+
+The transport-independent controller and actual native LVGL permission dialog now cover 22
+pointer/visibility scenarios for both board identities. Queuing and final commit are distinct,
+one-time stages; full prompt identity, lease, trusted context and displayed details are rechecked.
+No actual permission was sent and the view is not initialized in normal firmware. Physical touch,
+synchronized publication, secure BLE and real Desktop remain gates. See [the UI contract](PERMISSION_UI.md).
+The cache binding also rejects known accelerated draw-unit configurations until completion fencing
+is implemented; its supported baseline remains synchronous single-unit software rendering.
+The complete local verification passed 333 Python regressions, strict native core tests, actual
+P4/S3 LVGL tests and both production firmware builds. No actual permission, BLE connection or
+new model session was created by this validation.

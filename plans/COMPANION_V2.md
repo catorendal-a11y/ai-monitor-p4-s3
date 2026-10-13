@@ -205,7 +205,9 @@ LZ4 is selected for the experimental P4 cache; S3 and working-UI measurements re
 E has actual PSRAM allocation/hash/decode validation on P4 plus native LVGL lifetime/fallback tests
 and a generic renderer view. Production source selection, physical cached rendering and SD binding
 remain pending. See `docs/COMPANION_RUNTIME_FORMAT.md`. F has a tested bounded parser and permission state machine; firmware publication and
-transport binding are pending. G/H/I and the additional live product domains are not implemented.
+transport binding are pending. G now has native-tested fixed permission controls, fail-closed visibility,
+pointer cancellation and one-shot final commit validation; production integration/physical gestures
+remain pending. H/I and the additional live product domains are not implemented.
 Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
 
 Primary references: [Claude Desktop Hardware Buddy](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md),

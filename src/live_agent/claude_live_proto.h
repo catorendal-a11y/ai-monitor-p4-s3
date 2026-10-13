@@ -3,29 +3,15 @@
 #include <cstdint>
 #include <cstring>
 #include "../serialization/json_input.h"
+#include "types.h"
 
 namespace live_agent {
 // Independent of quota/AIM1, hooks, LVGL and BLE. Output metrics are not billing tokens.
-struct Prompt {
-  char id[97]{}, tool[65]{}, hint[513]{};
-  bool present=false, displaySupported=false;
-  bool equals(const Prompt& other) const {
-    return present==other.present && displaySupported==other.displaySupported &&
-      !strcmp(id,other.id) && !strcmp(tool,other.tool) && !strcmp(hint,other.hint);
-  }
-};
-struct ClaudeLiveSnapshot {
-  uint16_t total=0,running=0,waiting=0;
-  uint64_t outputTokens=0,outputTokensToday=0;
-  bool outputTokensKnown=false,outputTokensTodayKnown=false,fresh=false;
-  uint32_t receivedAt=0,epoch=0,revision=0;
-  Prompt prompt;
-};
 enum class ParseResult : uint8_t { snapshot, ignored, invalid, disconnected };
 class ClaudeLiveProto {
  public:
   static constexpr size_t maxLine=4095;
-  static constexpr uint32_t leaseMs=30000,fragmentMs=5000;
+  static constexpr uint32_t leaseMs=lease_ms,fragmentMs=5000;
   void connect() {
     clear_line(); connected_=true;
     const uint32_t next=data_.epoch+1;

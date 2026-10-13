@@ -1,5 +1,5 @@
 #pragma once
-#include "claude_live_proto.h"
+#include "types.h"
 
 namespace live_agent {
 enum class PermissionState : uint8_t { NONE, RECEIVED, DISPLAYED, HOLDING, SENT, ACKNOWLEDGED,
@@ -17,7 +17,7 @@ class PermissionMachine {
   const char* request_id() const { return prompt_.id; }
   void sync(const ClaudeLiveSnapshot& snapshot,bool connected,bool optIn,bool secure,uint32_t now) {
     if (!connected || !optIn || !secure) { cancel(); return; }
-    if (!snapshot.fresh || now-snapshot.receivedAt>=ClaudeLiveProto::leaseMs) {
+    if (!snapshot.fresh || now-snapshot.receivedAt>=lease_ms) {
       if (state_!=PermissionState::NONE) state_=PermissionState::EXPIRED;
       return;
     }
@@ -39,6 +39,9 @@ class PermissionMachine {
   }
   void cancel_gesture() { if (state_==PermissionState::HOLDING) state_=PermissionState::DISPLAYED; }
   void cancel() { if (state_!=PermissionState::NONE) state_=PermissionState::CANCELLED; }
+  void delivery_failed() {
+    if (state_==PermissionState::SENT || state_==PermissionState::DENIED)state_=PermissionState::ERROR;
+  }
   Decision approve(const ClaudeLiveSnapshot& snapshot,bool connected,bool optIn,bool secure,uint32_t now) {
     const auto previous=state_;
     sync(snapshot,connected,optIn,secure,now);

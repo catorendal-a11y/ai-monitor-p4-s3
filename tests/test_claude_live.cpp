@@ -1,5 +1,6 @@
 #include "live_agent/claude_live_proto.h"
 #include "live_agent/permission_state.h"
+#include "live_agent/permission_controller.h"
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -55,7 +56,50 @@ static void permissions_require_a_fresh_displayed_exact_request_and_continuous_h
   CHECK(rollover.displayed(core.snapshot().epoch,core.snapshot().revision,true) && rollover.begin_hold(0xfffffff0u));
   CHECK(rollover.approve(core.snapshot(),true,true,true,1800)==Decision::once);
 }
+static void permission_ui_controller_rechecks_queue_delivery_and_gesture_cancellation() {
+  using namespace live_agent;
+  ClaudeLiveProto core;core.connect();CHECK(parse(core,pending)==ParseResult::snapshot);
+  const PermissionContext trusted{true,true,true,true,true,false};
+  for (unsigned reason=0;reason<10;++reason) {
+    PermissionController controller;controller.update(core.snapshot(),trusted,100);
+    CHECK(!controller.press(100));CHECK(controller.displayed(true));CHECK(controller.press(100));
+    CHECK(controller.progress(1000)==50);
+    controller.pressing(1899,true);CHECK(!controller.queued());
+    if (reason==0) { controller.release();controller.pressing(1900,true);CHECK(!controller.queued());continue; }
+    if (reason==1) { controller.pressing(1000,false);controller.pressing(1900,true);CHECK(!controller.queued());continue; }
+    if (reason==2) { controller.pressing(1000,true,false);controller.pressing(1900,true);CHECK(!controller.queued());continue; }
+    controller.pressing(1900,true);CHECK(controller.queued());
+    auto changed=core.snapshot();auto context=trusted;
+    if (reason==3)context.secure=false;
+    if (reason==4)context.connected=false;
+    if (reason==5)++changed.epoch;
+    if (reason==6)changed.prompt.hint[0]='X';
+    if (reason==7)context.demo=true;
+    if (reason==8) { controller.displayed(false);CHECK(!controller.queued());continue; }
+    const auto envelope=controller.take(changed,context,reason==9?30100:1900);
+    CHECK(envelope.decision==Decision::none && !controller.queued());
+  }
+  PermissionController controller;controller.update(core.snapshot(),trusted,100);
+  CHECK(controller.displayed(true) && controller.press(100));controller.pressing(1900,true);
+  const auto issued=controller.take(core.snapshot(),trusted,1900);CHECK(issued.decision==Decision::once);
+  CHECK(controller.take(core.snapshot(),trusted,1900).decision==Decision::none);
+  CHECK(controller.commit(issued,core.snapshot(),trusted,1900));
+  auto invalidDecision=issued;invalidDecision.decision=static_cast<Decision>(255);
+  CHECK(!PermissionController::valid(invalidDecision,core.snapshot(),trusted,1900));
+  CHECK(!controller.commit(issued,core.snapshot(),trusted,1900));
+  controller.delivery_failed();CHECK(controller.state()==PermissionState::ERROR);
+  PermissionController denial;denial.update(core.snapshot(),trusted,100);CHECK(denial.displayed(true));
+  denial.deny(100);CHECK(denial.take(core.snapshot(),trusted,100).decision==Decision::deny);
+  CHECK(denial.take(core.snapshot(),trusted,101).decision==Decision::none);
+  PermissionController hide;hide.update(core.snapshot(),trusted,100);CHECK(hide.displayed(true)&&hide.press(100));
+  hide.hide();hide.pressing(1900,true);CHECK(!hide.queued());
+  PermissionController queued;queued.update(core.snapshot(),trusted,100);CHECK(queued.displayed(true)&&queued.press(100));
+  queued.pressing(1900,true);const auto beforeHide=queued.take(core.snapshot(),trusted,1900);
+  queued.hide();CHECK(!queued.commit(beforeHide,core.snapshot(),trusted,1900));
+}
+
 int main() {
+  permission_ui_controller_rechecks_queue_delivery_and_gesture_cancellation();
   permissions_require_a_fresh_displayed_exact_request_and_continuous_hold();
   live_agent::ClaudeLiveProto core;
   CHECK(parse(core,pending)==ParseResult::disconnected);

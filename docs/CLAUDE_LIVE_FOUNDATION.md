@@ -49,9 +49,11 @@ Tests cover fragmented lines, oversized/stalled input, malformed snapshots, chan
 disconnect/reconnect, clock rollover, stale leases, unsupported text, complete visibility, early release,
 single-use decisions and final opt-in/security/identity checks.
 
-The remaining work is real LVGL permission controls and touch cancellation tests, synchronized state
-publication, secure C6 BLE transport and real Desktop testing. No BLE adapter or permission UI is
-enabled by this increment. Built-in USB provider monitoring continues separately.
+Real native LVGL permission controls, pointer cancellation, queued/final commit checks and a persistent
+interaction authority are now implemented; see [the permission UI contract](PERMISSION_UI.md).
+Physical touch testing, synchronized firmware state publication, secure C6 BLE and real Desktop
+remain gates. No BLE adapter or permission UI is enabled in production. Built-in USB provider
+monitoring continues separately.
 
 The [official Hardware Buddy protocol](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md)
 is an experimental Claude Desktop developer-mode interface, not a generally supported product feature.

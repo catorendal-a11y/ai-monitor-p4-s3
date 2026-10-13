@@ -90,6 +90,7 @@ void display_apply_brightness(uint8_t value, bool persist) {
 #include "../../src/ui_usage_details.cpp"
 #include "../../src/ui_notifications.cpp"
 #include "../../src/ui_nova.cpp"
+#include "../../src/ui/permission_view.cpp"
 
 alignas(64) static uint32_t drawBuffer[800 * 480];
 static uint32_t framebuffer[800 * 480];
@@ -1294,6 +1295,116 @@ int main(int argc, char** argv) {
     }
     CHECK(!cache.slot(first)->pinned && lv_image_get_src(other)==&nova_assets::work);
     lv_obj_delete(other);
+  }
+  for (unsigned scenario=0;scenario<22;++scenario) {
+    auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
+    touchPressed=touchFailed=false;lv_indev_read(pointer);
+    {
+      live_agent::PermissionController authority;
+      live_agent::PermissionView view(authority,[] { return fakeTick; });
+      CHECK(view.initialize());view.show();
+      live_agent::ClaudeLiveSnapshot live;live.fresh=true;live.total=1;live.waiting=1;
+      live.epoch=1;live.revision=1;live.receivedAt=fakeTick;
+      live.prompt.present=live.prompt.displaySupported=true;
+      strcpy(live.prompt.id,"synthetic_request");strcpy(live.prompt.tool,"Bash");strcpy(live.prompt.hint,"Run the synthetic build and tests.");
+      live_agent::PermissionContext context{true,true,true,true,true,false};
+      view.update(live,context);CHECK(view.state()==live_agent::PermissionState::DISPLAYED);
+      check_inside(lv_obj_get_child(view.root(),0),view.approve_button());
+      check_inside(lv_obj_get_child(view.root(),0),view.deny_button());
+      lv_area_t approveBefore{};lv_obj_get_coords(view.approve_button(),&approveBefore);
+      touchPoint={(approveBefore.x1+approveBefore.x2)/2,(approveBefore.y1+approveBefore.y2)/2};
+      if(scenario==10) {
+        lv_area_t denyArea{};lv_obj_get_coords(view.deny_button(),&denyArea);
+        touchPoint={(denyArea.x1+denyArea.x2)/2,(denyArea.y1+denyArea.y2)/2};
+      }
+      if(scenario==7) {
+        memset(live.prompt.hint,'W',512);live.prompt.hint[512]=0;++live.revision;
+        view.update(live,context);CHECK(lv_obj_has_state(view.approve_button(),LV_STATE_DISABLED));
+        screenshot(screenshots,"permission-long-details-blocked");
+      } else if(scenario==8) {
+        context.demo=true;view.update(live,context);CHECK(lv_obj_has_state(view.approve_button(),LV_STATE_DISABLED));
+      } else if(scenario==13) {
+        strcpy(live.prompt.hint,"Unsupported \xc3\x98 text");live.prompt.displaySupported=false;++live.revision;
+        view.update(live,context);CHECK(lv_obj_has_state(view.approve_button(),LV_STATE_DISABLED));
+      }
+      lv_obj_send_event(view.approve_button(),LV_EVENT_CLICKED,nullptr);
+      CHECK(view.take(live,context,fakeTick).decision==live_agent::Decision::none);
+      touchPressed=true;lv_indev_read(pointer);
+      if(scenario==0 || scenario==10) {
+        touchPressed=false;lv_indev_read(pointer);
+      } else if(scenario==2) {
+        touchFailed=true;lv_indev_read(pointer);touchFailed=false;fakeTick+=2000;lv_indev_read(pointer);
+      } else if(scenario==3) {
+        touchPoint={0,0};fakeTick+=50;lv_indev_read(pointer);fakeTick+=2000;lv_indev_read(pointer);
+      } else if(scenario==4) {
+        ++live.revision;strcpy(live.prompt.id,"replacement_request");view.update(live,context);
+        fakeTick+=2000;lv_indev_read(pointer);
+      } else if(scenario==5) {
+        context.connected=false;view.update(live,context);fakeTick+=2000;lv_indev_read(pointer);
+      } else if(scenario==9) {
+        fakeTick+=30000;view.update(live,context);lv_indev_read(pointer);
+        CHECK(view.state()==live_agent::PermissionState::EXPIRED);
+      } else if(scenario==11) {
+        strcpy(live.prompt.hint,"Run the synthetic build with changed details.");
+        view.update(live,context);fakeTick+=2000;lv_indev_read(pointer);
+      } else if(scenario==14 || scenario==15) {
+        if(scenario==14)context.awake=false;else context.optIn=false;
+        view.update(live,context);fakeTick+=2000;lv_indev_read(pointer);
+      } else {
+        fakeTick+=1799;lv_indev_read(pointer);
+        lv_area_t heldArea{};lv_obj_get_coords(view.approve_button(),&heldArea);
+        CHECK(heldArea.x1==approveBefore.x1 && heldArea.y1==approveBefore.y1 &&
+              heldArea.x2==approveBefore.x2 && heldArea.y2==approveBefore.y2);
+        CHECK(view.take(live,context,fakeTick).decision==live_agent::Decision::none);
+        if(scenario==1)screenshot(screenshots,"permission-hold");
+        ++fakeTick;lv_indev_read(pointer);
+      }
+      live_agent::PermissionEnvelope prepared;
+      if(scenario==6 || scenario==12 || scenario>=16) {
+        prepared=view.take(live,context,fakeTick);CHECK(prepared.decision==live_agent::Decision::once);
+      }
+      lv_obj_t* cover=nullptr;
+      if(scenario==6) { cover=lv_obj_create(lv_layer_top());lv_obj_set_size(cover,800,480); }
+      if(scenario==12) { cover=lv_obj_create(lv_layer_sys());lv_obj_set_size(cover,800,480); }
+      auto* previousScreen=lv_screen_active();lv_obj_t* navigated=nullptr;
+      if(scenario==16) { navigated=lv_obj_create(nullptr);lv_screen_load(navigated); }
+      if(scenario==17)lv_obj_set_hidden(view.hint_label(),true);
+      if(scenario==18)lv_obj_set_style_opa(view.root(),LV_OPA_50,0);
+      if(scenario==19) { lv_obj_set_x(view.root(),100);lv_obj_update_layout(view.root()); }
+      if(scenario==20)lv_label_set_text(view.hint_label(),"Different visible text must never authorize the original request.");
+      if(scenario==21) {
+        touchPressed=false;lv_indev_read(pointer);
+        lv_area_t closeArea{};lv_obj_get_coords(view.close_button(),&closeArea);
+        touchPoint={(closeArea.x1+closeArea.x2)/2,(closeArea.y1+closeArea.y2)/2};
+        touchPressed=true;lv_indev_read(pointer);touchPressed=false;lv_indev_read(pointer);
+        CHECK(lv_obj_is_hidden(view.root()));
+      }
+      const auto decision=view.take(live,context,fakeTick);
+      CHECK(decision.decision==(scenario==1?live_agent::Decision::once:scenario==10?live_agent::Decision::deny:live_agent::Decision::none));
+      if(scenario==1 || scenario==10) {
+        CHECK(view.commit(decision,live,context,fakeTick));
+        CHECK(!view.commit(decision,live,context,fakeTick));
+      }
+      if(prepared.decision!=live_agent::Decision::none) {
+        CHECK(!view.commit(prepared,live,context,fakeTick));
+        CHECK(!view.commit(prepared,live,context,fakeTick));
+      }
+      CHECK(view.take(live,context,fakeTick).decision==live_agent::Decision::none);
+      if(scenario==1) {
+        view.hide();
+        live_agent::PermissionView reopened(authority,[] { return fakeTick; });
+        CHECK(reopened.initialize());reopened.show();reopened.update(live,context);
+        CHECK(lv_obj_has_state(reopened.approve_button(),LV_STATE_DISABLED));
+        CHECK(reopened.take(live,context,fakeTick).decision==live_agent::Decision::none);
+      }
+      if(cover)lv_obj_delete(cover);
+      if(navigated) { lv_screen_load(previousScreen);lv_obj_delete(navigated); }
+      lv_area_t approveAfter{};lv_obj_get_coords(view.approve_button(),&approveAfter);
+      if(scenario!=19)CHECK(approveAfter.x1==approveBefore.x1 && approveAfter.y1==approveBefore.y1 &&
+            approveAfter.x2==approveBefore.x2 && approveAfter.y2==approveBefore.y2);
+      touchPressed=false;lv_indev_read(pointer);view.hide();
+    }
+    lv_indev_delete(pointer);
   }
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
