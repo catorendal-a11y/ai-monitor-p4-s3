@@ -1,5 +1,14 @@
 # Companion v2 construction plan
 
+## Current transport decision
+
+The user explicitly removed Bluetooth from the product on 2026-10-13: USB only, now and in future
+phases. Do not implement BLE, Bluetooth pairing, advertising, GATT, HCI bring-up or a radio bridge.
+Historical C6 measurements remain evidence only; the standalone probe now checks identity/version only.
+USB live-domain work replaces phase H below. Existing native permission code is a disabled prototype;
+USB attachment alone must never set its trusted `secure` flag or authorize a tool call.
+See [the USB architecture and integration gates](../docs/USB_LIVE_TRANSPORT.md).
+
 User-authorized sequence: finish the analysis fixes, then v2. The user subsequently authorized
 push. Release/tag/forum publication remains a separate action. Keep English source, documentation and product UI.
 Each phase produces a local reviewable commit and evidence; synthetic tests never establish hardware success.
@@ -24,10 +33,10 @@ replace the working drivers/platform pin merely because another board's example 
 
 - P4 and S3 retain normal USB quota/activity monitoring with no default AI selection.
 - All LVGL/backlight/NVS work belongs to the UI task. Parsing and transport cannot mutate widgets.
-- Existing observational Claude hooks remain independent of the new Desktop BLE permission path.
+- Existing observational Claude hooks remain independent of live permission authority.
 - New live text/tool hints are transient display data: bounded, sanitized, never saved in history/logs/exports.
 - No permission is approved through hooks, automatic rules, a tap, a reconnect or an asset command.
-- Permission transmission requires explicit opt-in, encrypted bonded transport, a current prompt and
+- Permission transmission requires explicit opt-in, a verified trusted USB-host session, a current prompt and
   a completed physical hold on the exact displayed request. Unsupported/security state is closed.
 - Built-in companions always remain available without SD, PSRAM cache or a valid pack.
 - At the instant of transmission recheck opt-in, negotiated security, link epoch, prompt ID,
@@ -80,8 +89,8 @@ Files: asset generators, benchmark scripts, reproducible results, proposed frame
 Tasks: compare raw, RLE, LZ4 and suitable lossless alternatives with identical cropped pixels. Measure
 compressed size, real target decode latency, peak memory and visual equality, not size alone.
 Choose a versioned format compatible with constrained S3 and P4; separate delivery format from decoded
-LVGL format. Report complete delivered-folder size including manifest against Desktop's under-1.8-MB
-folder limit; use individual-companion packs or an explicitly supported alternative when it cannot fit.
+LVGL format. Report complete delivered-pack size including its manifest; choose USB transfer limits
+from measured memory/storage budgets. The former Desktop BLE folder limit no longer applies.
 Reject malformed/truncated/oversized compressed frames before exposing them to LVGL.
 Validation: round-trip pixel hashes, fuzz/limit fixtures, both target decode tests/measurements.
 Exit: documented runtime-format decision with evidence and safe raw/built-in fallback. Dependencies: C.
@@ -125,31 +134,35 @@ Files: new permission screen/overlay, touch interaction helpers, UI/core event q
 Tasks: show request identity/tool/hint clearly; fixed HOLD TO APPROVE and deny controls; complete
 one continuous timed hold with progress. Gesture captures request revision and transport epoch.
 Drag-out, touch read failure, release early, stale data, changed prompt, navigation, disconnect or
-unpair cancels. No approval while booting, sleeping, in demo mode or before encrypted connection.
+host trust revocation cancels. No approval while booting, sleeping, in demo mode or before verified host trust.
 Revalidate after queueing and immediately before TX; test changed/expired requests between hold and send,
 repeated holds, identical displayed prefixes and control-character changes in details.
 Validation: real LVGL synthetic touch/state sequences plus physical P4 gestures; S3 stays unverified
 until physically tested. Exit: approval fails closed in every cancellation path. Dependencies: F.
 Rollback: read-only live state; approval controls absent/disabled, never auto-approve.
 
-## H - C6 BLE transport and real Desktop test
+## H - USB live-domain transport
 
-Context: P4 has no integrated BLE radio; actual C6/hosted capability/version must be established in B.
-Files: transport adapter, explicit pairing/settings UI, hosted/NimBLE integration and compatibility docs.
-Tasks: verified hosted BT-controller path and version compatibility; encrypted-only NUS RX/TX/CCCD,
-LE Secure Connections bonding with displayed passkey, explicit pair/unpair mode, bounded RX/TX queues
-and MTU fragmentation. No unencrypted fallback. Reconnect starts a new epoch and needs a new current
-snapshot; no stale permission resend. Preserve normal USB quota/activity functionality.
-Validation: real C6 link, wrong/absent bond, unauthorized write/CCCD, reconnect/expiry, pairing removal;
-official Claude Desktop developer-mode connection and a harmless test permission in an isolated folder.
-Exit: real authenticated Desktop/P4 flow proved, including disconnect during hold. Required external
-inputs: supported board/C6 firmware, installed compatible Desktop app, user's sign-in and pairing.
-Dependencies: G plus B C6 proof. Rollback: disable BLE; retain USB and read-only normal companions.
+Context: the existing PC host owns the board's USB connection. Bluetooth is excluded permanently.
+Files: independent bounded live-event protocol/host adapter, synchronized firmware publication,
+capability negotiation and native/synthetic tests. See `docs/USB_LIVE_TRANSPORT.md`.
+Tasks: carry live metadata in a separate versioned domain over the same serial owner; preserve AIM1
+quota snapshots unchanged. Reconnect/reboot creates a new epoch, clears partial frames and cancels
+permissions. Reject unknown versions, invalid fields and oversized input; bound queues and deadlines.
+Start with read-only, documented provider events. Do not infer detailed agent states from quota usage.
+Permission transmission remains disabled until a supported provider decision interface and independently
+verified USB-host trust mechanism exist. Never mark USB trusted merely because a cable is connected.
+Validation: synthetic fragmented/interleaved traffic, backpressure, unplug/reconnect, changed board
+identity, stale epochs and no permission dispatch. Then validate read-only events on the physical P4.
+Exit: measured USB live activity while normal quota monitoring remains functional. Permission approval
+has a separate integration gate; it is not replaced by fabricated responses or transcript scraping.
+Dependencies: F and existing USB baseline; G applies only to future verified permission integration.
+Rollback: disable the live-domain adapter and retain normal USB quota/activity monitoring.
 
 ## I - Companion packs and microSD
 
-Context: renderer/schema are established in E; authenticated transfer uses H. SD wiring/storage availability
-must be verified on the actual board. Desktop folder push has its own delivery size/ack constraints.
+Context: renderer/schema are established in E; future verified USB transfer uses H. SD wiring/storage
+availability must be verified on the actual board. Desktop BLE folder push is excluded.
 Files: pack staging/validation/activation modules, SD adapter, manifest/pack tooling and tests.
 Tasks: strictly contained flat filenames, per-file and total limits, bounded chunk/base64 decode,
 SHA-256 verification, version/decoded-size validation, inactive staging and atomic activation marker.
@@ -163,9 +176,9 @@ Dependencies: E and H. Rollback: built-ins; ignore invalid staging; no activatio
 
 ## Execution and review
 
-The latest product direction moves standalone C6/ESP-Hosted bring-up early, alongside B/C, once
-the board revision's wiring is verified. It does not depend on Claude or permission UI. Secure
-Claude transport integration still follows F/G; SD packs remain later. Synthetic fixture authoring may
+The current product direction is USB only; no Bluetooth bring-up continues. Historical C6 detection
+does not create a radio dependency. Verified provider permission integration follows F/G and USB H;
+SD packs remain later. Synthetic fixture authoring may
 proceed while hardware is unavailable, but phases retain their physical exit gates. Reviewer checks
 dependency correctness, missing hardware assumptions, privacy, cancellation, bounds and rollback.
 If a probe exposes incompatible hardware/SDK, amend this plan with the evidence rather than silently
@@ -195,7 +208,7 @@ metrics and initialization checkpoints; P4 physical collection and application f
 PC diagnostics reads a capability-negotiated snapshot through the existing host. Production SD/C6
 initialization remains disabled; standalone runtime C6 detection has now succeeded.
 The standalone C6 test physically detected the coprocessor, read host/slave versions and confirmed
-controller init/enable RPC; production radio initialization, HCI and secure BLE remain pending.
+controller init/enable RPC before Bluetooth was permanently excluded. No HCI/BLE work continues.
 Results and limits are documented in `docs/C6_BRINGUP.md` and `docs/P4_HARDWARE_BENCHMARKS.md`.
 C now has physical CPU/PPA rotation and normal flush-counter measurements. PPA matched every
 pixel in eight trials and was 1.625x faster for isolated full-frame rotation. Production remains on
@@ -207,7 +220,14 @@ and a generic renderer view. Production source selection, physical cached render
 remain pending. See `docs/COMPANION_RUNTIME_FORMAT.md`. F has a tested bounded parser and permission state machine; firmware publication and
 transport binding are pending. G now has native-tested fixed permission controls, fail-closed visibility,
 pointer cancellation and one-shot final commit validation; production integration/physical gestures
-remain pending. H/I and the additional live product domains are not implemented.
+remain pending. H now has a bounded read-only USB metadata core, capability handshake, synchronized
+publication and an integration client using the existing serial owner. Native/Python tests cover
+sequencing, expiry and normal protocol coexistence. Regular polling now includes opted-in Codex/Claude
+lifecycle adapters, with setup/removal and neutral observer-output tests. The device now has a
+native-tested read-only agent view with fixed controls. Actual client compatibility and physical USB
+measurements remain pending. I and additional notification/timeline/history features
+are not implemented. See `docs/LIVE_PROVIDER_EVENTS.md` for honest state mappings and setup limits.
+No permission sender or Bluetooth transport is enabled.
 Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
 
 Primary references: [Claude Desktop Hardware Buddy](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md),

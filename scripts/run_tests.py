@@ -47,6 +47,14 @@ def main():
                         "-I", str(json_include), str(ROOT / "tests/test_claude_live.cpp"), "-o", str(live_binary)],
                        cwd=ROOT, check=True)
         subprocess.run([str(live_binary)], cwd=ROOT, check=True)
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
+                        "-I", str(json_include), str(ROOT / "tests/test_usb_live.cpp"), "-o", str(live_binary)],
+                       cwd=ROOT, check=True)
+        subprocess.run([str(live_binary)], cwd=ROOT, check=True)
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-DAIM_BOARD_WAVESHARE_S3=1",
+                        "-I", str(ROOT / "src"), "-I", str(json_include),
+                        str(ROOT / "tests/test_usb_live.cpp"), "-o", str(live_binary)], cwd=ROOT, check=True)
+        subprocess.run([str(live_binary)], cwd=ROOT, check=True)
     if args.ui:
         c_compiler = shutil.which(args.cc)
         if not c_compiler or not shutil.which("cmake") or not shutil.which("ninja"):

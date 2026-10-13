@@ -17,6 +17,46 @@ from token_activity import TokenReporter
 
 
 class HostSettingsTests(unittest.TestCase):
+    def test_live_metadata_uses_separate_client_and_never_enters_token_command(self):
+        panel=host.Panel.__new__(host.Panel)
+        panel.tokens_supported=True;panel.sessions_supported=False
+        panel.token_reporter=Mock(spec=TokenReporter)
+        panel.info={'liveProtocol':1,'livePermissions':False,'bootId':17}
+        panel.send_line=Mock()
+        rows=[{'provider':'codex','id':'opaque','state':'EDITING'}]
+        panel.token_reporter.poll.return_value={'cmd':'token_activity','known':False,'live_agents':rows,'live_sampled_at':100}
+        with patch('usb_live.UsbLiveClient') as client,patch.object(host.time,'monotonic',return_value=100):
+            panel.report_tokens()
+        client.assert_called_once_with(panel)
+        client.return_value.open.assert_called_once()
+        client.return_value.send.assert_called_once_with(rows)
+        self.assertEqual(json.loads(panel.send_line.call_args.args[0]),{'cmd':'token_activity','known':False})
+
+    def test_stale_live_sample_is_cleared_and_telemetry_failure_preserves_quota_path(self):
+        panel=host.Panel.__new__(host.Panel)
+        panel.tokens_supported=True;panel.sessions_supported=False
+        panel.token_reporter=Mock(spec=TokenReporter);panel.send_line=Mock()
+        panel.info={'liveProtocol':1,'livePermissions':False,'bootId':17}
+        panel.token_reporter.poll.return_value={'cmd':'token_activity','live_agents':[{}],'live_sampled_at':1}
+        with patch('usb_live.UsbLiveClient') as client,patch.object(host.time,'monotonic',return_value=100):
+            client.return_value.send.side_effect=TimeoutError('synthetic timeout')
+            panel.report_tokens()
+            self.assertIsNone(panel.live_client);self.assertEqual(panel.live_retry_at,130)
+            panel.report_tokens()
+        client.assert_called_once_with(panel)
+        client.return_value.send.assert_called_once_with([])
+        self.assertEqual(panel.send_line.call_count,2)
+
+    def test_serial_failure_from_live_path_reaches_existing_reconnect_handler(self):
+        panel=host.Panel.__new__(host.Panel)
+        panel.tokens_supported=True;panel.sessions_supported=False
+        panel.token_reporter=Mock(spec=TokenReporter);panel.send_line=Mock()
+        panel.info={'liveProtocol':1,'livePermissions':False,'bootId':17}
+        panel.token_reporter.poll.return_value={'cmd':'token_activity','live_agents':[],'live_sampled_at':100}
+        with patch('usb_live.UsbLiveClient') as client,patch.object(host.time,'monotonic',return_value=100):
+            client.return_value.send.side_effect=OSError('synthetic cable loss')
+            with self.assertRaises(OSError):panel.report_tokens()
+
     def test_explicit_hardware_wait_is_not_consumed_as_unsolicited_diagnostics(self):
         panel = host.Panel.__new__(host.Panel)
         panel._rx = bytearray(b'{"type":"hardware","schema":1}\n')

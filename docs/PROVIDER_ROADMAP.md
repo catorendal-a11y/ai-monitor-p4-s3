@@ -10,7 +10,7 @@ Start a new coding task with `AGENTS.md`, `docs/PROVIDERS.md`, this plan and the
 - Preserve explicit selections. An unselected provider must not be polled or scanned. Missing credentials must not silently enable another tool.
 - Report capability and actual availability separately. Context occupancy, billing estimates, request counts and plan quota percentages are distinct metrics.
 - Use documented interfaces or reviewed local formats. Never scrape browser cookies, decrypt app credentials or infer a personal quota from an organization report.
-- Fixtures must be synthetic and record sizes bounded. Keep prompts, authentication files, session transcripts, logs and identifiers out of commits/releases. Persist only whitelisted numeric bridge data and hashed IDs.
+- Fixtures must be synthetic and record sizes bounded. Keep prompts, authentication files, session transcripts, logs and raw identifiers out of commits/releases. Persist only whitelisted numeric bridge data or explicitly opted-in fixed lifecycle states/timestamps with hashed IDs.
 - Test first-sample baselines, repeated IDs, streaming updates, counter decreases, corrupt/partial records, staleness, reconnects, permission failure and a source that is missing entirely.
 - Firmware currently has eight source bits, eight views and three quota rows per view. A ninth provider is blocked on a versioned protocol-capacity change; do not reuse another source bit.
 - Preserve provider branding, quota warning meanings, theme/companion settings and the current RGB565+A8 asset strategy. v1.12.0 uses about 85% of the application partition; measure added firmware assets before accepting them.

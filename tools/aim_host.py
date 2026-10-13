@@ -499,6 +499,8 @@ class Panel:
         self.info = {}
         self.expected_board = None
         self.hardware_pending = False
+        self.live_client = None
+        self.live_retry_at = 0
 
     def close(self):
         self.ser.close()
@@ -597,13 +599,27 @@ class Panel:
             message = self.token_reporter.poll()
             if message is not None:
                 sessions = message.get('sessions')
-                self.send_line(json.dumps({key:value for key,value in message.items() if key not in ('sessions','deltas')}))
+                self.send_line(json.dumps({key:value for key,value in message.items() if key not in ('sessions','deltas','live_agents','live_sampled_at')}))
                 if sessions is not None:
                     if self.sessions_supported: self.send_line(json.dumps(sessions))
                     health = getattr(self, 'health', None)
                     if isinstance(health, HostStatus):
                         health.data['sessions'] = sessions
                         health.data['sessions_at'] = time.time()
+                if ('live_agents' in message and type(self.info.get('liveProtocol')) is int and
+                        self.info['liveProtocol']==1 and self.info.get('livePermissions') is False and
+                        time.monotonic()>=getattr(self,'live_retry_at',0)):
+                    from usb_live import UsbLiveClient
+                    try:
+                        if getattr(self,'live_client',None) is None:
+                            self.live_client=UsbLiveClient(self);self.live_client.open()
+                        sampled=message.get('live_sampled_at')
+                        fresh_sample=type(sampled) in (int,float) and 0<=time.monotonic()-sampled<=10
+                        self.live_client.send(message['live_agents'] if fresh_sample else [])
+                    except (ValueError,TimeoutError,RuntimeError):
+                        # Live telemetry failure must not take down quota monitoring. No blind replay.
+                        self.live_client=None;self.live_retry_at=time.monotonic()+30
+                    # Serial I/O failures propagate to the existing USB reconnect path.
 
     def _write(self, data):
         if self.ser.write(data) != len(data):

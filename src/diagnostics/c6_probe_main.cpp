@@ -1,4 +1,4 @@
-// Standalone developer firmware only. No display, Wi-Fi connection, GATT server or Claude logic.
+// Standalone identity/version probe only. Never initialize or enable Bluetooth.
 #if defined(AIM_C6_PROBE) && AIM_C6_PROBE
 #include <Arduino.h>
 #include <esp_event.h>
@@ -67,14 +67,6 @@ void probe(void*) {
   result.responded=true; result.major=version.major1; result.minor=version.minor1; result.patch=version.patch1;
   portEXIT_CRITICAL(&resultMux);
   if (deadline()) { finish("deadline-exceeded",ESP_ERR_TIMEOUT); vTaskDelete(nullptr); return; }
-  error=esp_hosted_bt_controller_init();
-  if (error!=ESP_OK) { finish("controller-init-failed",error); vTaskDelete(nullptr); return; }
-  if (deadline()) { finish("deadline-exceeded",ESP_ERR_TIMEOUT); vTaskDelete(nullptr); return; }
-  error=esp_hosted_bt_controller_enable();
-  if (error!=ESP_OK) { finish("controller-enable-failed",error); vTaskDelete(nullptr); return; }
-  portENTER_CRITICAL(&resultMux);
-  result.controllerEnableConfirmed=true;
-  portEXIT_CRITICAL(&resultMux);
   const bool late=deadline();
   finish(late ? "deadline-exceeded" : "completed",late ? ESP_ERR_TIMEOUT : ESP_OK);
   // Driver tasks/resources stay alive; no forced task deletion or unconfirmed cleanup of the SDK.
@@ -83,7 +75,7 @@ void probe(void*) {
 void report() {
   Result copy;
   portENTER_CRITICAL(&resultMux); copy=result; portEXIT_CRITICAL(&resultMux);
-  Serial.printf("{\"type\":\"c6_probe\",\"schema\":1,\"stage\":\"%s\",\"error\":%d,"
+  Serial.printf("{\"type\":\"c6_probe\",\"schema\":2,\"stage\":\"%s\",\"error\":%d,"
     "\"hostVersion\":\"%u.%u.%u\",\"coprocessorResponded\":%s,\"coprocessorVersion\":",
     copy.deadlineExceeded ? "deadline-exceeded" : copy.stage,copy.deadlineExceeded ? ESP_ERR_TIMEOUT : copy.error,
     ESP_HOSTED_VERSION_MAJOR_1,ESP_HOSTED_VERSION_MINOR_1,ESP_HOSTED_VERSION_PATCH_1,

@@ -50,6 +50,12 @@ Your display's USB settings, selected providers, Z.AI key, and robot/theme prefe
 
 ## Installation verification
 
+Optional v2 lifecycle metadata: choose **Link Codex session events** in AI setup, review/trust the
+exact hooks using Codex's `/hooks` browser and restart the session. Removing the link preserves other
+hooks. This does not change authentication or start a model turn. Hook support is client-version
+dependent; a saved configuration is not proof that events are delivered. The device live view is
+still under development. See [event semantics and validation limits](LIVE_PROVIDER_EVENTS.md).
+
 Synthetic tests cover missing-client installation/sign-in prompts, declined setup, existing-login reuse, discovery and read-only account requests. `scripts/test_codex_windows_install.py --disposable-ci` installs the official client for real on a disposable GitHub Windows runner with isolated Codex state and no Node/Python commands on PATH. It checks native executable discovery and login status, then declines personal sign-in. The release also runs this test through the compiled console EXE with a synthetic monitor configuration. Do not run this test on a personal PC: the vendor installer can update the user PATH. A CI installation test does not prove successful login for every account; each user completes their own browser authentication.
 
 Official references: [CLI installation](https://learn.chatgpt.com/docs/cli), [authentication/storage](https://learn.chatgpt.com/docs/auth), [account rate-limit interface](https://learn.chatgpt.com/docs/app-server), [CODEX_HOME and installation directories](https://learn.chatgpt.com/docs/config-file/environment-variables).

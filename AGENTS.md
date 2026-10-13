@@ -7,13 +7,17 @@
 - Hardware initialization: inspect display/touch sources before changing board pins.
 - `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
 - `src/ui/`: state/format/history helpers, theme and generated assets.
+- `src/ui_agents.cpp`: UI-owner read-only live metadata view; never add agent state or permissions
+  to quota snapshots, infer tool phases from counters or move navigation controls with incoming data.
 - `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions; no runtime image allocation.
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/aim_control.py`: console setup, scoped host controls and verified firmware installation.
-- `tools/aim_events.py`: small, silent, explicitly enabled Claude event observer; no model, host or serial control.
+- `tools/aim_events.py`, `tools/live_events.py`: explicitly enabled Codex/Claude state observers;
+  no model, host or serial control, transcripts or tool decisions. Codex's wrapper emits only neutral JSON.
+- `tools/usb_live.py`: read-only live metadata through the existing serial owner, separate from quota.
 - `tools/aim_desktop.py`, `tools/desktop_window.py`, `tools/desktop_support.py`: graphical NOVA control panel and validated actions. Qt mutations stay on the main thread; blocking actions use one worker.
 - Desktop tests use an offscreen Qt window with synthetic configuration, without provider requests or hardware writes.
 - `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
@@ -41,6 +45,9 @@ Use `setup.ps1 -BuildTools` for development; default setup installs host depende
 
 ## Rules
 
+- USB-only product: never add Bluetooth/BLE, pairing, advertising, GATT or a radio bridge.
+- USB attachment alone must not mark a permission transport trusted. Keep real permissions disabled
+  until host trust and a supported provider decision interface are independently validated.
 - English in project-owned code, documentation and UI.
 - UI-task ownership for LVGL/backlight mutations; safe snapshot publication.
 - Bounded buffers, strict JSON type validation, frame correlation and partial writes.

@@ -15,6 +15,7 @@
 #include "ui/interaction.h"
 #include "ui_settings.h"
 #include "ui_usage_details.h"
+#include "ui_agents.h"
 
 namespace nova_ui {
 static lv_obj_t *screen = nullptr, *dashboard = nullptr, *stage = nullptr, *figure = nullptr;
@@ -67,6 +68,7 @@ static lv_obj_t* button(lv_obj_t* parent, int x, int y, int width, const char* v
 }
 static void show_dashboard(lv_event_t*) { lv_screen_load(dashboard); }
 static void show_settings(lv_event_t*) { ui_settings_show(); }
+static void show_agents(lv_event_t*) {ui_agents_show();}
 static void say_hi(lv_event_t*) { state.greet(millis()); ui_nova_update(); }
 static void request_update(lv_event_t*) {
   const auto snapshot = aim::read();
@@ -99,6 +101,7 @@ void init() {
   lv_obj_set_style_radius(header, 0, 0); lv_obj_set_scrollable(header, false);
   label(header, 24, 12, 400, "AI MONITOR / COMPANION", &lv_font_montserrat_12, ui_theme::muted);
   companionLabel = label(header, 24, 34, 360, "NOVA", &lv_font_montserrat_26);
+  button(header,444,14,116,"AGENTS",show_agents);
   clock = label(header, 574, 28, 92, "--:--", &lv_font_montserrat_26);
   button(header, 672, 14, 104, "SET", show_settings);
   stage = lv_obj_create(screen); lv_obj_set_pos(stage, 20, 90); lv_obj_set_size(stage, 350, 315);

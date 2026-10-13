@@ -10,25 +10,80 @@ from telemetry_bridge import write_record
 
 
 def claude_command(root, option='--claude-statusline'):
-    if option not in ('--claude-statusline','--claude-event'): raise ValueError('Unsupported Claude integration')
+    if option not in ('--claude-statusline','--claude-event','--codex-event'): raise ValueError('Unsupported event integration')
+    observer=option in ('--claude-event','--codex-event')
     if getattr(sys, 'frozen', False):
-        helper = root / ('AI-Monitor-Events.exe' if option=='--claude-event' else 'AI-Monitor-Console.exe')
+        helper = root / ('AI-Monitor-Events.exe' if observer else 'AI-Monitor-Console.exe')
         if not helper.is_file(): raise ValueError('Console helper missing. Reinstall the complete release.')
         command = [str(helper), option]
     else:
-        command = [sys.executable, str(root / ('tools/aim_events.py' if option=='--claude-event' else 'tools/aim_control.py')), option]
+        command = [sys.executable, str(root / ('tools/aim_events.py' if observer else 'tools/aim_control.py')), option]
     if os.name == 'nt':
         expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + arg.replace("'", "''") + "'" for arg in command)
-        if option=='--claude-event':
+        if observer:
             expression=("$ProgressPreference='SilentlyContinue'; try { $buffer=[char[]]::new(65537); "
                 '$count=[Console]::In.ReadBlock($buffer,0,$buffer.Length); '
                 'if ($count -lt $buffer.Length) { $payload=[string]::new($buffer,0,$count); $payload | & '+
                 ' '.join("'"+arg.replace("'","''")+"'" for arg in command)+
                 ' *> $null } } catch {}; exit 0')
+            if option=='--codex-event':
+                # Stop/SubagentStop require neutral JSON. No context or decision fields.
+                expression=expression.replace('exit 0',"[Console]::Out.WriteLine('{}'); exit 0")
         encoded = base64.b64encode(expression.encode('utf-16le')).decode('ascii')
         return '"' + powershell_executable() + '" -NoProfile -EncodedCommand ' + encoded
     import shlex
-    return shlex.join(command)+(' >/dev/null 2>&1; exit 0' if option=='--claude-event' else '')
+    suffix = (' >/dev/null 2>&1; printf \'{}\\n\'; exit 0' if option=='--codex-event' else
+              ' >/dev/null 2>&1; exit 0' if observer else '')
+    return shlex.join(command)+suffix
+
+
+CODEX_EVENTS=('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest',
+              'SubagentStart','SubagentStop','Stop','Interrupt','SessionEnd')
+
+
+def codex_session_link(root, remove=False, home=None):
+    """Explicit setup only. Preserve unrelated hooks; never write hook trust or start Codex."""
+    from codex_support import codex_home
+    base=Path(home)/'.codex' if home is not None else codex_home()
+    settings=base/'hooks.json'
+    document=read_local_json(settings,65536) if settings.exists() else {}
+    if not isinstance(document,dict): raise ValueError('Invalid Codex hooks; nothing changed.')
+    hooks=document.get('hooks',{})
+    if not isinstance(hooks,dict): raise ValueError('Invalid Codex hook collection; nothing changed.')
+    expected={'type':'command','command':claude_command(Path(root),'--codex-event'),'timeout':2}
+    changed=False
+    for event in CODEX_EVENTS:
+        entries=hooks.get(event,[])
+        if (not isinstance(entries,list) or any(not isinstance(entry,dict) or
+                not isinstance(entry.get('hooks'),list) for entry in entries)):
+            raise ValueError('Invalid Codex hook entries; nothing changed.')
+        if remove:
+            kept=[]
+            for entry in entries:
+                owned=entry.get('matcher','')=='' and expected in entry['hooks']
+                if not owned: kept.append(entry); continue
+                remaining=[hook for hook in entry['hooks'] if hook!=expected]
+                if remaining: kept.append(dict(entry,hooks=remaining))
+                changed=True
+            if kept: hooks[event]=kept
+            else: hooks.pop(event,None)
+        elif not any(entry.get('matcher','')=='' and expected in entry['hooks'] for entry in entries):
+            hooks[event]=entries+[{'hooks':[expected]}];changed=True
+    from live_events import marker
+    activity=Path(root)/'tools/activity'
+    marker_path=activity/'codex-session-link.json'
+    if remove: write_record(marker_path,dict(enabled=False,generation=time.time_ns()))
+    if changed:
+        if hooks: document['hooks']=hooks
+        else: document.pop('hooks',None)
+        settings.parent.mkdir(parents=True,exist_ok=True)
+        if settings.exists(): shutil.copy2(settings,settings.with_name('hooks.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+        write_record(settings,document)
+    if not remove and (changed or not marker(activity,'codex')['enabled']):
+        write_record(marker_path,dict(enabled=True,generation=time.time_ns()))
+    return ('Codex events removed; unrelated hooks preserved.' if remove else
+            'Codex events linked. Review and trust these hooks in Codex /hooks, then restart the session. '
+            'The observer returns no context or permission decision. No model session was started.')
 
 
 def claude_bridge(root, remove=False, home=None):
@@ -81,7 +136,7 @@ def _host_quota_report(running, state):
 
 
 CLAUDE_EVENTS = ('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse',
-                 'PermissionRequest','Notification','Stop','StopFailure','SessionEnd')
+                 'PermissionRequest','Notification','Stop','StopFailure','SessionEnd','SubagentStart','SubagentStop')
 
 
 def claude_session_link(root, remove=False, home=None):

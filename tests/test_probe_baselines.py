@@ -22,6 +22,18 @@ def ppa():
 
 
 class ProbeBaselineTests(unittest.TestCase):
+    def test_identity_only_schema_never_reports_bluetooth_enabled(self):
+        identity = dict(c6(), schema=2, controllerEnableConfirmed=False)
+        self.assertEqual(validate_probe(identity)['stage'], 'completed')
+        for fields in ({'controllerEnableConfirmed': True}, {'schema': 3},
+                       {'coprocessorResponded': False, 'coprocessorVersion': None},
+                       {'stage': 'controller-init-failed', 'error': 263},
+                       {'stage': 'controller-enable-failed', 'error': 263}):
+            with self.subTest(fields=fields), self.assertRaises(ValueError):
+                validate_probe(dict(identity, **fields))
+        # Historical measurements stay readable; they are not new radio operations.
+        self.assertTrue(validate_probe(c6())['controllerEnableConfirmed'])
+
     def test_collector_handles_boot_noise_fragmentation_pending_and_terminal_failure(self):
         pending = dict(c6(), stage='pending', coprocessorResponded=False,
             coprocessorVersion=None, detectedChip=None, controllerEnableConfirmed=False)

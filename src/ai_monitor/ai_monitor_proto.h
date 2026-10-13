@@ -27,6 +27,7 @@
 #include "../diagnostics/hardware_types.h"
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/ppa_benchmark.h"
+#include "../live_agent/usb_live.h"
 
 namespace aim {
 
@@ -56,6 +57,7 @@ class ProtoCore {
   static constexpr const char* kReportedVersion = "2.23.0";
 
   const Snapshot& snapshot() const { return snap_; }
+  const live_agent::UsbLiveSnapshot& live_snapshot() const { return live_.snapshot(); }
   // Bumped on every snapshot state change; the owner publishes only on change.
   uint32_t snapshot_revision() const { return revision_; }
   // Bytes to transmit to the host (cleared by the owner after sending).
@@ -83,6 +85,7 @@ class ProtoCore {
   // loop; cheap enough to run every iteration.
   bool poll() {
     const uint32_t now = tick();
+    live_.poll(now);
     bool changed = false;
     if (framed_ && now - framedLastByteMs_ > kAim1ResyncMs) {
       framed_ = false;
@@ -144,6 +147,7 @@ class ProtoCore {
   }
   void touch() { ++revision_; }
   Snapshot snap_{};
+  live_agent::UsbLive live_;
   uint32_t revision_ = 0;
   std::string out_;
   char mac_[18] = "00:00:00:00:00:00";
@@ -245,7 +249,7 @@ class ProtoCore {
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
-          "\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
+          "\"liveProtocol\":1,\"livePermissions\":false,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
@@ -565,6 +569,14 @@ class ProtoCore {
   // ─────────────────────────────────────────────────────────────────────────────
   void handle_command(JsonDocument& doc) {
     const char* cmd = doc["cmd"] | "";
+    if (!strcmp(cmd,"live_open") || !strcmp(cmd,"live_state") || !strcmp(cmd,"live_close")) {
+      const bool accepted=live_.accept(doc.as<JsonObjectConst>(),boot_id,tick());
+      emitf("{\"type\":\"live_reply\",\"schema\":1,\"cmd\":\"%s\",\"ok\":%s,"
+            "\"bootId\":%u,\"epoch\":%u,\"sequence\":%u,\"permissions\":false,\"requestId\":%u}\n",
+            cmd,accepted?"true":"false",(unsigned)boot_id,(unsigned)live_.snapshot().epoch,
+            (unsigned)live_.snapshot().sequence,(unsigned)(doc["requestId"]|0u));
+      return;
+    }
 
     if (strcmp(cmd, "get_ppa_benchmark") == 0) {
       if (doc.size() != 1 || !ppa_benchmark) { reply_error(-1, 0, "PPA benchmark unavailable"); return; }

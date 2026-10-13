@@ -17,7 +17,10 @@ PROVIDER_SETUP = {
               '3. Accept sign-in and complete the official browser flow with your own ChatGPT account. No OpenAI key '
               'is pasted into this app.\n4. Start host and check Live provider health. Local token records animate the robot; '
               'the CLI supplies available 5-hour and 7-day quotas. The Windows monitor includes its runtime; Python, '
-              'Node.js and Git do not need to be installed separately. Internet and a browser are needed for first setup.',
+              'Node.js and Git do not need to be installed separately. Internet and a browser are needed for first setup.\n'
+              '5. Optional: Link Codex session events below. Review and trust the hooks using /hooks in a compatible '
+              'Codex client, then restart the session. Events report waiting, editing and stopped turns; they never '
+              'approve tools. Missing hook events remain unknown. The new USB live view is still under development.',
               'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/CODEX_SETUP.md'),
     'zcode': ('1. Install ZCode and sign in with your own account for local token activity.\n'
               '2. For quota percentages, create a Z.AI Coding Plan API key in your Z.AI account and paste it '

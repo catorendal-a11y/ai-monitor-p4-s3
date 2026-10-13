@@ -51,9 +51,10 @@ single-use decisions and final opt-in/security/identity checks.
 
 Real native LVGL permission controls, pointer cancellation, queued/final commit checks and a persistent
 interaction authority are now implemented; see [the permission UI contract](PERMISSION_UI.md).
-Physical touch testing, synchronized firmware state publication, secure C6 BLE and real Desktop
-remain gates. No BLE adapter or permission UI is enabled in production. Built-in USB provider
-monitoring continues separately.
+Physical touch testing, synchronized firmware publication and a verified USB/provider adapter
+remain gates. Bluetooth is permanently excluded. Direct Hardware Buddy integration is removed
+because its documented transport is BLE; a USB cable cannot replace that desktop API.
+No permission sender is enabled in production. See [USB-only integration](USB_LIVE_TRANSPORT.md).
 
 The [official Hardware Buddy protocol](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md)
 is an experimental Claude Desktop developer-mode interface, not a generally supported product feature.

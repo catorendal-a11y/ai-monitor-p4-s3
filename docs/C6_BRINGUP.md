@@ -1,5 +1,13 @@
 # Standalone P4/C6 bring-up
 
+## USB-only product decision (2026-10-13)
+
+Bluetooth is permanently excluded from AI Monitor. The current standalone probe is identity/version
+only (schema 2), with no Bluetooth controller initialization/enabling. Schema 1 measurements below
+are historical evidence from before this decision; the collector keeps them readable. The remaining
+controller-related procedure descriptions below apply only to that historical experiment.
+The normal firmware does not initialize the radio. See [USB-only v2 transport](USB_LIVE_TRANSPORT.md).
+
 The reported board is JC4880P443C_I_W_Y. The vendor specifies 32 MB PSRAM, 16 MB flash and an
 ST7701S panel. `_Y` identifies the enclosed variant. These specifications are not runtime detection.
 

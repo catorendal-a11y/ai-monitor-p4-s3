@@ -1,4 +1,4 @@
-"""Strict standalone probe results; controller RPC is not a BLE connection."""
+"""Strict identity/version probes; schema 1 controller results are historical only."""
 import re
 import json
 import time
@@ -18,7 +18,7 @@ def version(value):
 
 def validate_probe(data):
     if (not isinstance(data, dict) or not set(FIELDS).issubset(data) or data.get('type') != 'c6_probe' or
-            type(data.get('schema')) is not int or data['schema'] != 1):
+            type(data.get('schema')) is not int or data['schema'] not in (1, 2)):
         raise ValueError('Unsupported C6 probe result')
     stage = data.get('stage')
     if not isinstance(stage, str) or stage not in STAGES or type(data.get('error')) is not int or not -2147483648 <= data['error'] <= 2147483647:
@@ -36,10 +36,14 @@ def validate_probe(data):
         raise ValueError('Unexpected coprocessor version')
     if data['controllerEnableConfirmed'] and not data['coprocessorResponded']:
         raise ValueError('Unverified controller')
+    if data['schema'] == 2 and (data['controllerEnableConfirmed'] or
+            stage in ('controller-init-failed', 'controller-enable-failed')):
+        raise ValueError('Bluetooth is excluded from identity-only probes')
     if data['deadlineExceeded'] != (stage == 'deadline-exceeded'):
         raise ValueError('Inconsistent deadline')
-    if stage == 'completed' and (data['error'] != 0 or not data['controllerEnableConfirmed']):
-        raise ValueError('Incomplete controller probe')
+    if stage == 'completed' and (data['error'] != 0 or not data['coprocessorResponded'] or
+            (data['schema'] == 1 and not data['controllerEnableConfirmed'])):
+        raise ValueError('Incomplete probe')
     if stage not in ('pending', 'completed') and data['error'] == 0:
         raise ValueError('Failure without error')
     return {key: data[key] for key in FIELDS}

@@ -356,6 +356,21 @@ class DesktopWindowTests(unittest.TestCase):
             run.call_args.args[1](Mock())
         bridge.assert_called_once_with(self.root, remove=False)
 
+    def test_codex_session_actions_require_saved_selection_and_confirmation(self):
+        self.assertTrue(self.window.codex_session_button.isHidden())
+        self.window.board.setCurrentIndex(self.window.board.findData('guition-p4'))
+        self.window.providers['codex'].setChecked(True)
+        self.assertFalse(self.window.codex_session_button.isHidden())
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.No):
+            self.window.save()
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.No),patch.object(self.window,'_run') as run:
+            self.window.codex_sessions(False)
+        run.assert_not_called()
+        with patch.object(QMessageBox,'question',return_value=QMessageBox.StandardButton.Yes), \
+             patch.object(self.window,'_run') as run,patch('provider_setup.codex_session_link',return_value='fixture linked') as link:
+            self.window.codex_sessions(False);run.call_args.args[1](Mock())
+        link.assert_called_once_with(self.root,remove=False)
+
     def test_invalid_config_opens_recovery_ui_without_overwriting_file(self):
         self.window.close()
         (self.root/'tools').mkdir(exist_ok=True)

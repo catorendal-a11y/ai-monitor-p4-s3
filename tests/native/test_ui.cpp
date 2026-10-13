@@ -16,9 +16,11 @@
 #include "ui/visual_dimmer.h"
 #include "ui/touch_input.h"
 #include "companions/image_binding.h"
+#include "live_agent/activity_types.h"
 
 static uint32_t fakeTick = 1000;
 static aim::Snapshot sample{};
+static live_agent::UsbLiveSnapshot liveSample{};
 static uint8_t selectedBrightness = 160, actualBrightness = 160, dimMinutes = 1;
 static bool lastPersisted = false;
 static unsigned failures = 0;
@@ -39,6 +41,7 @@ static uint8_t testInitialBrightness = 160;
 
 uint32_t millis() { return fakeTick; }
 namespace aim { Snapshot read() { return sample; } void request_refresh() { ++requestedRefreshes; } }
+namespace live_agent {UsbLiveSnapshot read_usb() {return liveSample;}}
 namespace app_settings {
 void report_save(bool success) { testSaveStatus = success ? SaveStatus::saved : SaveStatus::failed; ++testSaveRevision; }
 SaveStatus save_status() { return testSaveStatus; }
@@ -90,6 +93,7 @@ void display_apply_brightness(uint8_t value, bool persist) {
 #include "../../src/ui_usage_details.cpp"
 #include "../../src/ui_notifications.cpp"
 #include "../../src/ui_nova.cpp"
+#include "../../src/ui_agents.cpp"
 #include "../../src/ui/permission_view.cpp"
 
 alignas(64) static uint32_t drawBuffer[800 * 480];
@@ -628,6 +632,7 @@ int main(int argc, char** argv) {
   ui_details_init();
   ui_notifications_init();
   ui_nova_init();
+  ui_agents_init();
   settle_backlight();
 
   // First activity-only frame clears initialized quota headings and remains
@@ -1404,6 +1409,58 @@ int main(int argc, char** argv) {
             approveAfter.x2==approveBefore.x2 && approveAfter.y2==approveBefore.y2);
       touchPressed=false;lv_indev_read(pointer);view.hide();
     }
+    lv_indev_delete(pointer);
+  }
+  {
+    ui_nova_show();
+    auto* entry=find_caption_button(lv_screen_active(),"AGENTS");CHECK(entry);
+    lv_obj_send_event(entry,LV_EVENT_CLICKED,nullptr);
+    CHECK(lv_screen_active()==agents_ui::screen);
+    CHECK(!lv_obj_is_hidden(agents_ui::empty));
+    CHECK(lv_obj_has_state(agents_ui::next,LV_STATE_DISABLED));
+    liveSample.fresh=true;liveSample.epoch=1;liveSample.receivedAt=fakeTick;liveSample.count=8;
+    for(unsigned i=0;i<8;++i) {
+      strcpy(liveSample.agents[i].provider,i%2?"claude":"codex");
+      snprintf(liveSample.agents[i].id,sizeof(liveSample.agents[i].id),"synthetic_%u",i);
+      liveSample.agents[i].state=static_cast<live_agent::ActivityState>(i+2);
+    }
+    ui_agents_update();lv_obj_update_layout(agents_ui::screen);
+    CHECK(!lv_obj_is_hidden(agents_ui::rows[0].card));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"THINKING"));
+    lv_area_t before{};lv_obj_get_coords(agents_ui::next,&before);
+    screenshot(screenshots,"live-agents-page-one");
+    auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
+    touchFailed=false;touchPressed=false;lv_indev_read(pointer);
+    touchPoint={(before.x1+before.x2)/2,(before.y1+before.y2)/2};
+    touchPressed=true;lv_indev_read(pointer);touchPressed=false;lv_indev_read(pointer);
+    CHECK(agents_ui::page==1);
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[3].state),"DONE"));
+    screenshot(screenshots,"live-agents-page-two");
+    liveSample.count=1;ui_agents_update();CHECK(agents_ui::page==0);
+    CHECK(lv_obj_is_hidden(agents_ui::rows[1].card));
+    CHECK(lv_obj_has_state(agents_ui::next,LV_STATE_DISABLED));
+    liveSample.count=8;liveSample.epoch=2;ui_agents_update();CHECK(agents_ui::page==0);
+    testAppearance.theme=app_settings::Theme::ocean;ui_theme::apply(testAppearance.theme);
+    CHECK(lv_color_eq(lv_obj_get_style_bg_color(agents_ui::screen,LV_PART_MAIN),lv_color_hex(ui_theme::background)));
+    fakeTick+=30000;ui_agents_update();
+    CHECK(!lv_obj_is_hidden(agents_ui::empty) && lv_obj_is_hidden(agents_ui::rows[0].card));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),""));
+    lv_area_t after{};lv_obj_update_layout(agents_ui::screen);lv_obj_get_coords(agents_ui::next,&after);
+    CHECK(before.x1==after.x1 && before.y1==after.y1 && before.x2==after.x2 && before.y2==after.y2);
+    liveSample={};ui_agents_update();screenshot(screenshots,"live-agents-disconnected");
+    liveSample.fresh=true;liveSample.epoch=3;liveSample.count=8;
+    fakeTick=0xfffffff0u;liveSample.receivedAt=fakeTick;ui_agents_update();
+    fakeTick=16;ui_agents_update();CHECK(!lv_obj_is_hidden(agents_ui::rows[0].card));
+    touchPoint={(before.x1+before.x2)/2,(before.y1+before.y2)/2};
+    touchPressed=true;lv_indev_read(pointer);
+    touchPoint={100,446};lv_indev_read(pointer);touchPressed=false;lv_indev_read(pointer);
+    CHECK(agents_ui::page==0 && lv_screen_active()==agents_ui::screen);
+    touchPoint={(before.x1+before.x2)/2,(before.y1+before.y2)/2};
+    touchPressed=true;lv_indev_read(pointer);
+    liveSample.count=0;ui_agents_update();touchPressed=false;lv_indev_read(pointer);
+    CHECK(agents_ui::page==0 && lv_obj_has_state(agents_ui::next,LV_STATE_DISABLED));
+    auto* back=find_caption_button(agents_ui::screen,"COMPANION");CHECK(back);
+    lv_obj_send_event(back,LV_EVENT_CLICKED,nullptr);CHECK(ui_nova_is_active());
     lv_indev_delete(pointer);
   }
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }

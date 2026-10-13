@@ -62,7 +62,9 @@ sleep/opt-out, popup/system overlays, navigation, hidden/faded/clipped details a
 text and closing after queue handoff. They also verify fixed controls and that view recreation
 cannot repeat a consumed approval.
 
-These tests do not establish physical touch reliability, BLE pairing or Claude Desktop behavior.
-Those gates remain open. A production adapter requires encrypted bonded LE Secure Connections,
-explicit local opt-in/pair/unpair controls, synchronized snapshot/security publication, bounded TX/RX
-and real disconnect-during-hold testing. The default remains no live permission transmission.
+These tests do not establish physical touch reliability or real provider permission behavior.
+Bluetooth is permanently excluded; future integration uses USB through the existing PC host.
+A production adapter requires independently verified host trust, a documented provider decision
+interface, explicit local opt-in, synchronized publication, bounded TX/RX and physical disconnect
+tests. USB attachment alone cannot assert security. See [USB-only integration](USB_LIVE_TRANSPORT.md).
+The default remains no live permission transmission.

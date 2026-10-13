@@ -697,9 +697,18 @@ class MonitorWindow(QMainWindow):
         form.addLayout(bridge_row)
         self.claude_session_button=self._button('Link Claude session events…',lambda:self.claude_sessions(False))
         self.claude_session_remove=self._button('Remove session events…',lambda:self.claude_sessions(True))
+        self.codex_session_button=self._button('Link Codex session events…',lambda:self.codex_sessions(False))
+        self.codex_session_remove=self._button('Remove session events…',lambda:self.codex_sessions(True))
+        self.session_action_slot=QStackedWidget()
+        self.session_remove_slot=QStackedWidget()
+        for slot,buttons in ((self.session_action_slot,(self.claude_session_button,self.codex_session_button)),
+                             (self.session_remove_slot,(self.claude_session_remove,self.codex_session_remove))):
+            slot.addWidget(QWidget())
+            for button in buttons: slot.addWidget(button)
+            slot.setFixedHeight(44)
         session_row=QHBoxLayout()
-        for button in (self.claude_session_button,self.claude_session_remove):
-            reserve_hidden_space(button); session_row.addWidget(button,1)
+        session_row.addWidget(self.session_action_slot,1)
+        session_row.addWidget(self.session_remove_slot,1)
         form.addLayout(session_row)
         self.key_row = QWidget()
         key_layout = QHBoxLayout(self.key_row)
@@ -913,6 +922,8 @@ class MonitorWindow(QMainWindow):
         self.claude_unlink_button.setEnabled(ready and 'claude' in self.config['providers'])
         self.claude_session_button.setEnabled(ready and 'claude' in self.config['providers'])
         self.claude_session_remove.setEnabled(ready and 'claude' in self.config['providers'])
+        self.codex_session_button.setEnabled(ready and 'codex' in self.config['providers'])
+        self.codex_session_remove.setEnabled(ready and 'codex' in self.config['providers'])
         self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
 
     def continue_setup(self):
@@ -943,8 +954,8 @@ class MonitorWindow(QMainWindow):
         key = self.provider_guide.currentData()
         self.provider_action_slot.setCurrentIndex(1 if key == 'codex' else 2 if key == 'claude' else 0)
         self.provider_remove_slot.setCurrentIndex(1 if key == 'claude' else 0)
-        self.claude_session_button.setVisible(key=='claude')
-        self.claude_session_remove.setVisible(key=='claude')
+        for slot in (self.session_action_slot,self.session_remove_slot):
+            slot.setCurrentIndex(1 if key=='claude' else 2 if key=='codex' else 0)
         if key in PROVIDER_SETUP:
             self.provider_instructions.setText(PROVIDER_SETUP[key][0])
             self.provider_link.setEnabled(True)
@@ -994,6 +1005,22 @@ class MonitorWindow(QMainWindow):
             try: emit(claude_session_link(self.root,remove=remove))
             except ValueError as error: raise control.SetupError(str(error)) from None
         self._run('Updating Claude session events',update)
+
+    def codex_sessions(self,remove):
+        if not self._ready() or 'codex' not in self.config['providers']: return
+        question=('Remove only this installation\'s observational Codex hooks? Other hooks are preserved.' if remove else
+            'Link Codex session events? A private hooks backup is kept. Only state and hashed IDs are recorded. '
+            'No commands, transcripts, context or permission decisions are returned. '
+            'After linking, review and trust the hooks using /hooks in Codex and restart the session. '
+            'Existing custom hooks are preserved; your Codex version must support lifecycle hooks.')
+        answer=QMessageBox.question(self,'Codex session events',question,
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes: return
+        from provider_setup import codex_session_link
+        def update(emit):
+            try: emit(codex_session_link(self.root,remove=remove))
+            except ValueError as error: raise control.SetupError(str(error)) from None
+        self._run('Updating Codex session events',update)
 
     def claude_quota(self, remove):
         if not self._ready() or 'claude' not in self.config['providers']: return

@@ -24,6 +24,19 @@
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/ppa_benchmark.h"
 
+namespace live_agent {
+static UsbLiveSnapshot published;
+static portMUX_TYPE publicationMux=portMUX_INITIALIZER_UNLOCKED;
+static void publish_usb(const UsbLiveSnapshot& value) {
+  portENTER_CRITICAL(&publicationMux);published=value;portEXIT_CRITICAL(&publicationMux);
+}
+UsbLiveSnapshot read_usb() {
+  UsbLiveSnapshot value;
+  portENTER_CRITICAL(&publicationMux);value=published;portEXIT_CRITICAL(&publicationMux);
+  return value;
+}
+}
+
 namespace aim {
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -91,6 +104,7 @@ static void ai_monitor_task(void*) {
   uint8_t chunk[128];
   uint32_t publishedRevision = 0;
   bool publishedOnce = false;
+  uint32_t liveRevision=0;
   for (;;) {
     int n = 0;
     while (n < (int)sizeof(chunk) && Serial.available() > 0) {
@@ -102,6 +116,10 @@ static void ai_monitor_task(void*) {
     const bool refresh = refreshRequested.exchange(false, std::memory_order_acq_rel);
     if (refresh) core.request_refresh();
     const bool changed = core.poll();
+    if (core.live_snapshot().revision!=liveRevision) {
+      liveRevision=core.live_snapshot().revision;
+      live_agent::publish_usb(core.live_snapshot());
+    }
     // Publish per state change, not per received chunk: one 4 KB frame must
     // not trigger dozens of full-snapshot copies with interrupts disabled.
     const uint32_t revision = core.snapshot_revision();

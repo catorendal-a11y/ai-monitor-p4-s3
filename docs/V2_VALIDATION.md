@@ -190,9 +190,87 @@ The transport-independent controller and actual native LVGL permission dialog no
 pointer/visibility scenarios for both board identities. Queuing and final commit are distinct,
 one-time stages; full prompt identity, lease, trusted context and displayed details are rechecked.
 No actual permission was sent and the view is not initialized in normal firmware. Physical touch,
-synchronized publication, secure BLE and real Desktop remain gates. See [the UI contract](PERMISSION_UI.md).
+synchronized publication and a verified USB/provider permission adapter remain gates.
+See [the UI contract](PERMISSION_UI.md).
 The cache binding also rejects known accelerated draw-unit configurations until completion fencing
 is implemented; its supported baseline remains synchronous single-unit software rendering.
 The complete local verification passed 333 Python regressions, strict native core tests, actual
 P4/S3 LVGL tests and both production firmware builds. No actual permission, BLE connection or
 new model session was created by this validation.
+
+## USB-only direction (2026-10-13)
+
+The user permanently excluded Bluetooth. Phase H now uses the existing PC host and USB, with a
+separate bounded live domain and no changes to quota snapshot meaning. The read-only USB core/client
+now exist; regular polling includes opt-in Codex/Claude lifecycle metadata on compatible firmware.
+The device now has a native-tested read-only agent view (checkpoint below). No real permission
+sender is implemented. The C6 diagnostic now queries identity/version only (schema 2);
+its previous controller measurements remain historical evidence. See [USB architecture](USB_LIVE_TRANSPORT.md).
+
+## Read-only USB live foundation
+
+Local validation passed 340 Python tests, existing native protocol tests for both board identities,
+settings/Claude core tests and new strict USB live tests for P4/S3 identities. New tests exercise
+actual command dispatch alongside an AIM1 quota frame, metadata bounds, complete replacement,
+stale sequence/boot/epoch rejection, expiry and clock rollover. Both production firmware builds
+passed; the first P4 build caught an initializer assignment incompatibility that was fixed explicitly.
+
+Firmware publishes independent synchronized live snapshots; the Python integration client shares
+the existing serial owner. Normal host polling does not enable the client yet. No live UI consumer,
+real provider adapter, host trust mechanism or permission sender is enabled. This checkpoint was
+not flashed or published as a release. Physical serial timing/backpressure/unplug tests and genuine
+provider event integration remain required before claiming an operational live-agent feature.
+
+## Provider lifecycle integration checkpoint
+
+The local Codex/Claude observers normalize documented lifecycle events without retaining prompts,
+commands, results or transcripts. Codex setup preserves hooks/configuration and requires the client's
+normal hook-trust review; tests never bypass it or modify personal client settings. The PC UI provides
+provider-specific link/remove actions in fixed slots. The background worker reads selected enabled
+sources; the existing serial owner negotiates live support and clears delayed samples. Live timeouts
+back off independently of quota polling; serial failures retain the existing reconnect path.
+
+Synthetic tests cover content exclusion, states/expiry, subagent identity, generation revocation,
+bounded agent selection, setup/removal preservation, the actual Windows neutral-output wrapper,
+explicit UI confirmation and quota/live separation. No genuine client hook exchange, physical USB
+test, device agent view or updated Windows executable is claimed at this checkpoint.
+See [provider event semantics and limits](LIVE_PROVIDER_EVENTS.md).
+
+Final Python verification passed 354 tests, including actual offscreen Qt layout/confirmation checks
+and synthetic Windows observer execution. The AI setup preview was visually inspected and action
+slots remain fixed across providers. An initial archive test hit a transient Windows replacement
+lock. A rerun using a project-local temp directory intentionally failed executable trust tests;
+the final run used an isolated temp directory outside the project and passed without weakening
+executable discovery policy. These are synthetic/local checks, not clean-PC or real-account proof.
+
+## Device agent view checkpoint
+
+The companion header has a fixed AGENTS button. The new UI-task-owned screen reads independent live
+snapshots, shows four of up to eight reported entries per page and keeps navigation coordinates fixed.
+Unknown/missing phase data is not inferred from quota or token usage. Expiry hides rows and clears
+their labels. Transport epoch changes and shrinking batches reset the page. The theme registry now
+contains all five permanent screens; rendering retains built-in NOVA/ORBIT.
+
+All 354 Python tests and strict native core tests passed. Actual native LVGL tests passed for P4/S3
+identities, including pointer pagination, fixed coordinates, theme changes, expiry/disconnect clearing
+and return navigation. Native screenshots were visually checked. The preview uses synthetic events;
+physical client/USB/touch validation and current Windows package installation remain pending.
+See [the agent view](LIVE_AGENT_VIEW.md).
+
+Both current production targets built successfully after the agent screen change (P4 and experimental
+Waveshare S3). Additional native pointer tests passed for drag-out cancellation and a batch shrinking
+while NEXT PAGE is held; freshness also passed clock rollover. These builds were not flashed or
+released. Runtime memory after creating the new screen and real USB/client timing remain unmeasured.
+
+## Physical P4 application update
+
+At the user's explicit flash request, the current local agent-view application was installed on the
+identified P4/COM6. Board/ROM identity and the existing partition layout were verified; the complete
+previous application partition was backed up privately. Only the application at 0x10000 was written.
+Flash digest, startup identity, read-only live capability, live open/empty-state/close exchange and
+hardware telemetry passed. No NVS, partition table, bootloader or C6 firmware was written.
+The installed EMBER host was restarted and its fresh connected COM6 status verified against its
+own executable. It remains the existing PC binary; current lifecycle adapters require an updated
+PC package. No real agent status, physical touch gesture or permission exchange is claimed.
+The new startup telemetry was retained privately for subsequent memory comparison; sustained
+runtime memory/USB latency and real-client validation remain pending. No release or push was made.

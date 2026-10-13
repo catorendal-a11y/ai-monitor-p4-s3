@@ -62,6 +62,22 @@ class DesktopLayoutTests(unittest.TestCase):
         window.save()
         self.settle()
 
+    def test_codex_and_claude_event_slots_keep_controls_in_place(self):
+        window=self.window
+        window.tabs.setCurrentIndex(1)
+        window.provider_guide.setCurrentIndex(window.provider_guide.findData('codex'))
+        expected=self.geometry(window.session_action_slot,window.session_remove_slot,window.key_row)
+        self.assertFalse(window.codex_session_button.isHidden())
+        for provider in ('claude','gemini','zcode','codex'):
+            window.provider_guide.setCurrentIndex(window.provider_guide.findData(provider))
+            self.assertEqual(self.geometry(window.session_action_slot,window.session_remove_slot,window.key_row),expected)
+            self.assertEqual(window.codex_session_button.isHidden(),provider!='codex')
+            self.assertEqual(window.claude_session_button.isHidden(),provider!='claude')
+        scroll=window.session_action_slot.parentWidget()
+        while scroll is not None and not isinstance(scroll,QScrollArea):scroll=scroll.parentWidget()
+        if scroll is not None:scroll.ensureWidgetVisible(window.session_action_slot)
+        self.settle();self.snapshot('codex-live-event-setup')
+
     def status(self, running=True, connected=True, providers=None):
         window = self.window
         return window.status_epoch, dict(

@@ -83,6 +83,11 @@ class TokenSampler:
                     try:
                         value['sessions'] = summary(self.options.get('activity_dir'), reporter.providers) if self.options.get('activity_dir') else {'cmd':'session_activity','providers':[]}
                     except (OSError,ValueError,TypeError,RecursionError): value['sessions']={'cmd':'session_activity','providers':[]}
+                    from live_events import live_agents
+                    try:
+                        value['live_agents']=live_agents(self.options['activity_dir'],reporter.providers) if self.options.get('activity_dir') else []
+                    except (OSError,ValueError,TypeError,RecursionError): value['live_agents']=[]
+                    value['live_sampled_at']=time.monotonic()
                     with self.condition: current = generation == self.generation and not self.closed
                     if current and self.history is not None:
                         try: self.history.record_tokens(reporter.deltas)
