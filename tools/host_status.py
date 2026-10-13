@@ -59,7 +59,7 @@ class HostStatus:
 
 def read_status(root, pids):
     try:
-        data = read_local_json(Path(root) / 'tools/aim_host.status.json', 4096)
+        data = read_local_json(Path(root) / 'tools/aim_host.status.json', 16384)
         if not isinstance(data, dict) or data.get('state') not in STATES: return None
         if type(data.get('pid')) is not int or data['pid'] not in pids: return None
         timestamp = data.get('updated_at')
@@ -80,6 +80,11 @@ def read_status(root, pids):
             if not isinstance(history,dict) or type(history.get('enabled')) is not bool: return None
             if history.get('error') is not None and history['error'] not in ERRORS: return None
         if data.get('local_reader','starting') not in ('starting','reading','ready','unavailable','stalled'): return None
+        if 'hardware' in data:
+            from hardware_baseline import validate_hardware
+            stamp=data.get('hardware_at')
+            if type(stamp) not in (int,float) or not math.isfinite(stamp) or not 0<=stamp<=time.time()+1: return None
+            data['hardware']=validate_hardware(data['hardware'],data.get('board'))
         return data
     except (ValueError, OSError, TypeError):
         return None

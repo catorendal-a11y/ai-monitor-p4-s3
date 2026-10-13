@@ -776,6 +776,10 @@ class MonitorWindow(QMainWindow):
             'Start the host to see provider health. Token activity and account quota are separate.', 8, 'Live provider health')
         layout.addWidget(label('LIVE PROVIDER HEALTH', 'eyebrow'))
         layout.addWidget(self.provider_health)
+        self.hardware_diagnostics = InformationPanel(
+            'Connect the host to read device memory. No estimated hardware values are shown.', 12, 'Device diagnostics')
+        layout.addWidget(label('DEVICE DIAGNOSTICS', 'eyebrow'))
+        layout.addWidget(self.hardware_diagnostics)
         self.recover_button = self._button('Recover invalid settings…', self.recover_settings)
         reserve_hidden_space(self.recover_button)
         self.recover_button.setVisible(self.config_error)
@@ -1326,6 +1330,7 @@ class MonitorWindow(QMainWindow):
             self.cached_summary = 'STATUS UNAVAILABLE — OPEN AI MONITOR'
             self.host_state.setText(self.cached_summary)
             self.provider_health.setText('Provider status unconfirmed. Check the host log or retry the status read.')
+            self.hardware_diagnostics.setText('Device telemetry unavailable. Reconnect the host to sample again.')
             self.token_state.setText('Local status unavailable; check the host log.')
             self._show_robot(False)
             self._update_setup_progress()
@@ -1338,6 +1343,9 @@ class MonitorWindow(QMainWindow):
         self.host_state.setText(data['summary'])
         health = data['health']
         self.cached_health=health
+        if not self.hidden_to_tray:
+            from hardware_presentation import hardware_text
+            self.hardware_diagnostics.setText(hardware_text(health))
         self.token_reporter = data['reporter']
         if not self.hidden_to_tray:
             states = health.get('providers', {}) if health else {}

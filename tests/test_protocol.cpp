@@ -801,6 +801,10 @@ static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
     CHECK(value.startup.capture(static_cast<diagnostics::StartupStage>(i),100+i*100,
                                {300000,150000,140000,100000},{33000000,28000000,27000000,24000000}));
   core.hardware = [&] { return value; };
+  feed(core,"{\"cmd\":\"get_info\"}\n");
+  JsonDocument advertised; CHECK(!deserializeJson(advertised,core.out()));
+  CHECK(advertised["hardwareDiagnostics"]==true);
+  core.clear_out();
   unsigned writes = 0; core.apply_brightness = [&](uint8_t, bool) { ++writes; return true; };
   const auto revision = core.snapshot_revision();
   feed(core, "{\"cmd\":\"get_hardware\"}\n");

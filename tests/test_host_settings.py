@@ -21,6 +21,29 @@ class HostSettingsTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name); (self.root/'tools').mkdir()
 
+    def test_device_metrics_require_requested_matching_identity_and_strip_extra_fields(self):
+        from test_hardware_baseline import fixture
+        from board_profiles import get_board
+        data=fixture(); data['private']='fixture secret never persist'
+        panel=host.Panel.__new__(host.Panel)
+        panel.expected_board=get_board('guition-p4'); panel.boot_id=17
+        panel.health=HostStatus(self.root/'tools'); panel.health.data['board']='guition-p4'
+        panel.health.update('connected','COM6')
+        panel.hardware_pending=False
+        self.assertTrue(panel.handle_event(data)); self.assertNotIn('hardware',panel.health.data)
+        panel.hardware_pending=True
+        data['bootId']=18
+        panel.handle_event(data); self.assertNotIn('hardware',panel.health.data)
+        data['bootId']=17
+        panel.handle_event(data)
+        self.assertFalse(panel.hardware_pending)
+        stored=read_status(self.root,{os.getpid()})
+        self.assertNotIn('private',stored['hardware'])
+        self.assertEqual(stored['hardware']['psram']['sizeBytes'],33554432)
+        panel.health.data['hardware']['psram']['free']=1<<40
+        panel.health.update()
+        self.assertIsNone(read_status(self.root,{os.getpid()}))
+
     def test_health_rejects_old_process_and_stale_connection(self):
         health = HostStatus(self.root/'tools')
         health.update('connected', 'COM6'); health.provider('codex', 'unavailable')

@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import Mock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from hardware_baseline import collect,validate_hardware
+from hardware_presentation import hardware_text
 
 
 def fixture():
@@ -21,6 +22,16 @@ def fixture():
 
 
 class HardwareBaselineTests(unittest.TestCase):
+    def test_presentation_distinguishes_snapshot_unknown_radio_and_bad_data(self):
+        data=fixture()
+        text=hardware_text(dict(state='connected',board='guition-p4',hardware=data))
+        self.assertIn('32.00 MiB',text); self.assertIn('free app space',text)
+        self.assertIn('C6 and SD: not probed',text); self.assertIn('not continuous telemetry',text)
+        self.assertNotIn('32.00 MiB',hardware_text(None))
+        self.assertIn('not received',hardware_text(dict(state='connected')))
+        data['psram']['free']=1<<40
+        self.assertIn('unavailable',hardware_text(dict(state='connected',board='guition-p4',hardware=data)))
+
     def test_startup_samples_are_bounded_ordered_and_private_fields_are_removed(self):
         data=fixture()
         names=('before-display','after-display','after-lvgl','after-companion')

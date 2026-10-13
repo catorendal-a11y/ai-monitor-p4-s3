@@ -41,7 +41,12 @@ python scripts/collect_graphics_baseline.py --board guition-p4 --port COM_NUMBER
 
 Replace `COM_NUMBER` with the explicitly identified device port. Port auto-selection is rejected.
 The collectors validate firmware identity and output only whitelisted diagnostic fields.
-These commands are developer tools; the desktop Diagnostics screen is not yet wired to this telemetry.
+These commands are developer tools. The desktop Host settings page now has Device diagnostics:
+the existing host requests one validated snapshot after a capability-aware connection handshake.
+It never opens a second COM connection or treats the snapshot as continuous memory telemetry.
+Firmware must advertise `hardwareDiagnostics: true`; older firmware keeps normal USB monitoring
+without an unsupported diagnostic request. Invalid/unsolicited replies and mismatched boot identities
+cannot populate the diagnostic display. Lost connection/status clears the visible sample.
 
 ## Graphics benchmark environments
 
@@ -96,9 +101,45 @@ identities, real native LVGL UI tests for P4/S3, and production firmware builds 
 P4 production build: application **4,570,004 / 6,553,600 bytes**, static RAM **100,068 / 327,680 bytes**.
 Static linker RAM usage is not runtime heap or total physical SRAM consumption.
 
-No new candidate has been physically flashed as part of this validation. No runtime C6 detection,
-BLE security/pairing, Claude Desktop exchange, permission approval, SD pack activation or new
-Windows installer release is claimed. The installed program and device were left untouched.
+The P4 production candidate was subsequently flashed and verified byte-for-byte. Partition layout
+matched before application-only writing; NVS was not written. The previous application was backed
+up locally outside the public repository. A normal post-flash reset did not start the app on this
+device; watchdog reset did. The P4 flasher now explicitly requests that reset. S3 retains UART hard reset.
+
+Physical USB telemetry confirmed v1.19.0, 16,777,216 bytes flash, 33,554,432 bytes PSRAM and
+**4,604,272 bytes serialized application / 1,949,328 bytes free application partition space**.
+Serialized image size differs from linker flash usage above. At the recorded connection snapshot,
+PSRAM free/largest were **29,710,160 / 29,360,116 bytes**; internal heap free/largest were
+**228,120 / 102,388 bytes**. These are measurements at one point, not long-term minima or guarantees.
+
+| Startup checkpoint | Internal free | Internal largest | PSRAM free | PSRAM largest |
+| --- | ---: | ---: | ---: | ---: |
+| Before display | 434,584 | 344,052 | 33,551,856 | 33,030,132 |
+| After display | 433,440 | 344,052 | 32,014,208 | 31,981,556 |
+| After LVGL/HAL | 428,764 | 344,052 | 29,710,160 | 29,360,116 |
+| After screens/companion creation | 186,932 | 102,388 | 29,710,160 | 29,360,116 |
+
+Runtime heap can increase when the startup/Arduino loop task releases its stack. Native touch tests
+passed, but physical gestures/fault injection and 24-hour soak remain pending. No runtime C6 test,
+BLE pairing, Claude Desktop exchange, permission approval, SD activation or installer release is claimed.
 Follow [the construction plan](../plans/COMPANION_V2.md) for incremental implementation and physical gates.
 The separate [Claude live foundation](CLAUDE_LIVE_FOUNDATION.md) now has a tested bounded parser
 and permission state machine; it is not connected to the UI or a transport yet.
+
+### Follow-up source validation
+
+The desktop flasher now checks the selected board's identity after writing and rebooting before
+reporting verified startup. USB re-enumeration retries are bounded and never select another port
+or repeat a write. An unconfirmed boot explicitly reports that writing finished and directs the
+user to reconnect USB and check the connection; it does not advise erasing device settings.
+
+The follow-up source passed 306 of 312 Python tests. The six errors occurred when Windows denied
+the per-user local IPC server inside the restricted execution environment; those tests remain
+unverified here. The 36 desktop action/UI tests and nine board/flasher tests passed. Strict native
+protocol tests and real LVGL UI regressions for both board identities passed.
+
+The current cross-build could not run the ESP32 toolchain in this execution environment
+(Windows reported Illegal System DLL Relocation). GitHub DNS access was also unavailable.
+These environmental failures are not a successful firmware build, release, or physical test of
+the follow-up changes. The hardware-diagnostics advertisement and post-flash boot verification
+still require a fresh firmware build and physical installation test before publication.

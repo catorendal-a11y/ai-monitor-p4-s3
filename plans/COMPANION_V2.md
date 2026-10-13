@@ -191,7 +191,8 @@ follow later. No Wi-Fi host, web dashboard, camera, voice assistant, cloud accou
 ## Current implementation checkpoint
 
 Source fixes and regression validation are recorded in `docs/V2_VALIDATION.md`. B exposes read-only
-metrics and initialization checkpoints; physical collection and SD/C6 detection remain pending.
+metrics and initialization checkpoints; P4 physical collection and application flash succeeded.
+PC diagnostics reads a capability-negotiated snapshot through the existing host. SD/C6 detection remains pending.
 The standalone C6 build and physical gate are documented in `docs/C6_BRINGUP.md`.
 C provides instrumentation and an isolated compiled benchmark, not measured P4 performance.
 D has exact host compression sizes; target decode timing and final runtime format remain pending.

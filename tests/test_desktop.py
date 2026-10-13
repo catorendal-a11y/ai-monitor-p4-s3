@@ -41,14 +41,45 @@ class DesktopSettingsTests(unittest.TestCase):
             panel.reset_mock(); panel.heartbeat.side_effect = outcomes
             with patch.object(desktop, 'prepare_flash', return_value=('COM6',['flasher'])), \
                     patch.object(control, 'stop_host'), patch.object(control.host, 'Panel', return_value=panel), \
-                    patch.object(desktop.time, 'sleep'), patch.object(desktop, 'run_firmware_command') as write:
+                    patch.object(desktop.time, 'sleep'), patch.object(desktop, 'verify_firmware_boot') as boot, \
+                    patch.object(desktop, 'run_firmware_command') as write:
                 if writes:
                     desktop.write_firmware(Path('.'), 'guition-p4', 'update', 'COM6', Mock())
                 else:
                     with self.assertRaises(control.SetupError):
                         desktop.write_firmware(Path('.'), 'guition-p4', 'update', 'COM6', Mock())
                 self.assertEqual(write.call_count, writes)
+                self.assertEqual(boot.call_count, writes)
                 panel.close.assert_called_once()
+
+    def test_post_flash_boot_reopens_only_selected_port_after_usb_returns(self):
+        panel = Mock()
+        with patch.object(control.host, 'Panel', side_effect=[OSError('re-enumerating'), panel]) as opened, \
+                patch.object(desktop.time, 'sleep'):
+            desktop.verify_firmware_boot('guition-p4', 'COM6')
+        self.assertEqual(opened.call_args_list, [unittest.mock.call('COM6')] * 2)
+        panel.heartbeat.assert_called_once()
+        panel.close.assert_called_once()
+        self.assertEqual(panel.expected_board.id, 'guition-p4')
+
+    def test_post_flash_no_response_is_bounded_and_does_not_report_success(self):
+        panel = Mock(); panel.heartbeat.side_effect = TimeoutError('unavailable')
+        with patch.object(control.host, 'Panel', return_value=panel) as opened, \
+                patch.object(desktop.time, 'sleep'), \
+                self.assertRaisesRegex(control.SetupError, 'written, but startup could not be confirmed'):
+            desktop.verify_firmware_boot('guition-p4', 'COM6')
+        self.assertEqual(opened.call_count, 3)
+        self.assertEqual(panel.heartbeat.call_count, 9)
+        self.assertEqual(panel.close.call_count, 3)
+
+    def test_post_flash_wrong_identity_does_not_retry(self):
+        panel = Mock(); panel.heartbeat.side_effect = RuntimeError('wrong board')
+        with patch.object(control.host, 'Panel', return_value=panel) as opened, \
+                patch.object(desktop.time, 'sleep'), \
+                self.assertRaisesRegex(control.SetupError, 'identity does not match'):
+            desktop.verify_firmware_boot('guition-p4', 'COM6')
+        opened.assert_called_once_with('COM6')
+        panel.close.assert_called_once()
 
     def test_transient_windows_lock_keeps_atomic_config_replacement(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -181,6 +212,19 @@ class DesktopWindowTests(unittest.TestCase):
         window._status_finished((window.status_epoch, data))
         self.assertTrue(window.status_known)
         self.assertTrue(window.live_connected)
+
+    def test_device_diagnostics_displays_snapshot_and_clears_when_status_is_lost(self):
+        from test_hardware_baseline import fixture
+        window=self.window
+        window.config['board']='guition-p4'; window.config['port']='COM6'
+        data={'running':True,'summary':'USB CONNECTED','health':dict(state='connected',
+            board='guition-p4',port='COM6',providers={},hardware=fixture()),
+            'reporter':None,'log':'','sample':None,'working':False}
+        window._status_finished((window.status_epoch,data))
+        self.assertIn('32.00 MiB',window.hardware_diagnostics.toPlainText())
+        self.assertIn('not continuous telemetry',window.hardware_diagnostics.toPlainText())
+        window._status_finished(None)
+        self.assertNotIn('32.00 MiB',window.hardware_diagnostics.toPlainText())
 
     def test_missing_packaged_firmware_fails_diagnostics_without_a_crash_dialog(self):
         import aim_desktop

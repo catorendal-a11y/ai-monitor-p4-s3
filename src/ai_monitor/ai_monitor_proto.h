@@ -245,11 +245,11 @@ class ProtoCore {
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
-          "\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
+          "\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
-          (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
+          hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
           static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();

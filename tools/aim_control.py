@@ -295,7 +295,8 @@ def flash_command(kind, port, root=ROOT, board_id='guition-p4'):
     command = [str(tool)] if tool.exists() else [sys.executable, "-m", "esptool"]
     if getattr(sys, "frozen", False) and not tool.exists():
         raise SetupError("Firmware flasher is missing. Extract the complete Windows package.")
-    return command + ["--chip", board.chip, "--port", serial_port(port), "--baud", "115200", "write-flash",
+    reset = 'watchdog-reset' if board.id == 'guition-p4' else 'hard-reset'
+    return command + ["--chip", board.chip, "--port", serial_port(port), "--baud", "115200", "--after", reset, "write-flash",
                       "0x0" if kind == "install" else "0x10000", str(path)]
 
 

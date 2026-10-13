@@ -84,6 +84,8 @@ class BoardTests(unittest.TestCase):
                 for kind, filename, offset in [('install','factory.bin','0x0'),('update','application.bin','0x10000')]:
                     command = control.flash_command(kind, 'COM6', root, board_id=key)
                     self.assertEqual(command[command.index('--chip')+1], board.chip)
+                    self.assertEqual(command[command.index('--after')+1],
+                        'watchdog-reset' if key=='guition-p4' else 'hard-reset')
                     self.assertEqual(command[-2], offset)
                     self.assertEqual(Path(command[-1]),root/'firmware'/key/filename)
 

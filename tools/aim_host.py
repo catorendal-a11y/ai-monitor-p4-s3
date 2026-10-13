@@ -498,6 +498,7 @@ class Panel:
         self.token_reporter = None
         self.info = {}
         self.expected_board = None
+        self.hardware_pending = False
 
     def close(self):
         self.ser.close()
@@ -515,6 +516,22 @@ class Panel:
             self.send_line(json.dumps({"cmd": "host_activity", "state": state, "message": message}))
 
     def handle_event(self, message):
+        if message.get('type') == 'hardware':
+            health = getattr(self, 'health', None)
+            if not getattr(self, 'hardware_pending', False) or self.expected_board is None or not isinstance(health, HostStatus):
+                return True
+            try:
+                from hardware_baseline import validate_hardware
+                data = validate_hardware(message, self.expected_board.id)
+                if self.boot_id is not None and data['bootId'] != self.boot_id:
+                    return True
+                health.data['hardware'] = data
+                health.data['hardware_at'] = time.time()
+                self.hardware_pending = False
+                health.update()
+            except ValueError:
+                pass  # Invalid optional diagnostics never break quota/USB monitoring.
+            return True
         request_id = message.get("requestId")
         if message.get("type") != "refresh_request" or type(request_id) is not int or not 0 < request_id <= 0xffffffff:
             return False
@@ -928,6 +945,11 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.config_watcher = watcher
                     panel.token_reporter = tokens
                     panel.history = history
+                    health.data.pop('hardware', None)
+                    health.data.pop('hardware_at', None)
+                    if panel.info.get('hardwareDiagnostics') is True:
+                        panel.hardware_pending = True
+                        panel.send_line('{"cmd":"get_hardware"}')
                     panel.report_tokens()
                     LOG(f"connected to {port_name}, views={views}")
                 except Exception as exc:

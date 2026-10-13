@@ -234,6 +234,30 @@ def run_firmware_command(command, root, environment, emit, timeout_s=600, idle_s
         if completed.is_set(): process.stdout.close()
 
 
+def verify_firmware_boot(board_id: str, port: str) -> None:
+    """Confirm the selected board boots; never retry a write or search other ports."""
+    for attempt in range(3):
+        panel = None
+        try:
+            panel = control.host.Panel(port)
+            panel.expected_board = get_board(board_id)
+            time.sleep(0.5)
+            _wait_for_boot(panel.heartbeat)
+            return
+        except (TimeoutError, OSError, control.host.serial.SerialException):
+            if attempt == 2:
+                raise control.SetupError('Firmware was written, but startup could not be confirmed. '
+                    'Keep the display powered, reconnect USB, and use Check connection. '
+                    'No additional write was attempted.') from None
+            time.sleep(0.5)
+        except RuntimeError:
+            raise control.SetupError('Firmware was written, but the connected display identity does not match. '
+                'Check the selected board and USB port. No additional write was attempted.') from None
+        finally:
+            if panel is not None:
+                panel.close()
+
+
 def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> None:
     # Revalidate the current files and configuration after the dialog, before
     # stopping the host or invoking any tool. Do not trust a prepared command.
@@ -259,7 +283,9 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
     environment = dict(os.environ)
     environment['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
     run_firmware_command(command, root, environment, emit)
-    emit('Firmware written. The display will reboot; reconnect if needed.')
+    emit('Firmware written. Checking display startup...')
+    verify_firmware_boot(board_id, port)
+    emit('Firmware written and display startup verified. You can start the host.')
 
 
 def check_flasher_runtime(root: Path) -> bool:
