@@ -15,6 +15,7 @@
 #include "app_settings.h"
 #include "ui/visual_dimmer.h"
 #include "ui/touch_input.h"
+#include "companions/image_binding.h"
 
 static uint32_t fakeTick = 1000;
 static aim::Snapshot sample{};
@@ -1241,7 +1242,59 @@ int main(int argc, char** argv) {
     CHECK(lv_obj_get_x(rendered) == -40 + (orbit ? nova_assets::orbit_origin_x : nova_assets::nova_origin_x));
     CHECK(lv_obj_get_y(rendered) == -2 + (orbit ? nova_assets::orbit_origin_y : nova_assets::nova_origin_y));
   }
+  CHECK(!cropRenderer.render(rendered,CompanionFrameView{},0,0));
+  CHECK(cropRenderer.render(rendered,{&nova_assets::work,3,4},10,20));
+  lv_obj_update_layout(rendered);
+  CHECK(lv_obj_get_x(rendered)==13 && lv_obj_get_y(rendered)==24);
+  lv_image_set_src(rendered,&nova_assets::done); // Another source owner replaced the image.
+  CHECK(cropRenderer.render(rendered,{&nova_assets::work,3,4},10,20));
+  CHECK(lv_image_get_src(rendered)==&nova_assets::work);
   lv_obj_delete(rendered);
+  {
+    uint8_t pixels[128]{},encoded[12];memset(encoded,255,sizeof(encoded));
+    companions::FrameCache cache;CHECK(cache.initialize(pixels,sizeof(pixels),64));
+    companions::Frame frame;frame.width=2;frame.height=2;frame.originX=3;frame.originY=4;
+    frame.encodedBytes=frame.decodedBytes=12;
+    auto hash=[](const uint8_t*,size_t,const char*) { return true; };
+    auto decode=[](companions::Codec,const uint8_t* input,size_t length,uint8_t* out,size_t capacity) {
+      if (length!=capacity)return false;
+      memcpy(out,input,length);return true;
+    };
+    auto* target=lv_image_create(lv_screen_active());
+    auto* other=lv_image_create(lv_screen_active());
+    companions::ImageBinding binding(&nova_assets::work,nova_assets::nova_origin_x,nova_assets::nova_origin_y);
+    CHECK(cache.load(frame,companions::Codec::raw,pixels,12,hash,decode)==-1);
+    int first=cache.load(frame,companions::Codec::raw,encoded,12,hash,decode);CHECK(first==0);
+    CHECK(binding.activate(target,cache,first,10,20));
+    lv_obj_update_layout(target);CHECK(lv_obj_get_x(target)==13 && lv_obj_get_y(target)==24);
+    const auto* descriptor=static_cast<const lv_image_dsc_t*>(lv_image_get_src(target));
+    CHECK(descriptor->data==cache.slot(first)->pixels && descriptor->header.cf==LV_COLOR_FORMAT_RGB565A8);
+    CHECK(cache.slot(first)->pinned);
+    companions::ImageBinding competing(&nova_assets::work);
+    CHECK(!competing.activate(other,cache,first,0,0));
+    CHECK(!binding.activate(other,cache,first,0,0));
+    CHECK(binding.activate(target,cache,first,20,30));lv_obj_update_layout(target);
+    CHECK(lv_obj_get_x(target)==23 && lv_obj_get_y(target)==34);
+    lv_image_set_src(target,&nova_assets::work);
+    CHECK(binding.activate(target,cache,first,20,30));
+    CHECK(lv_image_get_src(target)==descriptor);
+    int second=cache.load(frame,companions::Codec::raw,encoded,12,hash,decode);CHECK(second==1);
+    CHECK(binding.activate(target,cache,second,10,20));
+    CHECK(!cache.slot(first)->pinned && cache.slot(second)->pinned);
+    CHECK(!binding.activate(target,cache,2,0,0));
+    binding.detach();CHECK(!cache.slot(second)->pinned);
+    CHECK(lv_image_get_src(target)==&nova_assets::work);
+    lv_obj_update_layout(target);
+    CHECK(lv_obj_get_x(target)==10+nova_assets::nova_origin_x && lv_obj_get_y(target)==20+nova_assets::nova_origin_y);
+    CHECK(binding.activate(target,cache,first,0,0));
+    lv_obj_delete(target);CHECK(!cache.slot(first)->pinned);
+    {
+      companions::ImageBinding scoped(&nova_assets::work,nova_assets::nova_origin_x,nova_assets::nova_origin_y);
+      CHECK(scoped.activate(other,cache,first,30,40));
+    }
+    CHECK(!cache.slot(first)->pinned && lv_image_get_src(other)==&nova_assets::work);
+    lv_obj_delete(other);
+  }
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

@@ -200,9 +200,11 @@ Results and limits are documented in `docs/C6_BRINGUP.md` and `docs/P4_HARDWARE_
 C now has physical CPU/PPA rotation and normal flush-counter measurements. PPA matched every
 pixel in eight trials and was 1.625x faster for isolated full-frame rotation. Production remains on
 CPU pending partial-region, DMA/cache/scanout/soak checks. Bandwidth/buffer comparisons remain pending.
-D has exact host compression sizes; target decode timing and final runtime format remain pending.
-E has tested manifest/cache scaffolding and built-in rendering; runtime PSRAM/LVGL/SD binding remains
-pending. F now has a tested bounded parser and permission state machine; firmware publication and
+D now has physical P4 measurements for all twelve poses/four codecs, five hash-verified trials each.
+LZ4 is selected for the experimental P4 cache; S3 and working-UI measurements remain pending.
+E has actual PSRAM allocation/hash/decode validation on P4 plus native LVGL lifetime/fallback tests
+and a generic renderer view. Production source selection, physical cached rendering and SD binding
+remain pending. See `docs/COMPANION_RUNTIME_FORMAT.md`. F has a tested bounded parser and permission state machine; firmware publication and
 transport binding are pending. G/H/I and the additional live product domains are not implemented.
 Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
 

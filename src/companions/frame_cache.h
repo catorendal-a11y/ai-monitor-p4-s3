@@ -1,6 +1,7 @@
 #pragma once
-#include "manifest.h"
+#include "types.h"
 #include <cstring>
+#include <limits>
 
 namespace companions {
 // Caller supplies a preallocated pool and stable descriptors. No allocation in load/swap/render.
@@ -19,13 +20,17 @@ class FrameCache {
   int load(const Frame& frame,Codec codec,const uint8_t* encoded,size_t length,Hash hash,Decode decode) {
     if (!initialized_ || !encoded || !hash || !decode || length!=frame.encodedBytes || !frame.width || !frame.height ||
         frame.originX+frame.width>canvas_width || frame.originY+frame.height>canvas_height ||
-        (codec!=Codec::raw && codec!=Codec::lz4) || !frame.encodedBytes || !frame.decodedBytes ||
+        static_cast<unsigned>(frame.pose)>=8 || (codec!=Codec::raw && codec!=Codec::lz4) || !frame.encodedBytes || frame.encodedBytes>max_frame_bytes+64u || !frame.decodedBytes ||
         (codec==Codec::raw && frame.encodedBytes!=frame.decodedBytes) || frame.decodedBytes>capacity_ ||
         frame.decodedBytes!=static_cast<size_t>(frame.width)*frame.height*3u) return -1;
     int selected=-1;
     for (unsigned i=0;i<2;++i) if (!slots_[i].pinned) { selected=i; break; }
     if (selected<0 || !hash(encoded,length,frame.encodedSha256)) return -1;
     auto& target=slots_[selected]; target.valid=false;
+    const auto source=reinterpret_cast<uintptr_t>(encoded),destination=reinterpret_cast<uintptr_t>(target.pixels);
+    if (source>std::numeric_limits<uintptr_t>::max()-length ||
+        destination>std::numeric_limits<uintptr_t>::max()-frame.decodedBytes ||
+        (source<destination+frame.decodedBytes && destination<source+length))return -1;
     if (!decode(codec,encoded,length,target.pixels,frame.decodedBytes) ||
         !hash(target.pixels,frame.decodedBytes,frame.decodedSha256)) return -1;
     target.frame=frame; target.valid=true; return selected;

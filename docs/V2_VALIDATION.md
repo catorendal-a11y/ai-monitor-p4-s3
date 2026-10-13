@@ -86,7 +86,8 @@ Preliminary host-only payload sizes for all twelve frames:
 
 These are exact encoded payload sizes, not ESP32 decode timings. The benchmark also counts a
 prototype delivery manifest. Its multi-companion benchmark metadata is not the runtime pack schema.
-No runtime codec choice has been finalized or production decoder enabled.
+Those host-only results did not select a runtime codec. The later physical P4 checkpoint below
+selects LZ4 for the experimental cache; the production decoder remains disabled.
 
 The version-1 single-companion manifest and two-slot caller-supplied cache have synthetic native
 tests. They reject invalid sizes, hashes, traversal, duplicate fields, invalid UTF-8, case aliases
@@ -167,3 +168,18 @@ matched byte-for-byte in all eight trials; graphics chunk counters were also col
 [Hardware benchmark results](P4_HARDWARE_BENCHMARKS.md) distinguish these measurements from
 unverified HCI/GATT, production acceleration, scanout FPS, SD and target asset decoding.
 The bounded collectors and boot-correlation fixes passed all 324 Python regressions.
+
+## Target asset and cache checkpoint
+
+All twelve NOVA/ORBIT poses were physically measured in raw, RLE, LZ4 and Deflate form, with five
+SHA-256-verified decodes per case. LZ4 is selected for the experimental P4 cache. A boot-time PSRAM
+pool and actual encoded/decode/hash pipeline passed six NOVA loads and corruption/pin-retention
+tests on P4. Generic descriptor/origin rendering and LVGL binding ownership/fallback behavior have
+native tests for both board identities. External packs and cached rendering remain disabled in
+production; physical S3 and working-UI peak memory/performance remain gates.
+See [format decision and evidence](COMPANION_RUNTIME_FORMAT.md).
+All 333 Python regressions, strict protocol/settings/live-agent tests and actual native LVGL
+tests for both board identities passed. Both production firmware builds passed after the generic
+renderer change. Production images still use built-in assets; the cached LVGL path is not physically
+enabled. After each standalone asset/cache experiment, the original application was restored,
+its boot verified, and the installed host confirmed connected on COM6.

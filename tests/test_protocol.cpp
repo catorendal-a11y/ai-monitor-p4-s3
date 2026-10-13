@@ -12,6 +12,7 @@
 #include "companions/manifest.h"
 #include "diagnostics/probe_deadline.h"
 #include "companions/frame_cache.h"
+#include "companions/rle_bounds.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -953,7 +954,25 @@ static void startup_memory_is_ordered_once_only_and_handles_clock_rollover() {
   CHECK(!stages.checkpoints[2].captured && !stages.checkpoints[3].captured);
 }
 
+static void byte_rle_requires_exact_complete_output() {
+  const uint8_t run[]={3,42};
+  const uint8_t literal[]={0x83,1,2,3};
+  const uint8_t mixed[]={2,7,0x82,8,9};
+  CHECK(companions::exact_rle(run,sizeof(run),3));
+  CHECK(companions::exact_rle(literal,sizeof(literal),3));
+  CHECK(companions::exact_rle(mixed,sizeof(mixed),4));
+  CHECK(!companions::exact_rle(run,sizeof(run),2));
+  CHECK(!companions::exact_rle(run,sizeof(run),4));
+  CHECK(!companions::exact_rle(literal,sizeof(literal)-1,3));
+  CHECK(!companions::exact_rle(run,1,3));
+  const uint8_t zero[]={0,7};
+  CHECK(!companions::exact_rle(zero,sizeof(zero),3));
+  CHECK(!companions::exact_rle(run,400001,3));
+  CHECK(!companions::exact_rle(nullptr,2,3));
+}
+
 int main() {
+  byte_rle_requires_exact_complete_output();
   startup_memory_is_ordered_once_only_and_handles_clock_rollover();
   ppa_benchmark_queries_are_read_only();
   companion_manifests_and_preallocated_cache_fail_safely();

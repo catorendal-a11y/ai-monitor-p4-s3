@@ -53,12 +53,17 @@ def build_codecs(directory,compiler):
     return codec
 
 
-def compare_frame(raw,codec):
-    source=ctypes.create_string_buffer(raw); decoded=ctypes.create_string_buffer(len(raw))
+def encode_frame(raw,codec):
+    source=ctypes.create_string_buffer(raw)
     target=ctypes.create_string_buffer(codec.LZ4_compressBound(len(raw)))
     count=codec.LZ4_compress_default(source,target,len(raw),len(target))
     if count<=0: raise ValueError('LZ4 compression failed')
-    encoded=dict(raw=raw,rle=rle_encode(raw),lz4=target.raw[:count],deflate=zlib.compress(raw,9))
+    return dict(raw=raw,rle=rle_encode(raw),lz4=target.raw[:count],deflate=zlib.compress(raw,9))
+
+
+def compare_frame(raw,codec):
+    decoded=ctypes.create_string_buffer(len(raw))
+    encoded=encode_frame(raw,codec)
     result={}
     for name,data in encoded.items():
         compressed=ctypes.create_string_buffer(data)
