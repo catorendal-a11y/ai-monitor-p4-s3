@@ -186,7 +186,7 @@ struct CardCaches {
   uint32_t spine;
   bool spineKnown;
   char name[16];
-  char vendor[32];
+  char vendor[48];
   char remaining[12];
   RowCaches rows[aim::kMaxRows];
 };
@@ -605,7 +605,7 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
     }
     quotaStatus = critical ? "CRITICAL" : (low ? "LOW QUOTA" : "CONNECTED");
   }
-  char vendorBuf[32];
+  char vendorBuf[sizeof(cache.vendor)];
   snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
            !view || !view->valid ? "WAITING" :
            (!hostConnected ? "OFFLINE" : (view->informational ? "ACTIVITY / SETUP" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus))))));

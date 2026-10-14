@@ -6,7 +6,7 @@ The portable Windows archive lets users run the companion and flash the display 
 
 1. Push the reviewed, credential-free repository to your GitHub repository. Do not copy local configurations, logs or unrelated output files.
 2. Ensure Actions is enabled. Set `FW_VERSION` to the intended version and pass CI. Commit before tagging.
-3. Create and push a tag matching `FW_VERSION`, such as `v1.16.1`. This explicitly starts the Portable Windows release workflow.
+3. Create and push a tag matching the intended `FW_VERSION`. This explicitly starts the Portable Windows release workflow.
 4. The workflow builds/tests firmware on Linux, builds/tests the Windows executables, verifies the pinned Inno Setup compiler, and tests clean installation, upgrade and uninstall. It creates a **draft release** containing the Windows installer, portable ZIP and SHA-256 checksums. Drafts are invisible to ordinary downloaders.
 5. Download the draft ZIP, extract it on Windows, test the menu, setup and firmware on the target board, and verify no private files are included. Review license notices and the corresponding upstream source.
 6. Publish the reviewed draft using GitHub's Releases UI. README's recommended download is available after publication.
@@ -20,18 +20,19 @@ The build jobs have read-only repository permission and do not retain checkout c
 Use Python 3.12 x64 and a clean checkout. Install host dependencies plus the pinned release tools in an isolated virtual environment:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -BuildTools
-.\.venv\Scripts\python.exe -m pip install -r scripts/requirements-release.txt
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1 -BuildTools -FlashTools
+.\.venv\Scripts\python.exe -m pip install -r scripts/requirements-release.txt -r scripts/requirements-test.txt
 .\.venv\Scripts\python.exe -m platformio run -e esp32p4-release
-.\.venv\Scripts\python.exe -m platformio run -e esp32s3-waveshare-43-release
-```
-
-Collect both board-specific matching pairs. Each build creates its own application and factory image:
-
-```powershell
+if ($LASTEXITCODE -ne 0) { throw 'P4 build failed.' }
 .\.venv\Scripts\python.exe scripts/collect_firmware.py --environment esp32p4-release --output work/prebuilt
+if ($LASTEXITCODE -ne 0) { throw 'P4 collection failed.' }
+.\.venv\Scripts\python.exe -m platformio run -e esp32s3-waveshare-43-release
+if ($LASTEXITCODE -ne 0) { throw 'S3 build failed.' }
 .\.venv\Scripts\python.exe scripts/collect_firmware.py --environment esp32s3-waveshare-43-release --output work/prebuilt
+if ($LASTEXITCODE -ne 0) { throw 'S3 collection failed.' }
 ```
+
+Build sequentially: the board environments replace shared Arduino SDKs inside the project's ignored `.pio/core`. Each successful build creates a matching application/factory pair. Stop on failure before collecting images, so an older pair cannot be mistaken for a successful new build.
 
 The package requires both `work/prebuilt/guition-p4/` and `work/prebuilt/waveshare-s3-43/`. Its schema-2 manifest records board, chip, status, image offsets, sizes and hashes. The builder verifies image chip headers, current firmware version and factory/application consistency before archiving. Then:
 
@@ -40,7 +41,7 @@ The package requires both `work/prebuilt/guition-p4/` and `work/prebuilt/wavesha
 .\.venv\Scripts\python.exe scripts/build_windows_release.py --firmware-dir work/prebuilt
 ```
 
-The script builds a windowed `AI-Monitor.exe` with its replaceable `_internal` Qt runtime, a separate `AI-Monitor-Console.exe` for background/stdin workflows, and upstream `firmware-flasher.exe`, exports tracked source, adds the matching images/manifest, gathers dependency licenses and pinned esptool/Qt/PySide corresponding source, then creates the ZIP and internal file hashes in `work/windows-release`. It rejects an existing package directory so an old configuration cannot be silently mixed into a new release. Python/PlatformIO are needed only by the builder, not by the recipient of the portable ZIP.
+The script builds a windowed `AI-Monitor.exe` with its replaceable `_internal` Qt runtime, a separate `AI-Monitor-Console.exe` for background/stdin workflows, `AI-Monitor-Events.exe`, `AI-Monitor-Permission.exe` with their separate runtimes, and upstream `firmware-flasher.exe`. It exports tracked source, adds the matching images/manifest, gathers dependency licenses and pinned esptool/Qt/PySide corresponding source, then creates the ZIP and internal file hashes in `work/windows-release`. It rejects an existing package directory so an old configuration cannot be silently mixed into a new release. Python/PlatformIO are needed only by the builder, not by the recipient of the portable ZIP.
 
 The desktop build uses a clean PATH to avoid unrelated ICU DLLs. An unexpected bundled ICU aborts packaging; the exact windowed EXE must pass --gui-check before archiving. The native desktop tests use synthetic settings and never flash or log into a real account.
 
@@ -50,8 +51,15 @@ Versions are kept on one source: `#define FW_VERSION` in `src/config.h`. All bui
 
 ```powershell
 ./scripts/install_inno_builder.ps1 -Destination work/inno-builder
-.\.venv\Scripts\python.exe scripts/build_windows_installer.py --package work/windows-release/ai-monitor-p4-v1.16.1-windows --compiler work/inno-builder/compiler/ISCC.exe --output work/windows-release
-.\.venv\Scripts\python.exe scripts/test_windows_install.py --installer work/windows-release/AI-Monitor-Setup-v1.16.1-windows.exe
+if ($LASTEXITCODE -ne 0) { throw 'Compiler preparation failed.' }
+$taskVersion = & .\.venv\Scripts\python.exe -c "import sys; from pathlib import Path; sys.path.insert(0, 'tools'); from project_version import fw_version; print(fw_version(Path.cwd()))"
+if ($LASTEXITCODE -ne 0) { throw 'Could not read the source version.' }
+$taskPackage = Join-Path 'work/windows-release' ('ai-monitor-p4-' + $taskVersion + '-windows')
+.\.venv\Scripts\python.exe scripts/build_windows_installer.py --package $taskPackage --compiler work/inno-builder/compiler/ISCC.exe --output work/windows-installer
+if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+$taskInstaller = Join-Path 'work/windows-installer' ('AI-Monitor-Setup-' + $taskVersion + '-windows.exe')
+# Run this last command only on a clean Windows user profile:
+.\.venv\Scripts\python.exe scripts/test_windows_install.py --installer $taskInstaller
 ```
 
 Run installer smoke tests on a clean Windows user profile; they refuse to overwrite a registered installation. The compiler is hash-pinned and its upstream Authenticode publisher is verified; that does not sign our resulting app. Until a signing identity is available, label the release unsigned and retain [Windows protection](WINDOWS_TRUST.md). The installer excludes private configuration; uninstall never recursively deletes user data.

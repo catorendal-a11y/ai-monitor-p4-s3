@@ -9,11 +9,15 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 from project_version import fw_version, numeric_version, version_tuple
+from aim_control import firmware_file, SetupError
+from board_profiles import BOARDS
+from host_security import read_local_json
 
 
 def verify_package(package: Path) -> str:
     package = package.resolve()
-    version = numeric_version(fw_version(package))
+    source_version = fw_version(package)
+    version = numeric_version(source_version)
     expected = set()
     for line in (package/'SHA256SUMS.txt').read_text().splitlines():
         digest, relative = line.split('  ', 1)
@@ -30,9 +34,23 @@ def verify_package(package: Path) -> str:
         if file.name.startswith('aim_host.invalid-') or file.name in {'aim_host.json', 'aim_host.status.json', 'aim_host.log', 'auth.json', 'credentials.json'} or file.suffix in {'.db', '.sqlite', '.jsonl', '.lnk'}:
             raise ValueError('Private runtime file in package')
     for name in ('AI-Monitor.exe', 'AI-Monitor-Console.exe', 'AI-Monitor-Events.exe',
-                 'event-runtime/base_library.zip', 'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll'):
+                 'AI-Monitor-Permission.exe', 'permission-runtime/base_library.zip',
+                 'event-runtime/base_library.zip', '_internal/base_library.zip',
+                 'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll'):
         if not (package/name).is_file():
             raise ValueError('Incomplete application runtime')
+    manifest = read_local_json(package/'firmware/manifest.json')
+    if (not isinstance(manifest, dict) or type(manifest.get('schema')) is not int or
+            manifest['schema'] != 2 or manifest.get('version') != source_version):
+        raise ValueError('Firmware manifest does not match the package version')
+    for board in BOARDS.values():
+        try:
+            application = firmware_file('update', package, board.id)
+            firmware_file('install', package, board.id)
+        except SetupError as error:
+            raise ValueError('Invalid packaged firmware for ' + board.id) from error
+        if source_version.encode() not in application.read_bytes():
+            raise ValueError('Firmware image does not match the package version')
     return version
 
 

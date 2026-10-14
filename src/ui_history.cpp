@@ -8,6 +8,7 @@
 #include <Arduino.h>
 #include <lvgl.h>
 #include <cstdio>
+#include <cinttypes>
 #include <cstring>
 #include <algorithm>
 namespace history_ui {
@@ -95,19 +96,19 @@ void ui_history_update() {
   text(status,value);
   if(available && row->quotaKnown) {
     char window[48];quota_window_label(row->windowMinutes,"Model",window,sizeof(window));
-    if(row->changeKnown)snprintf(value,sizeof(value),"%s: %.0f%% used / +%.0f points / %um ago",window,row->usedPercent,row->changePercent,row->quotaAgeMinutes);
-    else snprintf(value,sizeof(value),"%s: %.0f%% used / %um ago",window,row->usedPercent,row->quotaAgeMinutes);
+    if(row->changeKnown)snprintf(value,sizeof(value),"%s: %.0f%% used / +%.0f points / %" PRIu32 "m ago",window,row->usedPercent,row->changePercent,row->quotaAgeMinutes);
+    else snprintf(value,sizeof(value),"%s: %.0f%% used / %" PRIu32 "m ago",window,row->usedPercent,row->quotaAgeMinutes);
   } else snprintf(value,sizeof(value),"Sessions / active time: not recorded");
   text(quota,value);
   if(available && row->agentKnown) {
     char sessions[16]="--",active[24]="--",completed[16]="--",failed[16]="--";
-    if(row->agentKnown&1)snprintf(sessions,sizeof(sessions),"%u",row->sessions);
+    if(row->agentKnown&1)snprintf(sessions,sizeof(sessions),"%" PRIu32,row->sessions);
     if(row->agentKnown&2) {
-      if(row->activeSeconds<60)snprintf(active,sizeof(active),"%us",row->activeSeconds);
-      else snprintf(active,sizeof(active),"%uh %02um",row->activeSeconds/3600,(row->activeSeconds/60)%60);
+      if(row->activeSeconds<60)snprintf(active,sizeof(active),"%" PRIu32 "s",row->activeSeconds);
+      else snprintf(active,sizeof(active),"%" PRIu32 "h %02" PRIu32 "m",row->activeSeconds/3600,(row->activeSeconds/60)%60);
     }
-    if(row->agentKnown&4)snprintf(completed,sizeof(completed),"%u",row->completedTurns);
-    if(row->agentKnown&8)snprintf(failed,sizeof(failed),"%u",row->failedTurns);
+    if(row->agentKnown&4)snprintf(completed,sizeof(completed),"%" PRIu32,row->completedTurns);
+    if(row->agentKnown&8)snprintf(failed,sizeof(failed),"%" PRIu32,row->failedTurns);
     snprintf(value,sizeof(value),"Sessions %s   Active %s   Turns %s / Failed %s",sessions,active,completed,failed);
   } else snprintf(value,sizeof(value),"Agent history: no observed session events");
   text(metrics,value);

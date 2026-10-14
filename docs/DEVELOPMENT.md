@@ -2,7 +2,7 @@
 
 A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4** and an experimental **original Waveshare ESP32-S3-Touch-LCD-4.3** target. [Board compatibility](BOARDS.md). A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.
 
-Release: **v1.16.1**. The interface, code comments and documentation are in English.
+The current development candidate is shown by `FW_VERSION` in `src/config.h`; see [v2 status](V2_STATUS.md) for validation boundaries. The interface, code comments and documentation are in English.
 
 ## Features
 
@@ -21,6 +21,8 @@ The target has a ST7701S 480 x 800 MIPI-DSI panel, GT911 touch, 16 MB flash and 
 [platformio.ini](../platformio.ini) pins pioarduino P4 `55.03.312-1` to commit `2959e98a2750832bca32fd2f849c0c274a4cdd63`, LVGL `v9.6.0` to commit `80ca777e37a2b176770726a02e07a6fb79ef0b39`, and ArduinoJson to `7.4.3`. Use Python 3.10 or later. Initial builds need internet access to download dependencies.
 
 S3 uses its own `esp32s3-waveshare-43-release` environment, pioarduino `54.03.20` pinned to commit `c6f1f4164d16dae8fda13221eb0f2722429175c6`, Arduino 3.2.0 and Espressif's matching high-performance SDK. It requires 8 MB OPI PSRAM and PSRAM XIP, uses native RGB/GT911/CH422G drivers and UART0 on GPIO44/43. Build it with `python -m platformio run -e esp32s3-waveshare-43-release`. Replace the environment in upload commands when working on S3, and use USB TO UART. Native tests run protocol/UI checks under both board profiles; hardware drivers still need a physical board test.
+
+PlatformIO keeps its core, Python environment and board SDKs inside this project's ignored `.pio/core` directory. This avoids loading native Python modules or SDKs from another project's global installation. Build P4 and S3 sequentially, collecting each image pair before switching boards: their pinned platforms use different shared Arduino SDK versions. The first build downloads a fresh toolchain; see [local release builds](RELEASING.md#local-build-on-windows).
 
 The 32 KiB Arduino startup stack still covers display/touch/USB initialization. After setup completes, loop() unregisters its own loop-task watchdog and deletes that unused task, releasing its stack. UI and USB continue in their dedicated tasks; no watchdog for those tasks is disabled. Do not reduce the startup allocation without measuring its high-water mark on both physical targets.
 
