@@ -74,10 +74,20 @@ Approval requires an independently verified host session, explicit local opt-in,
 decision interface, the exact current prompt, complete visible details and a continuous physical hold.
 Reconnect, stale data or ambiguous delivery must fail closed without replay.
 
-Claude Desktop's experimental Hardware Buddy reference currently documents a BLE NUS interface,
-not a USB interface. Therefore direct Hardware Buddy integration is removed from this roadmap.
-Do not claim that changing the board transport makes that desktop interface work over USB, or use
-Bluetooth as an intermediate bridge. Find and validate a supported alternative provider adapter
-before enabling real permissions. Read-only Claude Code activity remains a separate integration.
+Preferred future path: Claude Code PermissionRequest -> dedicated AI-Monitor-Permission helper ->
+same-user local IPC -> validated host -> USB -> existing physical permission UI -> one response along
+the same route. AI-Monitor-Events remains observational. No network listener, arbitrary file requests,
+shell execution, prompt persistence or configuration changes during helper operation.
+Unavailable/expired requests use normal provider permission handling when the documented hook
+contract allows it; never automatic allow. Generic interaction types replace the legacy live-snapshot
+dependency. Host/device/nonce/revision, freshness, opt-in, visibility and final single-use commit must
+all be checked. See phase 7 in [the updated plan](../plans/COMPANION_V2.md).
 
-Reference: [official Hardware Buddy protocol](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md).
+Reference: [Claude Code PermissionRequest contract](https://code.claude.com/docs/en/hooks#permissionrequest).
+
+### Read-only metadata capability 2
+
+`liveMetadata: 2` adds generic agent state names and optional `elapsedSeconds` (0..604800) and
+`observedAgeSeconds` (0..900) per entry. Unknown fields, booleans and out-of-bounds values reject
+the whole snapshot. Legacy three-field entries and FAILED/DONE aliases still work. The host
+downgrades entries for panels without the capability. Permissions remain disabled.

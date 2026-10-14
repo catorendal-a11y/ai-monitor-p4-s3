@@ -1,5 +1,10 @@
 # Claude live protocol foundation
 
+This is retained reference/tested code. It is not the production v2 architecture and must not gain
+new product dependencies. Production activity comes from normalized Claude Code hooks over USB;
+future permission control uses a dedicated helper, same-user IPC and generic interaction models.
+See [the updated v2 sequence](../plans/COMPANION_V2.md).
+
 `src/live_agent/` is independent of USB/AIM1 quota snapshots, provider readers, companion rendering,
 LVGL and BLE. Its current implementation is synthetic/native only. It cannot execute commands,
 approve an actual tool call, open a model session or modify Claude configuration.

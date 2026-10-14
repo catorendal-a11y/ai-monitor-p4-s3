@@ -22,6 +22,20 @@ def fixture():
 
 
 class HardwareBaselineTests(unittest.TestCase):
+    def test_companion_cache_metrics_are_bounded_and_do_not_accept_guessed_state(self):
+        data=fixture()
+        data['companionCache']=dict(enabled=True,active=True,allocatedBytes=630528,
+            decodedFrames=12,failures=0,lastSwitchUs=12000,maxSwitchUs=18000,private='ignored')
+        result=validate_hardware(data,'guition-p4')['companionCache']
+        self.assertEqual(result['allocatedBytes'],630528)
+        self.assertNotIn('private',result)
+        for key,value in [('enabled',1),('active','yes'),('allocatedBytes',1000000),
+                          ('decodedFrames',True),('lastSwitchUs',18001)]:
+            broken=copy.deepcopy(data);broken['companionCache'][key]=value
+            with self.assertRaises(ValueError):validate_hardware(broken,'guition-p4')
+        data['companionCache']['enabled']=False
+        with self.assertRaises(ValueError):validate_hardware(data,'guition-p4')
+
     def test_collection_waits_for_slow_boot_on_same_port_and_has_a_fixed_limit(self):
         panel=Mock(); panel.wait_for.side_effect=[TimeoutError('booting'),
             dict(boardId='guition-p4',chip='esp32p4',bootId=17),fixture()]

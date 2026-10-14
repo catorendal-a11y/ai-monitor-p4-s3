@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace live_agent {
+namespace interaction {
 namespace {
 void text(lv_obj_t* label,const char* value) {
   if (strcmp(lv_label_get_text(label),value))lv_label_set_text(label,value);
@@ -111,28 +111,28 @@ bool PermissionView::reviewable() const {
     if (!lv_obj_is_hidden(lv_obj_get_child(lv_layer_sys(),i)))return false;
   return true;
 }
-bool PermissionView::details_match(const ClaudeLiveSnapshot& value) const {
-  if(!root_ || !value.prompt.present)return false;
-  char id[112],tool[80];snprintf(id,sizeof(id),"REQUEST: %s",value.prompt.id);
-  snprintf(tool,sizeof(tool),"TOOL: %s",value.prompt.tool);
+bool PermissionView::details_match(const InteractionSnapshot& value) const {
+  if(!root_ || !value.request.present)return false;
+  char id[112],tool[80];snprintf(id,sizeof(id),"REQUEST: %s",value.request.id);
+  snprintf(tool,sizeof(tool),"TOOL: %s",value.request.tool);
   return !strcmp(lv_label_get_text(request_),id) && !strcmp(lv_label_get_text(tool_),tool) &&
-      !strcmp(lv_label_get_text(hint_),value.prompt.hint);
+      !strcmp(lv_label_get_text(hint_),value.request.hint);
 }
-void PermissionView::update(const ClaudeLiveSnapshot& value,const PermissionContext& context) {
+void PermissionView::update(const InteractionSnapshot& value,const PermissionContext& context) {
   if(!root_)return;
   const uint32_t now=clock_();context_=context;context_.visible &= reviewable();
   if (value.epoch!=renderedEpoch_ || value.revision!=renderedRevision_ ||
-      !value.prompt.equals(controller_.snapshot().prompt) || !context_.eligible())cancel_pointer();
+      !value.request.equals(controller_.snapshot().request) || !context_.eligible())cancel_pointer();
   controller_.update(value,context_,now);
-  const bool present=value.fresh && now-value.receivedAt<lease_ms && value.prompt.present;
+  const bool present=value.fresh && value.leaseMs>0 && value.leaseMs<=lease_ms && now-value.receivedAt<value.leaseMs && value.request.present;
   if(present) {
-    char id[112],tool[80];snprintf(id,sizeof(id),"REQUEST: %s",value.prompt.id);
-    snprintf(tool,sizeof(tool),"TOOL: %s",value.prompt.tool);
-    text(request_,id);text(tool_,tool);text(hint_,value.prompt.hint);
+    char id[112],tool[80];snprintf(id,sizeof(id),"REQUEST: %s",value.request.id);
+    snprintf(tool,sizeof(tool),"TOOL: %s",value.request.tool);
+    text(request_,id);text(tool_,tool);text(hint_,value.request.hint);
   } else { text(request_,"");text(tool_,"");text(hint_,""); }
   renderedEpoch_=value.epoch;renderedRevision_=value.revision;
   lv_obj_update_layout(root_);
-  complete_=present && value.prompt.displaySupported && fits(request_) && fits(tool_) && fits(hint_);
+  complete_=present && value.request.displaySupported && fits(request_) && fits(tool_) && fits(hint_);
   controller_.displayed(complete_);refresh();
 }
 bool PermissionView::pointer_inside(lv_obj_t* target) const {
@@ -176,26 +176,26 @@ void PermissionView::refresh() {
   lv_bar_set_value(progress_,state==PermissionState::SENT?100:controller_.progress(clock_()),LV_ANIM_OFF);
   const char* message="Waiting for a current request.";
   if(context_.demo)message="DEMO - approvals are blocked.";
-  else if(!context_.connected || !context_.secure)message="Secure paired connection required. Review on Desktop.";
-  else if(!context_.optIn)message="Device permissions are disabled.";
+  else if(!context_.connected || !context_.trustedChannel)message="Trusted host connection required. Review on your PC.";
+  else if(!context_.optedIn)message="Device permissions are disabled.";
   else if(state==PermissionState::EXPIRED)message="Request expired. Review on Desktop.";
   else if(state==PermissionState::CANCELLED)message="Request cancelled. A new request is required.";
   else if(state==PermissionState::ERROR)message="Request unavailable or delivery failed. Review on Desktop.";
   else if(state==PermissionState::SENT)message=controller_.queued()?"Approval queued; transport will recheck the request.":"Decision handed to transport. Verify on Desktop.";
   else if(state==PermissionState::DENIED)message="Denial selected. Verify on Desktop.";
   else if(state==PermissionState::ACKNOWLEDGED)message="Acknowledgement received.";
-  else if(!complete_ && controller_.snapshot().prompt.present)message="Complete details do not fit. Review on Desktop.";
+  else if(!complete_ && controller_.snapshot().request.present)message="Complete details do not fit. Review on Desktop.";
   else if(state==PermissionState::HOLDING)message="Keep holding inside the button. Release cancels.";
   else if(state==PermissionState::DISPLAYED)message="Hold for 1.8 seconds to approve. A tap never approves.";
   text(status_,message);
 }
-PermissionEnvelope PermissionView::take(const ClaudeLiveSnapshot& value,const PermissionContext& context,uint32_t now) {
+PermissionEnvelope PermissionView::take(const InteractionSnapshot& value,const PermissionContext& context,uint32_t now) {
   auto trusted=context;trusted.visible &= reviewable();
   if (!root_ || !complete_ || !details_match(value) || !fits(request_) || !fits(tool_) || !fits(hint_))trusted.visible=false;
   const auto result=controller_.take(value,trusted,now);refresh();return result;
 }
 void PermissionView::delivery_failed() { controller_.delivery_failed();refresh(); }
-bool PermissionView::commit(const PermissionEnvelope& value,const ClaudeLiveSnapshot& current,
+bool PermissionView::commit(const PermissionEnvelope& value,const InteractionSnapshot& current,
                             const PermissionContext& context,uint32_t now) {
   auto trusted=context;trusted.visible &= reviewable();
   if(!root_ || !complete_ || !details_match(current) || !fits(request_) || !fits(tool_) || !fits(hint_))trusted.visible=false;

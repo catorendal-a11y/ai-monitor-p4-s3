@@ -17,6 +17,7 @@ namespace {
 uint32_t imageBytes = 0;
 char hostedVersion[24] = "unavailable";
 StartupMemory startup;
+CompanionCache companion;
 portMUX_TYPE startupMux = portMUX_INITIALIZER_UNLOCKED;
 MemoryReading memory_reading(uint32_t caps) {
   multi_heap_info_t info{};
@@ -25,6 +26,11 @@ MemoryReading memory_reading(uint32_t caps) {
           static_cast<uint32_t>(info.total_free_bytes),static_cast<uint32_t>(info.minimum_free_bytes),
           static_cast<uint32_t>(info.largest_free_block)};
 }
+}
+void publish_companion_cache(const CompanionCache& value) {
+  portENTER_CRITICAL(&startupMux);
+  companion=value;
+  portEXIT_CRITICAL(&startupMux);
 }
 void capture_startup_memory(StartupStage stage) {
   const auto internal=memory_reading(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -71,6 +77,7 @@ HardwareBaseline hardware_baseline() {
   result.display.bounceBytes = panel.bounceBytes;
   portENTER_CRITICAL(&startupMux);
   result.startup=startup;
+  result.companion=companion;
   portEXIT_CRITICAL(&startupMux);
   return result;
 }

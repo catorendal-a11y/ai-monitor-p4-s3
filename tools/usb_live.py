@@ -4,7 +4,8 @@ import re
 from provider_catalog import PROVIDERS
 
 STATES = frozenset(('UNKNOWN', 'IDLE', 'THINKING', 'EDITING', 'SEARCHING', 'BUILDING',
-                    'TESTING', 'WAITING', 'FAILED', 'DONE'))
+                    'TESTING', 'WAITING', 'FAILED', 'DONE', 'WORKING', 'READING', 'WRITING',
+                    'RUNNING', 'NEEDS_ATTENTION', 'ERROR', 'COMPLETED'))
 MAX_VALUE = (1 << 32) - 1
 
 
@@ -17,7 +18,8 @@ def validate_agents(agents):
         raise ValueError('Live snapshots support at most eight agents')
     output, seen = [], set()
     for agent in agents:
-        if not isinstance(agent, dict) or set(agent) != {'provider', 'id', 'state'}:
+        if (not isinstance(agent, dict) or not {'provider','id','state'} <= set(agent) or
+                set(agent)-{'provider','id','state','elapsedSeconds','observedAgeSeconds'}):
             raise ValueError('Live metadata contains unsupported fields')
         provider, identifier, state = agent['provider'], agent['id'], agent['state']
         if (not isinstance(provider, str) or provider not in PROVIDERS or
@@ -28,7 +30,12 @@ def validate_agents(agents):
         if identity in seen:
             raise ValueError('Duplicate live agent identity')
         seen.add(identity)
-        output.append(dict(provider=provider, id=identifier, state=state))
+        row=dict(provider=provider, id=identifier, state=state)
+        for key,limit in (('elapsedSeconds',604800),('observedAgeSeconds',900)):
+            if key in agent:
+                if not integer(agent[key]) or agent[key]>limit:raise ValueError('Invalid live timing')
+                row[key]=agent[key]
+        output.append(row)
     return output
 
 
@@ -61,6 +68,10 @@ class UsbLiveClient:
 
     def send(self, agents):
         agents = validate_agents(agents)
+        if self.panel.info.get('liveMetadata')!=2:
+            legacy={'WORKING':'UNKNOWN','READING':'UNKNOWN','WRITING':'EDITING','RUNNING':'UNKNOWN',
+                    'NEEDS_ATTENTION':'WAITING','ERROR':'FAILED','COMPLETED':'DONE'}
+            agents=[dict(provider=row['provider'],id=row['id'],state=legacy.get(row['state'],row['state'])) for row in agents]
         if self.epoch is None or self.sequence == MAX_VALUE:
             raise ValueError('Open a new USB live session before sending')
         epoch, sequence = self.epoch, self.sequence + 1

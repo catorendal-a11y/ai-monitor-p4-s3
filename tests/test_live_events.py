@@ -36,10 +36,10 @@ class LiveEventTests(unittest.TestCase):
             self.assertNotIn('private',path.name+path.read_text())
             self.assertEqual(set(json.loads(path.read_text())),{'schema','state','received_at','generation'})
         self.assertEqual(live.live_agents(self.activity,['zcode'],101),[])
-        self.assertEqual(live.live_agents(self.activity,['codex'],130),[])
+        self.assertEqual(live.live_agents(self.activity,['codex'],1000),[])
 
     def test_only_explicit_tools_are_classified_without_reading_arguments(self):
-        for provider,tool,expected in (('codex','apply_patch','EDITING'),('codex','Bash','UNKNOWN'),
+        for provider,tool,expected in (('codex','apply_patch','EDITING'),('codex','Bash','WORKING'),
                                       ('claude','Edit','EDITING'),('claude','WebSearch','SEARCHING')):
             live.lifecycle_event(provider,self.event('PreToolUse',tool_name=tool),self.activity,17,100)
             self.assertEqual(live.live_agents(self.activity,[provider],101)[0]['state'],expected)
@@ -49,9 +49,51 @@ class LiveEventTests(unittest.TestCase):
         live.lifecycle_event('codex',self.event('SubagentStart',agent_id='child'),self.activity,17,101)
         self.assertEqual(len(live.live_agents(self.activity,['codex'],102)),2)
         live.lifecycle_event('codex',self.event('SubagentStop',agent_id='child'),self.activity,17,103)
-        self.assertEqual({row['state'] for row in live.live_agents(self.activity,['codex'],104)}, {'UNKNOWN','DONE'})
+        self.assertEqual({row['state'] for row in live.live_agents(self.activity,['codex'],104)}, {'WORKING','COMPLETED'})
         live.lifecycle_event('codex',self.event('SessionEnd'),self.activity,17,105)
-        self.assertEqual([row['state'] for row in live.live_agents(self.activity,['codex'],106)],['DONE'])
+        self.assertEqual([row['state'] for row in live.live_agents(self.activity,['codex'],106)],['COMPLETED'])
+
+    def test_real_start_timer_freezes_on_stop_and_never_guesses_missing_start(self):
+        live.lifecycle_event('claude',self.event('PreToolUse',tool_name='Read'),self.activity,17,100)
+        row=live.live_agents(self.activity,['claude'],110)[0]
+        self.assertEqual(row['state'],'READING');self.assertNotIn('elapsedSeconds',row)
+        live.lifecycle_event('claude',self.event('UserPromptSubmit'),self.activity,17,120)
+        live.lifecycle_event('claude',self.event('PreToolUse',tool_name='Write'),self.activity,17,130)
+        row=live.live_agents(self.activity,['claude'],140)[0]
+        self.assertEqual((row['state'],row['elapsedSeconds'],row['observedAgeSeconds']),('WRITING',20,10))
+        live.lifecycle_event('claude',self.event('Stop'),self.activity,17,150)
+        self.assertEqual(live.live_agents(self.activity,['claude'],160)[0]['elapsedSeconds'],30)
+        live.lifecycle_event('claude',self.event('UserPromptSubmit'),self.activity,17,170)
+        self.assertEqual(live.live_agents(self.activity,['claude'],171)[0]['elapsedSeconds'],1)
+        # An older concurrent event cannot replace the fresh state/start.
+        live.lifecycle_event('claude',self.event('Stop'),self.activity,17,160)
+        self.assertEqual(live.live_agents(self.activity,['claude'],172)[0]['state'],'WORKING')
+
+    def test_long_work_is_last_observed_and_expires_without_renewing_source_time(self):
+        live.lifecycle_event('codex',self.event('UserPromptSubmit'),self.activity,17,100)
+        row=live.live_agents(self.activity,['codex'],800)[0]
+        self.assertEqual((row['observedAgeSeconds'],row['elapsedSeconds']),(700,700))
+        self.assertEqual(live.live_agents(self.activity,['codex'],1000),[])
+        self.assertEqual(live.live_agents(self.activity,['codex'],99),[])
+
+    def test_claude_child_tools_and_teammate_idle_do_not_overwrite_parent(self):
+        live.lifecycle_event('claude',self.event('UserPromptSubmit'),self.activity,17,100)
+        live.lifecycle_event('claude',self.event('SubagentStart',agent_id='child'),self.activity,17,101)
+        live.lifecycle_event('claude',self.event('PreToolUse',agent_id='child',tool_name='Read'),self.activity,17,102)
+        self.assertEqual({r['state'] for r in live.live_agents(self.activity,['claude'],103)}, {'WORKING','READING'})
+        live.lifecycle_event('claude',self.event('TeammateIdle',agent_id='child'),self.activity,17,104)
+        self.assertEqual({r['state'] for r in live.live_agents(self.activity,['claude'],105)}, {'WORKING','IDLE'})
+
+    def test_failure_denial_and_task_requests_are_observations_never_decisions(self):
+        for event,state in [('PostToolUseFailure','ERROR'),('PermissionDenied','NEEDS_ATTENTION')]:
+            live.lifecycle_event('claude',self.event(event,error='secret',reason='secret'),self.activity,17,100)
+            self.assertEqual(live.live_agents(self.activity,['claude'],101)[0]['state'],state)
+        live.lifecycle_event('claude',self.event('TaskCreated',task_id='task',task_subject='secret'),self.activity,17,102)
+        live.lifecycle_event('claude',self.event('TaskCompleted',task_id='task',task_description='secret'),self.activity,17,103)
+        task=json.loads(next((self.activity/'task-events').rglob('*.json')).read_text())
+        self.assertEqual(task['event'],'TASK_COMPLETE_REQUESTED')
+        self.assertEqual(live.live_agents(self.activity,['claude'],104)[0]['state'],'NEEDS_ATTENTION')
+        for file in self.activity.rglob('*.json'):self.assertNotIn('secret',file.read_text())
 
     def test_disabled_generation_mismatch_and_unknown_events_do_not_publish(self):
         live.lifecycle_event('codex',self.event('UserPromptSubmit'),self.activity,16,100)
@@ -60,6 +102,21 @@ class LiveEventTests(unittest.TestCase):
         live.lifecycle_event('codex',self.event('Stop'),self.activity,17,100)
         write_record(self.activity/'codex-session-link.json',dict(enabled=False,generation=18))
         self.assertEqual(live.live_agents(self.activity,['codex'],101),[])
+
+    def test_setup_report_never_calls_codex_live_events_unsupported_or_proves_trust_from_marker(self):
+        with patch('aim_control.local_config',return_value=dict(providers=['codex'],board='guition-p4',port='COM6')),\
+             patch('aim_control.owned_hosts',return_value=[]),patch('codex_support.codex_command',return_value=None),\
+             patch('token_activity.TokenReporter') as reporter:
+            reporter.return_value.poll.return_value={'sources':0}
+            report=setup.setup_report(self.root,home=self.root/'home')
+            self.assertEqual(report[0]['sessions'],'link enabled / waiting for client events')
+            live.lifecycle_event('codex',self.event('UserPromptSubmit'),self.activity,17)
+            self.assertEqual(setup.setup_report(self.root,home=self.root/'home')[0]['sessions'],'reporting')
+
+    def test_observer_lock_contention_is_bounded_and_does_not_write_a_partial_timer(self):
+        with live._event_lock(self.activity,'codex'):
+            with self.assertRaises(OSError):live.lifecycle_event('codex',self.event('UserPromptSubmit'),self.activity,17,100)
+        self.assertFalse((self.activity/'live').exists())
 
     def test_codex_receiver_requires_selected_provider_and_emits_no_decision(self):
         write_record(self.root/'tools/aim_host.json',dict(providers=['claude']))

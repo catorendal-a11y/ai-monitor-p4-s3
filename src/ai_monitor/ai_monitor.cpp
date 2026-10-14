@@ -23,6 +23,10 @@
 #include "../diagnostics/hardware_types.h"
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/ppa_benchmark.h"
+#include "../interaction/enrollment_runtime.h"
+#if defined(AIM_USB_AUTH_BENCHMARK)
+#include "../interaction/crypto_benchmark.h"
+#endif
 
 namespace live_agent {
 static UsbLiveSnapshot published;
@@ -35,6 +39,27 @@ UsbLiveSnapshot read_usb() {
   portENTER_CRITICAL(&publicationMux);value=published;portEXIT_CRITICAL(&publicationMux);
   return value;
 }
+}
+
+namespace agent {
+static Snapshot published;
+static portMUX_TYPE publicationMux=portMUX_INITIALIZER_UNLOCKED;
+static void publish(const Snapshot& value) {
+  portENTER_CRITICAL(&publicationMux);published=value;portEXIT_CRITICAL(&publicationMux);
+}
+
+Snapshot read() {
+  Snapshot value;
+  portENTER_CRITICAL(&publicationMux);value=published;portEXIT_CRITICAL(&publicationMux);
+  return value;
+}
+}
+
+namespace history {
+static Snapshot published;
+static portMUX_TYPE publicationMux=portMUX_INITIALIZER_UNLOCKED;
+static void publish(const Snapshot& value){portENTER_CRITICAL(&publicationMux);published=value;portEXIT_CRITICAL(&publicationMux);}
+Snapshot read(){Snapshot value;portENTER_CRITICAL(&publicationMux);value=published;portEXIT_CRITICAL(&publicationMux);return value;}
 }
 
 namespace aim {
@@ -86,8 +111,13 @@ static void ai_monitor_task(void*) {
   core.hardware = diagnostics::hardware_baseline;
   core.graphics = diagnostics::graphics_snapshot;
   core.ppa_benchmark = diagnostics::ppa_benchmark_result;
+#if defined(AIM_USB_AUTH_BENCHMARK)
+  core.crypto_benchmark=interaction::crypto_benchmark;
+#endif
   core.firmware_version = FW_VERSION;
   core.boot_id = esp_random();
+  if(!core.boot_id)core.boot_id=1;
+  if(interaction::enrollment_runtime_initialize(core.boot_id))core.enrollment_command=interaction::enrollment_runtime_command;
   core.brightness = [] { return brightness_percent(display_get_brightness()); };
   core.apply_brightness = [](uint8_t pct, bool persist) {
     const BrightnessControl control{pct, persist};
@@ -105,6 +135,8 @@ static void ai_monitor_task(void*) {
   uint32_t publishedRevision = 0;
   bool publishedOnce = false;
   uint32_t liveRevision=0;
+  uint32_t agentRevision=0;
+  uint32_t historyRevision=0;
   for (;;) {
     int n = 0;
     while (n < (int)sizeof(chunk) && Serial.available() > 0) {
@@ -116,6 +148,11 @@ static void ai_monitor_task(void*) {
     const bool refresh = refreshRequested.exchange(false, std::memory_order_acq_rel);
     if (refresh) core.request_refresh();
     const bool changed = core.poll();
+    interaction::enrollment_runtime_poll(millis(),core.snapshot().hostPresent);
+    if(core.agent_snapshot().revision!=agentRevision) {
+      agentRevision=core.agent_snapshot().revision;agent::publish(core.agent_snapshot());
+    }
+    if(core.history_snapshot().revision!=historyRevision){historyRevision=core.history_snapshot().revision;history::publish(core.history_snapshot());}
     if (core.live_snapshot().revision!=liveRevision) {
       liveRevision=core.live_snapshot().revision;
       live_agent::publish_usb(core.live_snapshot());

@@ -28,6 +28,8 @@
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/ppa_benchmark.h"
 #include "../live_agent/usb_live.h"
+#include "../agent/types.h"
+#include "../history/usb_history.h"
 
 namespace aim {
 
@@ -46,6 +48,12 @@ class ProtoCore {
   std::function<uint8_t()> brightness = [] { return 100u; };
   // Applied when the companion sends set_brightness (percent 0-100).
   std::function<bool(uint8_t, bool)> apply_brightness;
+  // Optional separate interaction owner. No permission/live state belongs in aim::Snapshot.
+  // A missing adapter fails closed; registering a callback does not establish host trust.
+  std::function<bool(JsonObjectConst,uint32_t,std::string&)> interaction_command;
+  std::function<bool(JsonObjectConst,uint32_t,std::string&)> enrollment_command;
+  std::function<void(uint32_t)> interaction_tick;
+  std::function<std::string()> crypto_benchmark; // Developer-only, no enrolled key/permission path.
 
   void set_mac(const char* mac) { strlcpy_local(mac_, mac, sizeof(mac_)); }
 
@@ -58,6 +66,8 @@ class ProtoCore {
 
   const Snapshot& snapshot() const { return snap_; }
   const live_agent::UsbLiveSnapshot& live_snapshot() const { return live_.snapshot(); }
+  const agent::Snapshot& agent_snapshot() const {return agents_;}
+  const history::Snapshot& history_snapshot() const{return history_.snapshot();}
   // Bumped on every snapshot state change; the owner publishes only on change.
   uint32_t snapshot_revision() const { return revision_; }
   // Bytes to transmit to the host (cleared by the owner after sending).
@@ -86,6 +96,12 @@ class ProtoCore {
   bool poll() {
     const uint32_t now = tick();
     live_.poll(now);
+    history_.poll(now);
+    if(interaction_tick)interaction_tick(now);
+    if(agents_.fresh && now-agents_.sessionActivityMs>=35000u) {
+      for(auto& value:agents_.sessions)value=agent::SessionCounts{};
+      agents_.sessionCount=0;agents_.fresh=false;++agents_.revision;
+    }
     bool changed = false;
     if (framed_ && now - framedLastByteMs_ > kAim1ResyncMs) {
       framed_ = false;
@@ -148,6 +164,8 @@ class ProtoCore {
   void touch() { ++revision_; }
   Snapshot snap_{};
   live_agent::UsbLive live_;
+  agent::Snapshot agents_;
+  history::UsbHistory history_{[](const char* key){return provider_style(key)!=nullptr;}};
   uint32_t revision_ = 0;
   std::string out_;
   char mac_[18] = "00:00:00:00:00:00";
@@ -249,11 +267,11 @@ class ProtoCore {
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
-          "\"liveProtocol\":1,\"livePermissions\":false,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
+          "\"liveProtocol\":1,\"liveMetadata\":2,\"historyProtocol\":1,\"livePermissions\":false,\"interactionProtocol\":%u,\"enrollmentProtocol\":%u,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
-          hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
+          interaction_command ? 1u : 0u, enrollment_command ? 1u : 0u, hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
           static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();
@@ -292,6 +310,11 @@ class ProtoCore {
     hosted["detectedChip"] = nullptr;
     auto ppa = reply["ppa"].to<JsonObject>();
     ppa["supported"] = value.ppaSupported; ppa["active"] = false;
+    auto cache=reply["companionCache"].to<JsonObject>();
+    cache["enabled"]=value.companion.enabled;cache["active"]=value.companion.active;
+    cache["allocatedBytes"]=value.companion.allocatedBytes;
+    cache["decodedFrames"]=value.companion.decodedFrames;cache["failures"]=value.companion.failures;
+    cache["lastSwitchUs"]=value.companion.lastSwitchUs;cache["maxSwitchUs"]=value.companion.maxSwitchUs;
     auto stages=reply["startupMemory"].to<JsonArray>();
     for (unsigned i=0;i<4;++i) {
       const auto& checkpoint=value.startup.checkpoints[i];
@@ -569,6 +592,41 @@ class ProtoCore {
   // ─────────────────────────────────────────────────────────────────────────────
   void handle_command(JsonDocument& doc) {
     const char* cmd = doc["cmd"] | "";
+    if(!doc["cmd"].is<const char*>() || doc["cmd"].as<JsonString>().size()!=strlen(cmd)) {
+      reply_error(-1,0,"invalid command");return;
+    }
+    if(!strcmp(cmd,"get_crypto_benchmark")) {
+      if(doc.as<JsonObjectConst>().size()!=1 || !crypto_benchmark) {
+        reply_error(-1,0,"crypto benchmark unavailable");return;
+      }
+      const auto response=crypto_benchmark();
+      if(response.empty() || response.size()>kAim1MaxPayload) {
+        reply_error(-1,0,"crypto benchmark unavailable");return;
+      }
+      emit(response.c_str());emit("\n");return;
+    }
+    if(!strcmp(cmd,"history_begin") || !strcmp(cmd,"history_provider")) {
+      const bool accepted=history_.handle(doc.as<JsonObjectConst>(),boot_id,tick());
+      emitf("{\"type\":\"history_reply\",\"schema\":1,\"cmd\":\"%s\",\"ok\":%s,\"bootId\":%u,\"epoch\":%u,\"revision\":%u,\"index\":%u}\n",
+        cmd,accepted?"true":"false",(unsigned)boot_id,(unsigned)(doc["epoch"]|0u),(unsigned)(doc["revision"]|0u),(unsigned)(doc["index"]|0u));
+      return;
+    }
+    if(!strcmp(cmd,"interaction_enroll") || !strncmp(cmd,"interaction_enroll_",19)) {
+      std::string response;
+      if(!enrollment_command || !enrollment_command(doc.as<JsonObjectConst>(),tick(),response) ||
+          response.empty() || response.size()>kAim1MaxPayload) {
+        reply_error(-1,0,"USB enrollment unavailable");return;
+      }
+      emit(response.c_str());emit("\n");return;
+    }
+    if(!strcmp(cmd,"interaction") || !strncmp(cmd,"interaction_",12)) {
+      std::string response;
+      if(!interaction_command || !interaction_command(doc.as<JsonObjectConst>(),tick(),response) ||
+          response.empty() || response.size()>kAim1MaxPayload) {
+        reply_error(-1,0,"USB interaction unavailable");return;
+      }
+      emit(response.c_str());emit("\n");return;
+    }
     if (!strcmp(cmd,"live_open") || !strcmp(cmd,"live_state") || !strcmp(cmd,"live_close")) {
       const bool accepted=live_.accept(doc.as<JsonObjectConst>(),boot_id,tick());
       emitf("{\"type\":\"live_reply\",\"schema\":1,\"cmd\":\"%s\",\"ok\":%s,"
@@ -620,7 +678,7 @@ class ProtoCore {
       if (providers.isNull() || providers.size() > kMaxViews) {
         reply_error(-1, 0, "invalid session activity"); return;
       }
-      SessionCounts incoming[kMaxViews]{};
+      agent::SessionCounts incoming[kMaxViews]{};
       uint8_t count = 0, sources = 0;
       for (const auto row : providers) {
         const auto* style = provider_style(row["provider"] | "");
@@ -634,11 +692,11 @@ class ProtoCore {
         if (static_cast<uint32_t>(running) + waiting + completed + error > 64u) {
           reply_error(-1, 0, "invalid session counts"); return;
         }
-        incoming[count++] = SessionCounts{running, waiting, completed, error, style->activityMask};
+        incoming[count++] = agent::SessionCounts{running, waiting, completed, error, style->activityMask};
         sources |= style->activityMask;
       }
-      for (size_t i = 0; i < kMaxViews; ++i) snap_.sessions[i] = incoming[i];
-      snap_.sessionCount = count; snap_.sessionActivityMs = tick();
+      for (size_t i = 0; i < kMaxViews; ++i) agents_.sessions[i] = incoming[i];
+      agents_.sessionCount = count; agents_.sessionActivityMs = tick();agents_.fresh=true;++agents_.revision;
       emit("{\"type\":\"ok\",\"cmd\":\"session_activity\"}\n");
     } else if (strcmp(cmd, "host_activity") == 0) {
       if (!doc["state"].is<const char*>() || (!doc["message"].isNull() && !doc["message"].is<const char*>())) {

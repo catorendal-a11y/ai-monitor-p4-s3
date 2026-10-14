@@ -22,7 +22,7 @@ inline uint32_t& muted = current.muted;
 inline uint32_t& accent = current.accent;
 inline uint32_t& button = current.button;
 inline uint32_t& pressed = current.pressed;
-inline lv_obj_t* roots[5] = {};
+inline lv_obj_t* roots[8] = {};
 inline uint32_t revision = 0;
 inline void watch(lv_obj_t* screen) {
   for (auto*& root : roots) { if (root == screen) return; if (!root) { root = screen; return; } }

@@ -136,7 +136,8 @@ def _host_quota_report(running, state):
 
 
 CLAUDE_EVENTS = ('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse',
-                 'PermissionRequest','Notification','Stop','StopFailure','SessionEnd','SubagentStart','SubagentStop')
+                 'PermissionRequest','Notification','Stop','StopFailure','SessionEnd','SubagentStart','SubagentStop',
+                 'PostToolUseFailure','PermissionDenied','TeammateIdle','TaskCreated','TaskCompleted')
 
 
 def claude_session_link(root, remove=False, home=None):
@@ -193,6 +194,7 @@ def setup_report(root, home=None):
     from provider_catalog import PROVIDERS
     from token_activity import TokenReporter
     from session_activity import summary
+    from live_events import live_agents,marker
     config=local_config(root)
     reporter=TokenReporter(providers=config['providers'],activity_dir=root/'tools/activity',home=home)
     sample=reporter.poll()
@@ -200,6 +202,7 @@ def setup_report(root, home=None):
     health=read_status(root,{p.pid for p in processes}) if processes else None
     states=health['providers'] if health else {}
     session_rows=summary(root/'tools/activity',config['providers'])['providers']
+    observed=live_agents(root/'tools/activity',config['providers'])
     live=bool(health and health['state']=='connected' and health.get('board')==config.get('board')
               and config['port'] in ('auto',health.get('port')))
     results=[]
@@ -212,13 +215,15 @@ def setup_report(root, home=None):
         elif provider in ('gemini','opencode'): next_step='Use the official client once, then check again. This integration does not report remaining account quota.'
         else: next_step=_bridge_extra(provider,readable)
         event_state=claude_session_state(root,home) if provider=='claude' else 'unsupported'
+        if provider=='codex':
+            event_state='link enabled / waiting for client events' if marker(root/'tools/activity','codex')['enabled'] else 'not linked'
         results.append(dict(provider=provider,activity='readable' if readable else 'missing',
             quota=quota if provider in ('codex','zcode','claude') else 'unsupported',
             display=('source-echoed' if live and type(health.get('display_sources')) is int
                      and health['display_sources'] & PROVIDERS[provider][1]
                      and type(health.get('display_sources_at')) in (int,float)
                      and 0<=time.time()-health['display_sources_at']<=35 else 'connected' if live else 'unconfirmed'),
-            sessions='reporting' if any(r['provider']==provider for r in session_rows) else
+            sessions='reporting' if any(r['provider']==provider for r in session_rows+observed) else
                      'linked / waiting for events' if event_state=='installed' else event_state,
             next_step=next_step))
     return results

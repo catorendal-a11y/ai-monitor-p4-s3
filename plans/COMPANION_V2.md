@@ -1,235 +1,194 @@
-# Companion v2 construction plan
+# AI Monitor v2: physical AI agent companion and monitor
 
-## Current transport decision
+The user's updated repository review supersedes the earlier construction order. Inspect current
+main and the working tree before changes; preserve existing verified work and the mature USB/AIM1
+system. Keep English code, UI and documentation. Push/release readiness is not established by
+a local build or mock. Do not claim complete integration without its physical exit gates.
 
-The user explicitly removed Bluetooth from the product on 2026-10-13: USB only, now and in future
-phases. Do not implement BLE, Bluetooth pairing, advertising, GATT, HCI bring-up or a radio bridge.
-Historical C6 measurements remain evidence only; the standalone probe now checks identity/version only.
-USB live-domain work replaces phase H below. Existing native permission code is a disabled prototype;
-USB attachment alone must never set its trusted `secure` flag or authorize a tool call.
-See [the USB architecture and integration gates](../docs/USB_LIVE_TRANSPORT.md).
+## Product and architecture invariants
 
-User-authorized sequence: finish the analysis fixes, then v2. The user subsequently authorized
-push. Release/tag/forum publication remains a separate action. Keep English source, documentation and product UI.
-Each phase produces a local reviewable commit and evidence; synthetic tests never establish hardware success.
-The user identified the PCB as JC4880P443C_I_W_Y; microSD presence is still unconfirmed.
-Continue incremental implementation; verify this revision's wiring before active C6/SD initialization.
-Runtime detection and physical exit gates remain pending actual measurements.
+Production transport is the existing PC host's USB/AIM1 connection to the device. No second
+production transport or C6 runtime dependency is planned. Do not add wireless transport, network
+listeners, cloud accounts, a web dashboard, camera, voice assistant, transcripts or remote shell.
+Historical C6 measurements remain optional developer diagnostics: detected chip, host/slave versions,
+the earlier controller RPC test and compatibility information. C6 failure cannot affect product features.
 
-## Historical starting point
+Keep quota/provider views, token activity, live agents, permissions, companion rendering, history
+and USB transport separate. Carrying them over USB does not merge their state structures.
+aim::Snapshot keeps quota/views, token activity, host health and refresh state. Existing session
+counts must move to agent::Snapshot before further agent features grow. The legacy ClaudeLiveProto
+remains tested reference code; do not expand it or make new production systems depend on it.
 
-Canonical Git root is this project directory, branch `codex/usage-insights`. Local HEAD `22c5790`
-contains the initial brightness recovery fix, transparent global crops, origin-preserving renderer,
-coalesced desktop/host token readers and Windows Job Objects. 298 Python tests pass. Both firmware
-targets and actual native LVGL interfaces were built/tested previously. The installed PC app and
-physical P4 still run v1.18.5; latest candidates have not been physically flashed. COM6 is the
-identified P4; COM4 belongs to another project and must not be accessed. No physical S3 available.
+Use only documented/reviewed sources. Tokens do not establish a phase or start time. Unsupported
+states, source gaps and missing metrics stay unknown. No invented percentages or billing.
+LVGL/backlight/NVS remain UI-task owned. Buffers, queues, messages, parsers, manifests and transfers
+have strict type, size and timeout limits. No credentials, prompts or transcripts in Git/history/logs.
+Every major new subsystem gets synthetic/native tests before physical integration.
 
-Use `AGENTS.md`, `docs/BOARDS.md`, `docs/PROVIDER_ROADMAP.md` and this file for cold-start execution.
-Never read personal conversations/auth for development, copy private configs into a package or
-replace the working drivers/platform pin merely because another board's example uses different versions.
+## Verified foundations: reuse these
 
-## Invariants
+USB/AIM1, quota/token tracking and PC history already exist. Claude observational hooks exist;
+the new local Codex/Claude lifecycle adapters, read-only USB metadata channel and agent/provider
+screen have synthetic/native validation. The correct AI Monitor Windows app is now locally rebuilt;
+real client compatibility remains a separate gate. Provider-status rows are not fabricated agents.
 
-- P4 and S3 retain normal USB quota/activity monitoring with no default AI selection.
-- All LVGL/backlight/NVS work belongs to the UI task. Parsing and transport cannot mutate widgets.
-- Existing observational Claude hooks remain independent of live permission authority.
-- New live text/tool hints are transient display data: bounded, sanitized, never saved in history/logs/exports.
-- No permission is approved through hooks, automatic rules, a tap, a reconnect or an asset command.
-- Permission transmission requires explicit opt-in, a verified trusted USB-host session, a current prompt and
-  a completed physical hold on the exact displayed request. Unsupported/security state is closed.
-- Built-in companions always remain available without SD, PSRAM cache or a valid pack.
-- At the instant of transmission recheck opt-in, negotiated security, link epoch, prompt ID,
-  complete-detail revision and lease; consume an approval once. Never replay ambiguous delivery.
-- C6 firmware is not overwritten as a probe. Active hosted initialization must use verified wiring
-  and record compatibility failures without turning an unprobed chip into a detected device.
-- Every buffer, decoder, queue, manifest and transfer has strict type/size/time limits.
+NOVA/ORBIT union-alpha cropping saved 23.8%. P4 physically validated LZ4 across twelve poses
+(about 520 KB encoded payload), verified PSRAM cache allocation/decode/hash behavior and physically
+benchmarked PPA rotation. The generic renderer and cache ownership/fallback foundation exist.
+Do not repeat codec research. Built-ins remain safe fallback.
 
-## A - Finish current analysis fixes
+The permission controller/UI have native-tested fixed controls, 1.8-second continuous hold,
+drag/read-failure cancellation, full visibility/prompt identity checks, single-use decisions and final
+commit gates. Preserve these. Real permission transmission remains disabled until phase 7 is validated.
+See docs/V2_VALIDATION.md for dated evidence and limits; previous main CI success does not prove
+the current local changes have passed CI.
 
-Context: source fixes are local; process containment now has real synthetic Windows process tests.
-Files: `tools/process_runtime.py`, `tools/windows_job.py`, settings/touch helpers and existing tests.
-Tasks: preserve the passing baseline, record remaining physical touch/soak/fresh-PC checks explicitly;
-verify packaged modules and workers; do not relabel missing hardware tests as completed fixes.
-Validation: `python -m unittest discover -s tests -p "test_*.py"`; package checks with fake provider/home.
-Exit: source defects fixed, tests pass, unresolved physical checks listed and carried into B/C/H.
-Rollback: previous local commit; no external publication and no private config overwrite.
+## Phase 1: roadmap cleanup
 
-## B - Hardware baseline
+Replace the earlier transport/dependency assumptions with USB-only architecture, including
+permission control, packs, release planning and UI notes. Keep historical radio test results as
+developer evidence only. Do not spend new v2 effort on radio bring-up. Remove obsolete active
+integration plans rather than retaining them behind a misleading current checkpoint.
 
-Context: firmware currently reports board/chip identity, free heap and free PSRAM. P4 has separate
-logical draw buffers, rotation scratch and DPI framebuffers. C6/hosted are not initialized by this app.
-Files: `src/diagnostics/`, `src/ai_monitor/`, board/display/HAL interfaces, Python diagnostic reader.
-Tasks: add a bounded read-only hardware reply with actual chip revision, flash/app partition, PSRAM
-totals/free/largest block, heap, SDK version and allocated display buffer sizes. Distinguish compiled
-hosted/PPA support from runtime detection. Collect serial identity on the exact board; verify PCB/module
-revision and hosted wiring before an active, bounded coprocessor/version probe. Preserve NVS/config.
-Validation: strict protocol fixture tests, both firmware builds, chip/board mismatch and legacy replies.
-Exit: baseline artifact records measured values and explicit unknown/not-probed values; C6 chip and
-firmware version are only marked detected after successful runtime communication.
-Dependencies: A implementation. Rollback: omit new diagnostic command; retain normal info/USB behavior.
+## Phase 2: agent domain cleanup
 
-## C - Graphics benchmark
+Move all session counts/status out of aim::Snapshot into agent::Snapshot with independent
+publication/revision/expiry. Preserve the existing session_activity wire command as compatibility
+where needed without retaining its state in the quota object. Add a generic AgentActivity/event model.
 
-Context: P4 rotates partial RGB565 regions on CPU; PPA driver exists in the SDK. S3 has no PPA path.
-Files: diagnostic counters/bench harness, `src/ui/lvgl_hal*.cpp`, `src/ui/display*.cpp`, benchmark docs.
-Tasks: measure render/rotate/copy/present timing separately, frame/update rate, buffer allocation,
-internal/PSRAM bandwidth and memory high-water data. Use an explicit benchmark mode, off by default.
-Compare CPU with PPA on aligned scratch buffers before touching production display presentation.
-Validate orientation, buffer lifetime, completion/cache ownership and display scan behavior on hardware.
-Validation: deterministic test patterns/checksums, native rotation correctness, hardware timings;
-PPA timeout/failure must retain the CPU fallback. Never report PC native timing as P4 throughput.
-Exit: benchmark report and measured choice of buffer/rotation approach. Dependencies: B.
-Rollback: original CPU rotation and proven buffer sizes; benchmark instrumentation disabled.
+Supported semantic states: IDLE, WORKING, THINKING, READING, SEARCHING, EDITING, WRITING, RUNNING,
+BUILDING, TESTING, WAITING, NEEDS_ATTENTION, ERROR and COMPLETED, plus UNKNOWN when information
+is missing. Detailed phases require explicit trusted-source events. Legacy wire names must be mapped
+explicitly, not silently relabeled as evidence. Test native transitions, leases, reconnect and
+compatibility before updating UI consumers. Preserve quota/token functionality throughout.
 
-## D - Asset benchmark and runtime format
+## Phase 3: production LZ4 companions
 
-Context: cropped RGB565+A8 payload is 3,349,656 bytes; origins are fixed per companion family.
-Files: asset generators, benchmark scripts, reproducible results, proposed frame/manifest format.
-Tasks: compare raw, RLE, LZ4 and suitable lossless alternatives with identical cropped pixels. Measure
-compressed size, real target decode latency, peak memory and visual equality, not size alone.
-Choose a versioned format compatible with constrained S3 and P4; separate delivery format from decoded
-LVGL format. Report complete delivered-pack size including its manifest; choose USB transfer limits
-from measured memory/storage budgets. The former Desktop BLE folder limit no longer applies.
-Reject malformed/truncated/oversized compressed frames before exposing them to LVGL.
-Validation: round-trip pixel hashes, fuzz/limit fixtures, both target decode tests/measurements.
-Exit: documented runtime-format decision with evidence and safe raw/built-in fallback. Dependencies: C.
-Rollback: current generated RGB565+A8 arrays; no compulsory compression or extra decoder on boot.
+Move normal NOVA/ORBIT rendering toward verified compressed LZ4 assets, PSRAM cache,
+CompanionRenderer and LVGL. Retain a safe built-in fallback chain; allocate bounded pools at boot
+and respect image lifetime/fencing. Measure actual built firmware/app size, free application space,
+boot time, PSRAM/internal heap and largest blocks, frame-switch latency and UI responsiveness.
+A codec payload estimate is not a built-firmware saving. Do not prioritize microSD; first measure
+internal storage and real pack requirements. External storage stays optional future work.
 
-## E - CompanionRenderer, manifest and PSRAM cache
+## Phase 4: documented Claude events and timers
 
-Context: the initial renderer preserves cropped origins; it has no runtime pack/cache support yet.
-Files: `src/ui/companion_renderer.h`, new bounded companion manifest/cache/provider modules, native UI tests.
-Tasks: versioned schema, dimensions/origins/pose enum/format/decoded and encoded sizes/SHA-256;
-fallback chain requested pose -> pack fallback -> built-in same pose -> built-in work.
-Allocate a bounded PSRAM pool during initialization within the measured budget; rendering and cache
-swaps allocate nothing. Retain/pin image storage until LVGL no longer reads it.
-Stable pose origins and fixed controls survive cache eviction, decoder failure, SD loss and pack changes.
-Validation: invalid versions/paths/overflow/missing frames/allocation failures, cache lifetime tests,
-actual LVGL screenshots and both targets. Exit: safe runtime selection without losing built-ins.
-Dependencies: D. Rollback: built-ins only; cache/pack selection remains disabled by default.
+Expand observational hook support where documented: PostToolUseFailure, SubagentStart/Stop,
+TaskCreated/Completed, PermissionDenied and TeammateIdle, alongside current lifecycle events.
+Normalize fixed events without retaining their text/arguments/results. No observational hook may
+authorize a tool, modify inputs, execute a command or return model context.
 
-## F - ClaudeLiveProto and state machines
+Track session start/active duration only from reliable events; gaps remain unknown. A stopped
+turn is not proof of task/test success. Add bounded task lifecycle events (created, started, progress,
+completed, failed, cancelled); only show structured source milestones, never guessed percentages.
 
-Context: official Claude Desktop Hardware Buddy uses NUS JSON lines; this is separate from quota
-and Claude Code hooks. The reference includes snapshots, turn events, permission requests and commands.
-Files: independent `src/claude_live/` pure protocol/state core and synthetic fixtures/tests.
-Tasks: bounded incremental UTF-8 framing, strict schema/counts/IDs, 30-second lease, transport epochs;
-session states and permission states with revisions. Reject/restrict file/name/owner commands until their
-specific handlers exist. Drop transcript storage; expose only bounded transient text needed for the UI.
-Permission invalidation on replacement, changed request details, expiry, disconnect, unpair and reboot.
-Valid authoritative snapshots omitting prompt revoke it. Only valid snapshots renew their lease;
-malformed/oversized prompt-bearing input disables approval. Turn events and commands cannot renew it.
-Truncated, unsupported or incompletely reviewable details are not locally approvable; use Desktop.
-Compute revisions from complete accepted request fields before presentation sanitization.
-Validation: partial/multiple/oversized/invalid frames, rollover, repeats, stale IDs, queue limits,
-synthetic permission events and no transmission before validated authorization.
-Exit: pure tested core with no BLE/LVGL/PC execution side effects. Dependencies: E.
-Rollback: no live protocol dispatch; existing observational/activity/quota code remains intact.
+## Phase 5: multi-agent UX and companion reactions
 
-## G - Permission UI
+Expand the current screen to reliable per-agent/session state and timers, with fixed navigation and
+honest source readiness. The current provider-status fallback is distinct from live sessions.
+React to actual agent start/wait/attention, tests, task success/error and quota warnings.
+Home is event-driven: normal companion/usage/activity, permission priority, temporary success,
+error/attention and a clean idle state. Avoid permanent card clutter and unsupported classifications.
 
-Context: existing touch-target ownership/failed-read cancellation provide the starting interaction layer.
-Files: new permission screen/overlay, touch interaction helpers, UI/core event queues and native tests.
-Tasks: show request identity/tool/hint clearly; fixed HOLD TO APPROVE and deny controls; complete
-one continuous timed hold with progress. Gesture captures request revision and transport epoch.
-Drag-out, touch read failure, release early, stale data, changed prompt, navigation, disconnect or
-host trust revocation cancels. No approval while booting, sleeping, in demo mode or before verified host trust.
-Revalidate after queueing and immediately before TX; test changed/expired requests between hold and send,
-repeated holds, identical displayed prefixes and control-character changes in details.
-Validation: real LVGL synthetic touch/state sequences plus physical P4 gestures; S3 stays unverified
-until physically tested. Exit: approval fails closed in every cancellation path. Dependencies: F.
-Rollback: read-only live state; approval controls absent/disabled, never auto-approve.
+## Phase 6: notifications and timeline
 
-## H - USB live-domain transport
+Create bounded, deduplicated, expiring events for attention, completion, failures, quota warnings,
+host disconnect, pack and storage errors. Notifications carry type, source/provider, timestamp,
+severity, short safe text and read/unread. Timeline is structured event history, never conversation
+history. Do not persist sensitive permission hints. Keep existing quota notifications working.
 
-Context: the existing PC host owns the board's USB connection. Bluetooth is excluded permanently.
-Files: independent bounded live-event protocol/host adapter, synchronized firmware publication,
-capability negotiation and native/synthetic tests. See `docs/USB_LIVE_TRANSPORT.md`.
-Tasks: carry live metadata in a separate versioned domain over the same serial owner; preserve AIM1
-quota snapshots unchanged. Reconnect/reboot creates a new epoch, clears partial frames and cancels
-permissions. Reject unknown versions, invalid fields and oversized input; bound queues and deadlines.
-Start with read-only, documented provider events. Do not infer detailed agent states from quota usage.
-Permission transmission remains disabled until a supported provider decision interface and independently
-verified USB-host trust mechanism exist. Never mark USB trusted merely because a cable is connected.
-Validation: synthetic fragmented/interleaved traffic, backpressure, unplug/reconnect, changed board
-identity, stale epochs and no permission dispatch. Then validate read-only events on the physical P4.
-Exit: measured USB live activity while normal quota monitoring remains functional. Permission approval
-has a separate integration gate; it is not replaced by fabricated responses or transcript scraping.
-Dependencies: F and existing USB baseline; G applies only to future verified permission integration.
-Rollback: disable the live-domain adapter and retain normal USB quota/activity monitoring.
+## Phase 7: explicit Claude permission control over USB
 
-## I - Companion packs and microSD
+Checkpoint: generic interaction/UI dependency cleanup, dedicated helper, current-user Windows
+IPC and bounded host broker/service are implemented with synthetic/native tests. The service
+now has explicit Panel-owner lifecycle hooks, persistent host-instance replay protection and
+safe shutdown, but is not enabled by production startup. A tested bounded UI-to-serial handoff
+requires an actual PermissionView commit and fresh local visibility. ESP task synchronization
+and immediate final transmission remain to be integrated. Physical authenticated USB enrollment,
+permission protocol integration,
+explicit setup and physical provider validation remain required. See
+[implementation status](../docs/USB_PERMISSION_HELPER.md).
 
-Context: renderer/schema are established in E; future verified USB transfer uses H. SD wiring/storage
-availability must be verified on the actual board. Desktop BLE folder push is excluded.
-Files: pack staging/validation/activation modules, SD adapter, manifest/pack tooling and tests.
-Tasks: strictly contained flat filenames, per-file and total limits, bounded chunk/base64 decode,
-SHA-256 verification, version/decoded-size validation, inactive staging and atomic activation marker.
-Use immutable staged generations, flush completed files before a generation completion marker, and
-validate the manifest/file hashes on boot before choosing a generation. Reserve staging space separately.
-Power loss, full/missing/removed SD, checksum mismatch or invalid manifests fall back to the previous
-valid generation or built-ins. Reject firmware/config/executable uploads; no arbitrary path writes or code execution.
-Validation: traversal, symlink-like/path confusion, duplicates, bad hashes, malformed chunks,
-interrupted transfers and physical SD removal/reboot. Exit: verified selectable packs and recovery.
-Dependencies: E and H. Rollback: built-ins; ignore invalid staging; no activation before verification.
+Authenticated session/request transport, PC ECDH enrollment/DPAPI storage and the existing
+serial-owner broker adapter now have real-crypto Python/native interoperability tests. ESP
+primitives compile on P4/S3 and were physically measured on P4. Device enrollment, key persistence
+and explicit PC/device setup are connected. Physical enrollment validation, permission-specific
+UI publication/final TX gates and opt-in remain required; no real approval is enabled.
+See [authentication evidence](../docs/USB_INTERACTION_AUTH.md).
 
-## Execution and review
+Claude Code PermissionRequest -> AI-Monitor-Permission -> same-user local IPC ->
+validated AI Monitor host -> USB -> existing permission UI -> one decision back along the same path.
+AI-Monitor-Events stays observational. Create a separate permission helper/executable and explicit
+setup; do not give the event observer interactive authority.
 
-The current product direction is USB only; no Bluetooth bring-up continues. Historical C6 detection
-does not create a radio dependency. Verified provider permission integration follows F/G and USB H;
-SD packs remain later. Synthetic fixture authoring may
-proceed while hardware is unavailable, but phases retain their physical exit gates. Reviewer checks
-dependency correctness, missing hardware assumptions, privacy, cancellation, bounds and rollback.
-If a probe exposes incompatible hardware/SDK, amend this plan with the evidence rather than silently
-flashing C6 or substituting a different radio path. Push is authorized; releases remain a separate step.
+The helper accepts one strictly bounded request, extracts only required transient ID/tool/hint fields,
+creates a random request nonce, sends to the running host, waits for one exact matching decision,
+returns the documented hook allow/deny response and exits. No network sockets, arbitrary file access,
+shell execution, configuration changes, persistence, automatic approval or ambiguous approval retry.
+If unavailable/expired, prefer normal Claude permission handling when its contract permits that
+fallback; never auto-allow. Verify the actual hook contract before implementing fallback/output.
 
-## Additional v2 product domains
+Use generic PermissionRequest, InteractionSnapshot, PermissionContext and PermissionDecision,
+independent of ClaudeLiveSnapshot. Trusted context includes connection, opt-in, trustedChannel,
+visibility, awake and demo state. USB attachment alone does not establish host trust.
 
-After the foundations, implement live activity (THINKING, EDITING, SEARCHING, BUILDING, TESTING,
-WAITING, FAILED, DONE) in a distinct bounded domain, with synthetic lifecycle tests. Do not infer
-these states from quota decreases or invent tool detail absent from a provider's events.
-Multi-Agent View consumes live session/provider identity and state without adding it to `aim::Snapshot`.
-Permission states are NONE, RECEIVED, DISPLAYED, HOLDING, SENT, ACKNOWLEDGED, DENIED, EXPIRED,
-CANCELLED and ERROR; security and prompt revision/epoch checks govern every transition.
+Local IPC: per-user restriction, correct host instance, bounded fixed messages, nonce correlation,
+deadline, one response, no TCP listener or arbitrary operations. Reuse proven local desktop IPC
+patterns where appropriate. At actual transmission recheck correct device/session, opt-in, current
+request ID/revision, freshness, visible complete details, earned continuous hold and single-use
+commit. Disconnect, request change, stale state, hidden UI or trust loss cancels. Test synthetically
+before harmless real physical approval/denial and unplug-during-hold integration.
 
-Task-finished/needs-attention events, session timer, bounded activity timeline and notification center
-must deduplicate and expire events; companion reactions consume these events independently of renderer
-and transport. Numeric usage history already exists locally; extend it with reliable session/active-time
-metrics only when source events establish them, preserving explicit opt-in and transcript exclusion.
+## Phase 8: device history and daily summary
 
-Build/test status, Git/project status, daily summary, audio, microSD packs and configurable layouts
-follow later. No Wi-Fi host, web dashboard, camera, voice assistant, cloud account or full transcripts.
+Checkpoint: compact Today/24h/7d token and reliable quota summaries are implemented, tested natively
+and installed on P4. Atomic synthetic USB history delivery passed without changing activity counters.
+The existing backend does not store reliable session/active-time/task totals; these remain unavailable.
+History is opt-in, stays off in the user's saved preferences, and never transfers the SQLite database.
+See [device history](../docs/DEVICE_HISTORY.md) and [validation](../docs/V2_VALIDATION.md).
 
-## Current implementation checkpoint
+Reuse the existing PC SQLite history backend. Aggregate compact today/24-hour/7-day summaries;
+never transmit the full database. Show per-provider tokens, sessions, reliable active time, quota
+trends and structured completed/failed task counts only when backed by observed data.
+Add small graphs and a daily AI summary; unsupported values remain unavailable.
 
-Source fixes and regression validation are recorded in `docs/V2_VALIDATION.md`. B exposes read-only
-metrics and initialization checkpoints; P4 physical collection and application flash succeeded.
-PC diagnostics reads a capability-negotiated snapshot through the existing host. Production SD/C6
-initialization remains disabled; standalone runtime C6 detection has now succeeded.
-The standalone C6 test physically detected the coprocessor, read host/slave versions and confirmed
-controller init/enable RPC before Bluetooth was permanently excluded. No HCI/BLE work continues.
-Results and limits are documented in `docs/C6_BRINGUP.md` and `docs/P4_HARDWARE_BENCHMARKS.md`.
-C now has physical CPU/PPA rotation and normal flush-counter measurements. PPA matched every
-pixel in eight trials and was 1.625x faster for isolated full-frame rotation. Production remains on
-CPU pending partial-region, DMA/cache/scanout/soak checks. Bandwidth/buffer comparisons remain pending.
-D now has physical P4 measurements for all twelve poses/four codecs, five hash-verified trials each.
-LZ4 is selected for the experimental P4 cache; S3 and working-UI measurements remain pending.
-E has actual PSRAM allocation/hash/decode validation on P4 plus native LVGL lifetime/fallback tests
-and a generic renderer view. Production source selection, physical cached rendering and SD binding
-remain pending. See `docs/COMPANION_RUNTIME_FORMAT.md`. F has a tested bounded parser and permission state machine; firmware publication and
-transport binding are pending. G now has native-tested fixed permission controls, fail-closed visibility,
-pointer cancellation and one-shot final commit validation; production integration/physical gestures
-remain pending. H now has a bounded read-only USB metadata core, capability handshake, synchronized
-publication and an integration client using the existing serial owner. Native/Python tests cover
-sequencing, expiry and normal protocol coexistence. Regular polling now includes opted-in Codex/Claude
-lifecycle adapters, with setup/removal and neutral observer-output tests. The device now has a
-native-tested read-only agent view with fixed controls. Actual client compatibility and physical USB
-measurements remain pending. I and additional notification/timeline/history features
-are not implemented. See `docs/LIVE_PROVIDER_EVENTS.md` for honest state mappings and setup limits.
-No permission sender or Bluetooth transport is enabled.
-Physical touch/soak/fresh-PC checks from A remain explicit validation gates, not claimed successes.
+## Phase 9: versioned animation packs
 
-Primary references: [Claude Desktop Hardware Buddy](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md),
-[ESP-Hosted](https://github.com/espressif/esp-hosted-mcu),
-[PPA driver](https://docs.espressif.com/projects/esp-idf/en/v5.5.2/esp32p4/api-reference/peripherals/ppa.html).
+Separate mood from animation before public runtime packs. Support bounded multi-frame states,
+frame duration, loops/nonloops, idle/blink/work/testing/attention/success/error sequences and runtime
+selection. Keep strict schema/hash/dimension/decoded-size limits and fallback. Storage/staging,
+atomic activation and recovery stay required if runtime packs are enabled. MicroSD is optional,
+not a dependency of this phase or permission transport.
+
+## Phase 10: later developer integrations
+
+Structured build/test results and lightweight project/branch/changed-files/last-commit status.
+Safe refresh, deny/approve, stop/retry/acknowledge actions only with explicit supported integrations.
+No arbitrary terminal scraping, device Git client, remote shell or inferred test results.
+PPA remains lower priority: revisit measured end-to-end performance after runtime rendering and
+more animations/higher redraw frequency. Keep the proven CPU path meanwhile.
+
+## Validation and hardware gates
+
+P4 is JC4880P443C_I_W_Y on COM6; COM4 belongs to another project and must not be accessed.
+No physical S3 is available. Production diagnostics retain firmware/app/free partition, heap/largest
+block, PSRAM/largest block, display buffers, uptime, touch/host and future cache health.
+Preserve private settings, NVS and firmware rollback backups. Fresh executable packaging, correct
+installed-app/shortcut identity, real provider events, physical touch/USB tests, memory/latency and
+soak/fresh-PC checks are release gates. Windows signing remains unresolved; do not bypass protection.
+
+## Current next work
+
+The corrected home UI is deployed on P4, and phase 2 domain separation is implemented.
+The device enrollment core now interoperates with PC enrollment using actual native crypto;
+it requires local arming, a matching physical UI revision, PC proof and successful storage before
+acknowledging enrollment. Its real ESP crypto adapter is registered for enrollment only.
+Device key storage/readback, physical hold-to-compare UI and explicit PC connection setup are now
+connected for enrollment only. Physically validate this path, then implement separate permission
+opt-in and final permission publication/transmission gates. Keep production permissions
+disabled until exact packaged programs and physical provider/unplug tests pass.
+The user confirmed Codex hook review/trust, but real hook delivery still requires observation.
+Do not treat that confirmation or a saved marker as proof of lifecycle exchange.
+
+References: docs/USB_LIVE_TRANSPORT.md, docs/LIVE_PROVIDER_EVENTS.md, docs/LIVE_AGENT_VIEW.md,
+docs/COMPANION_RUNTIME_FORMAT.md, docs/P4_HARDWARE_BENCHMARKS.md and docs/PERMISSION_UI.md.

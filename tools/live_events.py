@@ -1,7 +1,9 @@
 """Opt-in lifecycle metadata. No transcripts, tool arguments, decisions or model calls."""
 import hashlib
+from contextlib import contextmanager
 from itertools import islice
 import math
+import os
 from pathlib import Path
 import re
 import time
@@ -11,7 +13,9 @@ from telemetry_bridge import write_record
 from usb_live import STATES
 
 SOURCES = frozenset(('codex', 'claude'))
-LEASE_SECONDS = 30
+LEASE_SECONDS = 900
+TERMINAL_SECONDS = 30
+MAX_DURATION = 604800
 
 
 def marker(directory, provider):
@@ -27,39 +31,133 @@ def marker(directory, provider):
 
 
 def lifecycle_event(provider, payload, directory, generation, now=None):
+    if provider not in SOURCES:return
+    current=marker(directory,provider)
+    if not current['enabled'] or current['generation']!=generation:return
+    with _event_lock(Path(directory),provider):
+        _lifecycle_event(provider,payload,directory,generation,now)
+
+
+@contextmanager
+def _event_lock(directory,provider):
+    """Bounded same-PC serialization; concurrent hooks cannot overwrite a newer timer."""
+    directory.mkdir(parents=True,exist_ok=True)
+    path=directory/('.live-'+provider+'.lock')
+    if path.is_symlink():raise ValueError('Invalid event lock')
+    with path.open('a+b') as stream:
+        if os.name=='nt':
+            import msvcrt
+            if path.stat().st_size==0:stream.write(b'0');stream.flush()
+            deadline=time.monotonic()+.2
+            while True:
+                try:
+                    stream.seek(0);msvcrt.locking(stream.fileno(),msvcrt.LK_NBLCK,1);break
+                except OSError:
+                    if time.monotonic()>=deadline:raise
+                    time.sleep(.01)
+            try:yield
+            finally:stream.seek(0);msvcrt.locking(stream.fileno(),msvcrt.LK_UNLCK,1)
+        else:
+            import fcntl
+            deadline=time.monotonic()+.2
+            while True:
+                try:fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB);break
+                except BlockingIOError:
+                    if time.monotonic()>=deadline:raise
+                    time.sleep(.01)
+            try:yield
+            finally:fcntl.flock(stream,fcntl.LOCK_UN)
+
+
+def _lifecycle_event(provider, payload, directory, generation, now=None):
     if provider not in SOURCES or not isinstance(payload,dict) or type(generation) is not int: return
     current = marker(directory,provider)
     if not current['enabled'] or current['generation'] != generation: return
     session,event = payload.get('session_id'),payload.get('hook_event_name')
     if not isinstance(session,str) or not 1 <= len(session) <= 200 or not isinstance(event,str): return
-    state = {'SessionStart':'IDLE','UserPromptSubmit':'UNKNOWN','PermissionRequest':'WAITING',
-             'PreToolUse':'UNKNOWN','PostToolUse':'UNKNOWN','Stop':'DONE','SessionEnd':'closed',
-             'Interrupt':'IDLE','SubagentStart':'UNKNOWN','SubagentStop':'DONE'}.get(event)
-    if event == 'StopFailure' and provider == 'claude': state = 'FAILED'
+    if provider=='claude' and event in ('TaskCreated','TaskCompleted'):
+        task=payload.get('task_id');timestamp=time.time() if now is None else now
+        if (not isinstance(task,str) or not 1<=len(task)<=200 or type(timestamp) not in (int,float)
+                or not math.isfinite(timestamp)):return
+        # These hooks fire before other handlers can veto. Never count them as confirmed success.
+        key=hashlib.sha256(f'task:{len(session)}:{session}{task}'.encode()).hexdigest()
+        folder=Path(directory)/'task-events'/provider/str(generation)
+        write_record(folder/(key+'.json'),dict(schema=1,generation=generation,received_at=timestamp,
+            event='TASK_CREATE_REQUESTED' if event=='TaskCreated' else 'TASK_COMPLETE_REQUESTED'))
+        paths=[p for p in islice(folder.glob('*.json'),MAX_SESSIONS*2)
+               if re.fullmatch(r'[0-9a-f]{64}\.json',p.name) and not p.is_symlink()]
+        paths.sort(key=lambda p:p.stat().st_mtime,reverse=True)
+        for path in paths[MAX_SESSIONS:]:path.unlink()
+        return
+    state = {'SessionStart':'IDLE','UserPromptSubmit':'WORKING','PermissionRequest':'WAITING',
+             'PreToolUse':'WORKING','PostToolUse':'WORKING','Stop':'COMPLETED','SessionEnd':'closed',
+             'Interrupt':'IDLE','SubagentStart':'WORKING','SubagentStop':'COMPLETED'}.get(event)
+    if provider == 'claude':
+        state = {'StopFailure':'ERROR','PostToolUseFailure':'ERROR',
+                 'PermissionDenied':'NEEDS_ATTENTION','TeammateIdle':'IDLE'}.get(event,state)
+        if event == 'PostToolUseFailure' and payload.get('is_interrupt') is True: state='IDLE'
     if event == 'Notification' and provider == 'claude':
         state = 'WAITING' if payload.get('notification_type') in ('permission_prompt','elicitation_dialog','agent_needs_input') else None
     if event == 'PreToolUse':
         tool=payload.get('tool_name')
-        if tool in (('apply_patch',) if provider=='codex' else ('Edit','Write','MultiEdit')): state='EDITING'
-        if provider=='claude' and tool in ('Grep','Glob','WebSearch'): state='SEARCHING'
+        if tool in (('apply_patch',) if provider=='codex' else ('Edit','MultiEdit')): state='EDITING'
+        if provider=='claude':
+            state={'Write':'WRITING','Read':'READING','Grep':'SEARCHING','Glob':'SEARCHING',
+                   'WebSearch':'SEARCHING','WebFetch':'READING','Bash':'RUNNING','PowerShell':'RUNNING'}.get(tool,state)
     if state is None: return
     identity='session:'+session
-    if event in ('SubagentStart','SubagentStop'):
-        agent=payload.get('agent_id')
+    agent=payload.get('agent_id')
+    if event in ('SubagentStart','SubagentStop') or (provider=='claude' and agent is not None):
         if not isinstance(agent,str) or not 1 <= len(agent) <= 200: return
         # Length prefixes avoid composite-ID collisions; no raw identifiers are persisted.
         identity=f'agent:{len(session)}:{session}{agent}'
+    if provider=='claude' and event=='TeammateIdle' and agent is None:
+        teammate=payload.get('teammate_name')
+        if not isinstance(teammate,str) or not 1<=len(teammate)<=200:return
+        identity=f'teammate:{len(session)}:{session}{teammate}'
     timestamp=time.time() if now is None else now
     if type(timestamp) not in (int,float) or not math.isfinite(timestamp): return
     folder=Path(directory)/'live'/provider/str(generation)
     key=hashlib.sha256(identity.encode('utf-8')).hexdigest()
-    record=dict(schema=1,state=state,received_at=timestamp,generation=generation)
-    write_record(folder/(key+'.json'),record)
+    path=folder/(key+'.json')
+    previous=_read_record(path,generation)
+    if previous and previous['received_at']>timestamp:return
+    record=dict(schema=2,state=state,received_at=timestamp,generation=generation)
+    if event in ('UserPromptSubmit','SubagentStart'):
+        record['started_at']=timestamp
+    elif previous and event!='SessionStart' and 'started_at' in previous:
+        start=previous['started_at']
+        if 0<=timestamp-start<=MAX_DURATION:record['started_at']=start
+    if 'started_at' in record:
+        if event in ('Stop','SubagentStop','StopFailure','Interrupt','SessionEnd','TeammateIdle'):
+            record['finished_at']=timestamp
+        elif previous and 'finished_at' in previous and event not in ('UserPromptSubmit','SubagentStart'):
+            # No new start was observed: never resume an old completed timer on tool metadata.
+            record.pop('started_at',None)
+    write_record(path,record)
     # Bounded scan, even if the local directory was filled with unrelated files.
     paths=[path for path in islice(folder.glob('*.json'),MAX_SESSIONS*2)
            if re.fullmatch(r'[0-9a-f]{64}\.json',path.name) and not path.is_symlink()]
     paths.sort(key=lambda path:path.stat().st_mtime,reverse=True)
     for path in paths[MAX_SESSIONS:]: path.unlink()
+
+
+def _read_record(path,generation):
+    try:
+        value=read_local_json(path,1024)
+        required={'schema','state','received_at','generation'}
+        if (not isinstance(value,dict) or not required<=set(value) or
+                set(value)-required-{'started_at','finished_at'} or
+                type(value['schema']) is not int or value['schema'] not in (1,2) or
+                type(value['generation']) is not int or value['generation']!=generation or
+                not isinstance(value['state'],str) or value['state'] not in STATES|{'closed'}):return None
+        for key in ('received_at','started_at','finished_at'):
+            if key in value and (type(value[key]) not in (int,float) or not math.isfinite(value[key])):return None
+        if 'finished_at' in value and 'started_at' not in value:return None
+        if 'started_at' in value and not 0<=value['received_at']-value['started_at']<=MAX_DURATION:return None
+        if 'finished_at' in value and not value['started_at']<=value['finished_at']<=value['received_at']:return None
+        return value
+    except (ValueError,OSError,TypeError,RecursionError):return None
 
 
 def live_agents(directory, providers, now=None):
@@ -75,14 +173,17 @@ def live_agents(directory, providers, now=None):
         for path in islice(folder.glob('*.json'),MAX_SESSIONS*2):
             if not re.fullmatch(r'[0-9a-f]{64}\.json',path.name) or path.is_symlink(): continue
             try:
-                value=read_local_json(path,1024)
-                if (not isinstance(value,dict) or set(value)!={'schema','state','received_at','generation'} or
-                        type(value['schema']) is not int or value['schema']!=1 or
-                        type(value['generation']) is not int or value['generation']!=current['generation'] or
-                        not isinstance(value['state'],str) or value['state'] not in STATES or
-                        type(value['received_at']) not in (int,float) or not math.isfinite(value['received_at']) or
-                        not 0 <= timestamp-value['received_at'] < LEASE_SECONDS): continue
-                rows.append((value['received_at'],dict(provider=provider,id=path.stem,state=value['state'])))
+                value=_read_record(path,current['generation'])
+                if not value or value['state'] not in STATES:continue
+                age=timestamp-value['received_at']
+                limit=TERMINAL_SECONDS if value['state'] in ('COMPLETED','DONE','FAILED','ERROR','IDLE') else LEASE_SECONDS
+                if not 0<=age<limit:continue
+                row=dict(provider=provider,id=path.stem,state=value['state'],observedAgeSeconds=int(age))
+                if 'started_at' in value:
+                    end=value.get('finished_at',timestamp)
+                    elapsed=end-value['started_at']
+                    if 0<=elapsed<=MAX_DURATION:row['elapsedSeconds']=int(elapsed)
+                rows.append((value['received_at'],row))
             except (OSError,ValueError,TypeError,RecursionError): continue
-    rows.sort(key=lambda row:(row[1]['state'] not in ('WAITING','FAILED'),-row[0],row[1]['provider'],row[1]['id']))
+    rows.sort(key=lambda row:(row[1]['state'] not in ('WAITING','FAILED','ERROR','NEEDS_ATTENTION'),-row[0],row[1]['provider'],row[1]['id']))
     return [row[1] for row in rows[:8]]

@@ -57,11 +57,21 @@ def claude_event(payload, directory, now=None, generation=None):
     state = {'SessionStart':'idle', 'UserPromptSubmit':'running', 'PreToolUse':'running',
              'PostToolUse':'running', 'PermissionRequest':'waiting', 'Stop':'completed',
              'StopFailure':'error', 'SessionEnd':'closed'}.get(event)
+    state={'PostToolUseFailure':'error','PermissionDenied':'waiting','TeammateIdle':'idle',
+           'SubagentStart':'running','SubagentStop':'completed'}.get(event,state)
+    if event=='PostToolUseFailure' and payload.get('is_interrupt') is True:state='idle'
     if event == 'Notification':
         kind = payload.get('notification_type')
         state = 'waiting' if kind in ('permission_prompt','elicitation_dialog','agent_needs_input') else None
     if state is not None:
-        ingest_event('claude', {'session_id':payload.get('session_id'), 'state':state}, directory, now, generation)
+        identifier=payload.get('session_id')
+        child=payload.get('agent_id')
+        if child is not None or event in ('SubagentStart','SubagentStop','TeammateIdle'):
+            if child is None and event=='TeammateIdle':child=payload.get('teammate_name')
+            if (not isinstance(identifier,str) or not 1<=len(identifier)<=200 or
+                    not isinstance(child,str) or not 1<=len(child)<=200):return
+            identifier=hashlib.sha256(f'agent:{len(identifier)}:{identifier}{child}'.encode()).hexdigest()
+        ingest_event('claude', {'session_id':identifier, 'state':state}, directory, now, generation)
 
 
 def summary(directory, providers, now=None):

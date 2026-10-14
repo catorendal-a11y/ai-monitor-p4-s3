@@ -29,7 +29,7 @@ through state and text changes, including while pressed.
 The interaction authority is `PermissionController`, independent of LVGL, parser and transport.
 It must outlive its view; closing/recreating widgets must not reset the consumed-request ledger.
 Only trusted local connection/security/settings/display state can create `PermissionContext`.
-All flags default closed. JSON cannot assert pairing, opt-in or secure connection.
+All flags default closed. JSON cannot assert host trust, opt-in or an authenticated connection.
 
 The future adapter must follow this sequence:
 
@@ -47,7 +47,7 @@ The future adapter must follow this sequence:
    ambiguous delivery enters ERROR and is never retried as an approval. No delayed queue may bypass
    this final gate or use stale visibility/security values.
 
-An omitted prompt, successful BLE write or notification is not an acknowledgement. The official
+An omitted prompt or successful transport write is not an acknowledgement. The archived
 [Hardware Buddy reference](https://github.com/anthropics/claude-desktop-buddy/blob/main/REFERENCE.md)
 does not define a correlated permission ACK. ACKNOWLEDGED remains reserved for a documented trusted
 acknowledgement source; the current prototype never invents one.
@@ -68,3 +68,13 @@ A production adapter requires independently verified host trust, a documented pr
 interface, explicit local opt-in, synchronized publication, bounded TX/RX and physical disconnect
 tests. USB attachment alone cannot assert security. See [USB-only integration](USB_LIVE_TRANSPORT.md).
 The default remains no live permission transmission.
+
+The updated production plan uses a separate AI-Monitor-Permission helper for Claude Code's
+PermissionRequest hook, same-user local IPC and the existing USB host. AI-Monitor-Events must never
+gain permission authority. Generic interaction/request/decision types and trustedChannel context
+now replace the prototype's ClaudeLiveSnapshot/security dependency in the permission UI.
+Keep every tested physical hold, cancellation, visibility and single-use final commit check.
+The separate helper, same-user IPC and host broker/service have synthetic tests, including actual
+local Windows pipe roundtrips. Authenticated USB integration and explicit opt-in setup remain
+pending; the host does not start the service. See [implementation status](USB_PERMISSION_HELPER.md)
+and [phase 7](../plans/COMPANION_V2.md).

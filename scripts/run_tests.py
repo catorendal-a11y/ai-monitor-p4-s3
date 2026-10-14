@@ -38,6 +38,18 @@ def main():
                         "-I", str(json_include), str(ROOT / "tests/test_protocol.cpp"), "-o", str(binary)], cwd=ROOT, check=True)
         subprocess.run([str(binary)], cwd=ROOT, check=True)
         settings_binary = Path(directory) / ("settings-tests.exe" if os.name == "nt" else "settings-tests")
+        lease_binary = Path(directory) / ("enrollment-lease-tests.exe" if os.name == "nt" else "enrollment-lease-tests")
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
+                        str(ROOT / "tests/test_enrollment_lease.cpp"), "-o", str(lease_binary)], cwd=ROOT, check=True)
+        subprocess.run([str(lease_binary)], cwd=ROOT, check=True)
+        delivery_binary = Path(directory) / ("permission-delivery-tests.exe" if os.name == "nt" else "permission-delivery-tests")
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
+                        str(ROOT / "tests/test_permission_delivery.cpp"), "-o", str(delivery_binary)], cwd=ROOT, check=True)
+        subprocess.run([str(delivery_binary)], cwd=ROOT, check=True)
+        history_binary=Path(directory)/("history-tests.exe" if os.name=="nt" else "history-tests")
+        subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
+                        "-I",str(json_include),str(ROOT/"tests/test_history_usb.cpp"),"-o",str(history_binary)],cwd=ROOT,check=True)
+        subprocess.run([str(history_binary)],cwd=ROOT,check=True)
         subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
                         "-I", str(ROOT / "tests/native"), str(ROOT / "tests/test_settings.cpp"), "-o", str(settings_binary)],
                        cwd=ROOT, check=True)

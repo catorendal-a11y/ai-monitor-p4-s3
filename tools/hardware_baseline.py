@@ -83,6 +83,18 @@ def validate_hardware(data,board_id):
     if not isinstance(ppa,dict) or type(ppa.get('supported')) is not bool or ppa.get('active') is not False:
         raise ValueError('Unverified graphics acceleration')
     result['ppa']=dict(supported=ppa['supported'],active=False)
+    if 'companionCache' in data:
+        cache=data['companionCache']
+        if (not isinstance(cache,dict) or type(cache.get('enabled')) is not bool or
+                type(cache.get('active')) is not bool): raise ValueError('Invalid companion cache state')
+        values={key:number(cache,key) for key in
+                ('allocatedBytes','decodedFrames','failures','lastSwitchUs','maxSwitchUs')}
+        if (values['allocatedBytes']>2*430*284*3+128 or
+                values['lastSwitchUs']>values['maxSwitchUs'] or
+                (cache['active'] and not cache['enabled']) or
+                (not cache['enabled'] and values['allocatedBytes'])):
+            raise ValueError('Inconsistent companion cache metrics')
+        result['companionCache']=dict(values,enabled=cache['enabled'],active=cache['active'])
     return result
 
 

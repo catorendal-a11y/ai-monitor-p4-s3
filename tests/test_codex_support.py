@@ -20,6 +20,16 @@ class RetainedBuffer(io.BytesIO):
 
 
 class CodexOnboardingTests(unittest.TestCase):
+    def test_hook_inventory_is_a_bounded_read_only_rpc_without_thread_or_account_requests(self):
+        incoming=[{'id':1,'result':{}},{'id':2,'result':{'data':[]}}]
+        process=Mock(pid=123456);process.stdin=RetainedBuffer();process.stdout=RetainedBuffer(b''.join(json.dumps(v).encode()+b'\n' for v in incoming));process.poll.side_effect=[None,None,0]
+        with patch.object(support,'start_child',return_value=process),patch('process_runtime.psutil.Process',return_value=Mock(children=Mock(return_value=[]))):
+            self.assertEqual(support.read_hook_status(['official-cli'],Path.cwd()),{'data':[]})
+        messages=[json.loads(line) for line in process.stdin.getvalue().splitlines()]
+        self.assertEqual([m['method'] for m in messages],['initialize','initialized','hooks/list'])
+        self.assertEqual(messages[-1]['params'],{'cwds':[str(Path.cwd())]})
+        process.terminate.assert_called_once()
+        with self.assertRaises(ValueError):support.read_hook_status(['official-cli'],'relative')
     @unittest.skipUnless(os.name == 'nt', 'Windows executable resolution')
     def test_posix_npm_shim_does_not_hide_native_windows_installation(self):
         with tempfile.TemporaryDirectory() as directory:

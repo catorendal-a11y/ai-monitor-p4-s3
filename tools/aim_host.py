@@ -501,9 +501,24 @@ class Panel:
         self.hardware_pending = False
         self.live_client = None
         self.live_retry_at = 0
+        self.permission_runtime = None  # Explicit validated setup only; never auto-enable from USB.
+
+    def attach_permission_runtime(self, runtime):
+        from permission_runtime import PermissionRuntime
+        if not isinstance(runtime, PermissionRuntime):
+            raise ValueError('A locally validated permission runtime is required')
+        previous = getattr(self, 'permission_runtime', None)
+        if previous is not None and previous is not runtime:
+            previous.close()
+        self.permission_runtime = runtime
+        return runtime.attach(self)
 
     def close(self):
-        self.ser.close()
+        try:
+            runtime = getattr(self, 'permission_runtime', None)
+            if runtime is not None: runtime.close()
+        finally:
+            self.ser.close()
 
     def refresh_status(self, request_id, state, message):
         self.send_line(json.dumps({"cmd": "refresh_status", "requestId": request_id, "state": state, "message": message}))
@@ -518,6 +533,9 @@ class Panel:
             self.send_line(json.dumps({"cmd": "host_activity", "state": state, "message": message}))
 
     def handle_event(self, message):
+        runtime = getattr(self, 'permission_runtime', None)
+        if runtime is not None and runtime.handle_event(message):
+            return True
         if message.get('type') == 'hardware':
             health = getattr(self, 'health', None)
             if not getattr(self, 'hardware_pending', False) or self.expected_board is None or not isinstance(health, HostStatus):
@@ -595,6 +613,18 @@ class Panel:
             status.update('connected', self.name)
 
     def report_tokens(self):
+        runtime = getattr(self, 'permission_runtime', None)
+        if runtime is not None: runtime.pump()
+        sampler=getattr(self,'history_sampler',None)
+        if sampler is not None and type(self.info.get('historyProtocol')) is int and self.info['historyProtocol']==1:
+            summary=sampler.take()
+            if summary is not None:
+                from usb_history import UsbHistoryClient
+                try:
+                    if getattr(self,'history_client',None) is None:self.history_client=UsbHistoryClient(self)
+                    self.history_client.send(summary)
+                except (ValueError,TimeoutError,RuntimeError):self.history_client=None
+                # Actual serial errors retain the normal reconnect path; optional history cannot block quota.
         if self.tokens_supported and isinstance(self.token_reporter, (TokenReporter, TokenSampler)):
             message = self.token_reporter.poll()
             if message is not None:
@@ -913,6 +943,8 @@ def _run_loop(cfg, interval, zai_key, views):
     health.update('starting')
     from usage_history import HistoryRecorder
     history = HistoryRecorder(HERE / 'activity', cfg.get('usage_history',False))
+    from device_history import HistorySampler
+    history_sampler=HistorySampler(HERE/'activity',views,cfg.get('usage_history',False))
     tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
@@ -930,6 +962,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 if not changed_views:
                     LOG('No providers selected; stopping host. Open First-time setup.')
                     return
+                history_sampler.configure(cfg.get('usage_history',False),changed_views)
                 if changed_views != views:
                     tokens.configure(changed_views)
                 retries.interval = interval
@@ -963,6 +996,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.config_watcher = watcher
                     panel.token_reporter = tokens
                     panel.history = history
+                    panel.history_sampler=history_sampler
                     health.data.pop('hardware', None)
                     health.data.pop('hardware_at', None)
                     if panel.info.get('hardwareDiagnostics') is True:
@@ -1010,6 +1044,7 @@ def _run_loop(cfg, interval, zai_key, views):
         health.update('stopped')
         tokens.close()
         history.close()
+        history_sampler.close()
         fetcher.close()
         if panel is not None:
             panel.close()

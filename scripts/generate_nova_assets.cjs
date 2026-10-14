@@ -11,10 +11,16 @@ const header = ['#pragma once', '#include <lvgl.h>', 'namespace nova_assets {'];
 const cpp = ['// Generated from assets/nova/*.svg by scripts/generate_nova_assets.cjs.', '#include "nova_assets.h"', 'namespace nova_assets {'];
 function emit(name, pixels, width, height, format, stride) {
   header.push(`extern const lv_image_dsc_t ${name};`);
+  const compressedPose = ['done','low','critical','sleep','blink','orbit_done','orbit_low','orbit_critical','orbit_sleep','orbit_blink'].includes(name);
+  if (compressedPose) cpp.push('#if !defined(CONFIG_IDF_TARGET_ESP32P4)');
   cpp.push(`alignas(4) static const uint8_t ${name}_pixels[] = {`);
   for (let i = 0; i < pixels.length; i += 24)
     cpp.push('  ' + [...pixels.subarray(i, i + 24)].map(value => '0x' + value.toString(16).padStart(2, '0')).join(',') + ',');
   cpp.push('};', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${name}_pixels), ${name}_pixels, nullptr, nullptr };`);
+  if (compressedPose) {
+    const fallback = name.startsWith('orbit_') ? 'orbit_work' : 'work';
+    cpp.push('#else', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${fallback}_pixels), ${fallback}_pixels, nullptr, nullptr };`, '#endif');
+  }
 }
 (async () => {
   const crops = {};

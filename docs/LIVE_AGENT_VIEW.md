@@ -1,12 +1,20 @@
 # Live agent view
 
-Open **AGENTS** from the companion screen. This read-only view consumes the separate USB live
+Open **MENU > AGENTS**. This read-only view consumes the separate USB live
 snapshot; it does not change quotas, issue provider commands or approve tools. Four fixed rows per
 page show the provider, shortened opaque session ID and last reported state. At most eight entries
 are published; this is not the provider's total agent count. WAITING and FAILED use text and color.
 
-COMPANION, NEXT PAGE and SETTINGS stay in fixed positions. NEXT PAGE is disabled when there is
-only one page. A new transport epoch or a reduced entry count returns safely to page one. Hidden rows
+Selected providers without recent live sessions now have separately labelled provider-status rows,
+so Codex/ZCode do not disappear just because hooks are absent. These rows come from quota/token
+source availability and never create live agents. Codex/Claude show NO RECENT EVENTS; other providers
+show ACTIVITY ONLY. A readable token counter does not establish a working phase. Live sessions and
+provider statuses are counted separately; pagination can cover up to eight of each.
+
+![Native LVGL agent view with synthetic data](images/device-agents-readable.png)
+
+MENU, HOME and NEXT PAGE stay in fixed positions. NEXT PAGE is hidden when there is
+only one page; other targets do not move. A new transport epoch or a reduced entry count returns safely to page one. Hidden rows
 have their text cleared. After thirty seconds without a valid USB update, entries disappear and
 setup/reconnect guidance is shown. UNKNOWN preserves missing phase information. DONE means a turn
 stopped; it does not prove that a task or its tests succeeded.
@@ -24,3 +32,15 @@ shrinking pages while pressed, clock rollover,
 epoch changes, theme updates, expiry/disconnect clearing and returning to the companion screen.
 Physical USB/client exchange, installation of current executables and P4 touch validation remain
 required before release. Physical S3 validation remains unavailable.
+
+## Observed timers and generic phases
+
+Metadata capability 2 adds WORKING, READING, WRITING, RUNNING, NEEDS_ATTENTION, ERROR and
+COMPLETED to the generic agent state model. Each row shows an observed turn/subagent duration
+when a start exists, plus explicit last-event age. Unknown starts are labelled; navigation is fixed.
+Older firmware receives downgraded three-field metadata. NOVA reacts only to recent explicit
+client events, and provider session counts are not counted twice.
+
+![Synthetic native LVGL session timer](images/live-agent-session-timer-native-preview.png)
+
+This is a synthetic native preview, not a physical screenshot or proof of real Codex delivery.

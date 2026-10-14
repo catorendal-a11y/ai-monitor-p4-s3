@@ -4,7 +4,7 @@
 //   button; two cards with provider-colored spine, letter badge, vendor meta,
 //   "REMAINING" column, window meta rows, 30 px percentages with LEFT unit,
 //   pill bars with light end-knob; system bar footer.
-// Three-row cards adapt their spacing; additional providers use a paged 2x2 grid.
+// Always show two full-size provider cards; extra providers use pages rather than tiny grids.
 
 #include "dashboard.h"
 
@@ -28,6 +28,7 @@
 #include "ui_nova.h"
 #include "ui/nova_assets.h"
 #include "ui_settings.h"
+#include "ui_menu.h"
 
 // ───────────────────────────────────────────────────────────────────────────────
 // V2 PALETTE (from the SVG)
@@ -58,16 +59,15 @@ static const uint32_t& C_GREEN = ui_theme::accent;
 static const uint32_t C_RED = 0xFF5252;
 static const uint32_t C_AMBER = 0xFFAA00;
 
-#define F_EYEBROW &lv_font_montserrat_12
-#define F_META &lv_font_montserrat_12
-#define F_ROWLABEL &lv_font_montserrat_18
+#define F_EYEBROW &lv_font_montserrat_18
+#define F_META &lv_font_montserrat_16
+#define F_ROWLABEL &lv_font_montserrat_22
 #define F_PROVIDER &lv_font_montserrat_26
 #define F_TIME &lv_font_montserrat_26
 #define F_PCT &lv_font_montserrat_30
 #define F_BADGE &lv_font_montserrat_22
 
 static constexpr size_t kBigCards = 2;       // side-by-side (<= 2 providers)
-static constexpr size_t kCompactCards = 4;   // 2x2 fallback (>= 3 providers)
 static constexpr uint32_t STALE_MS = 300000;
 
 // Per-provider v2 styling: brand base, light knob tint, badge colors, vendor.
@@ -149,7 +149,6 @@ struct HeaderWidgets {
 
 static HeaderWidgets hdr;
 static CardWidgets big[kBigCards];
-static CardWidgets compact[kCompactCards];
 static lv_obj_t* footDot = nullptr;
 static lv_obj_t* footStrong = nullptr;
 static lv_obj_t* footFrames = nullptr;
@@ -157,12 +156,10 @@ static lv_obj_t* footSync = nullptr;
 static lv_obj_t* footServices = nullptr;
 static lv_obj_t* hintLabel = nullptr;
 static lv_obj_t* dashboardScreen = nullptr;
-static lv_obj_t* novaButton = nullptr;
-static void nova_open_cb(lv_event_t*) { ui_nova_show(); }
 
 static void settings_open_cb(lv_event_t* e) {
   (void)e;
-  ui_settings_show();
+  ui_menu_show();
 }
 
 bool dashboard_is_active() { return dashboardScreen && lv_screen_active() == dashboardScreen; }
@@ -195,7 +192,6 @@ struct CardCaches {
 };
 
 static CardCaches bigCache[kBigCards];
-static CardCaches compactCache[kCompactCards];
 static char liveCache[12] = {0};
 static char clockCache[8] = {0};
 static uint32_t liveDotColor = 0;
@@ -207,13 +203,11 @@ static char hintCache[96] = {0};
 static uint32_t footDotColor = 0;
 static lv_obj_t* pageButton = nullptr;
 static lv_obj_t* pageLabel = nullptr;
-static lv_obj_t* refreshButton = nullptr;
-static lv_obj_t* refreshLabel = nullptr;
 static uint8_t currentPage = 0, pageCount = 1;
 static uint32_t lastPageMs = 0, viewRevision = UINT32_MAX;
 // bar value/color cache slots: stable index per (layout, card, row)
-static float g_barValue[kBigCards + kCompactCards][aim::kMaxRows];
-static uint32_t g_barColor[kBigCards + kCompactCards][aim::kMaxRows];
+static float g_barValue[kBigCards][aim::kMaxRows];
+static uint32_t g_barColor[kBigCards][aim::kMaxRows];
 
 static void set_label_cached(lv_obj_t* lbl, char* cache, size_t cap, const char* text) {
   if (!lbl || (strncmp(cache, text, cap) == 0 && strcmp(lv_label_get_text(lbl), cache) == 0)) return;
@@ -311,7 +305,7 @@ static void window_label(uint32_t windowMinutes, char* out, size_t cap) {
 static void build_row(CardWidgets& c, size_t r, lv_coord_t yTop, bool withDivider) {
   RowWidgets& w = c.rows[r];
   if (withDivider) w.divider = make_line(c.card, 18, yTop - 17, 338, C_LINE_SOFT);
-  w.winMeta = make_label(c.card, 18, yTop, 220, &lv_font_montserrat_14, C_META, LV_TEXT_ALIGN_LEFT, "");
+  w.winMeta = make_label(c.card, 18, yTop, 220, &lv_font_montserrat_18, C_META, LV_TEXT_ALIGN_LEFT, "");
   lv_obj_set_style_text_letter_space(w.winMeta, 1, 0);
   w.name = make_label(c.card, 18, yTop + 20, 240, F_ROWLABEL, C_ROWLABEL, LV_TEXT_ALIGN_LEFT, "");
   w.pct = make_label(c.card, 236, yTop + 5, 110, F_PCT, C_PCT, LV_TEXT_ALIGN_RIGHT, "--");
@@ -330,7 +324,7 @@ static void build_row(CardWidgets& c, size_t r, lv_coord_t yTop, bool withDivide
   lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_INDICATOR);
   lv_obj_set_style_radius(w.bar, 5, LV_PART_INDICATOR);
   w.knob = make_dot(w.bar, 314, 1, 8, C_GREEN);  // child of the bar; x set per value
-  w.reset = make_label(c.card, 18, yTop + 82, 330, &lv_font_montserrat_14, C_RESET, LV_TEXT_ALIGN_LEFT, "");
+  w.reset = make_label(c.card, 18, yTop + 82, 330, &lv_font_montserrat_18, C_RESET, LV_TEXT_ALIGN_LEFT, "");
 }
 
 static CardWidgets build_big_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) {
@@ -379,63 +373,6 @@ static CardWidgets build_big_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) 
   return c;
 }
 
-static CardWidgets build_compact_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) {
-  CardWidgets c;
-  c.compact = true;
-  c.card = lv_obj_create(parent);
-  lv_obj_set_size(c.card, 372, 150);
-  lv_obj_set_pos(c.card, x, y);
-  lv_obj_set_style_bg_color(c.card, lv_color_hex(C_CARD), 0);
-  lv_obj_set_style_bg_opa(c.card, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_color(c.card, lv_color_hex(C_LINE), 0);
-  lv_obj_set_style_border_width(c.card, 1, 0);
-  lv_obj_set_style_radius(c.card, 18, 0);
-  lv_obj_set_style_shadow_width(c.card, 0, 0);
-  lv_obj_set_style_pad_all(c.card, 0, 0);
-  lv_obj_set_scrollable(c.card, false);
-  lv_obj_set_clickable(c.card, false);
-  lv_obj_set_hidden(c.card, true);
-
-  c.spine = make_dot(c.card, 0, 0, 4, C_GREEN);
-  lv_obj_set_size(c.spine, 4, 150);
-  lv_obj_set_style_radius(c.spine, 2, 0);
-
-  c.badge = lv_obj_create(c.card); lv_obj_set_pos(c.badge, 14, 10); lv_obj_set_size(c.badge, 28, 28);
-  lv_obj_set_style_pad_all(c.badge, 0, 0); lv_obj_set_style_border_width(c.badge, 0, 0);
-  lv_obj_set_scrollable(c.badge, false); lv_obj_set_clickable(c.badge, false);
-  c.badgeLogo = lv_image_create(c.badge); lv_obj_set_pos(c.badgeLogo, 2, 2); lv_obj_set_clickable(c.badgeLogo, false);
-  c.badgeLetter = make_label(c.badge, 0, 0, 26, F_META, C_NAME, LV_TEXT_ALIGN_CENTER, "-"); lv_obj_center(c.badgeLetter);
-  c.name = make_label(c.card, 48, 12, 192, F_PROVIDER, C_NAME, LV_TEXT_ALIGN_LEFT, "-");
-  c.vendor = make_label(c.card, 16, 44, 240, F_META, C_META, LV_TEXT_ALIGN_LEFT, "");
-  lv_obj_set_style_text_letter_space(c.vendor, 1, 0);
-  c.remaining = make_label(c.card, 240, 14, 106, F_META, C_META, LV_TEXT_ALIGN_RIGHT, "REMAINING");
-  lv_obj_set_style_text_letter_space(c.remaining, 1, 0);
-
-  static constexpr lv_coord_t ROWS_TOP = 64;
-  static constexpr lv_coord_t PITCH = 30;
-  for (size_t r = 0; r < aim::kMaxRows; ++r) {
-    RowWidgets& w = c.rows[r];
-    const lv_coord_t ry = (lv_coord_t)(ROWS_TOP + r * PITCH);
-    w.winMeta = nullptr;  // no room in compact rows
-    w.name = make_label(c.card, 16, ry, 96, F_META, C_ROWLABEL, LV_TEXT_ALIGN_LEFT, "");
-    w.pct = make_label(c.card, 260, ry - 1, 86, &lv_font_montserrat_16, C_PCT, LV_TEXT_ALIGN_RIGHT, "--");
-    w.unit = nullptr;
-    w.bar = lv_bar_create(c.card);
-    lv_obj_set_size(w.bar, 330, 5);
-    lv_obj_set_pos(w.bar, 16, ry + 20);
-    lv_bar_set_range(w.bar, 0, 100);
-    lv_obj_set_style_bg_color(w.bar, lv_color_hex(C_BAR_TRACK), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_MAIN);
-    lv_obj_set_style_border_width(w.bar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(w.bar, 4, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(w.bar, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(w.bar, 4, LV_PART_INDICATOR);
-    w.knob = nullptr;
-    w.reset = make_label(c.card, 116, ry, 136, F_META, C_RESET, LV_TEXT_ALIGN_RIGHT, "");
-  }
-  return c;
-}
-
 // ───────────────────────────────────────────────────────────────────────────────
 // BUILD
 // ───────────────────────────────────────────────────────────────────────────────
@@ -456,11 +393,6 @@ static void open_card_cb(lv_event_t* event) {
     if (strcmp(key, card->providerKey) == 0) { ui_details_show(static_cast<uint8_t>(i)); return; }
   }
 }
-static void refresh_cb(lv_event_t*) {
-  const auto snapshot = aim::read();
-  if (snapshot.hostPresent && snapshot.manualRefreshSupported && !refresh_busy(snapshot.refreshState)) aim::request_refresh();
-}
-
 void dashboard_init() {
   lv_obj_t* scr = lv_screen_active();
   ui_theme::watch(scr);
@@ -490,13 +422,6 @@ void dashboard_init() {
   hdr.eyebrow = make_label(header, 24, 13, 300, F_EYEBROW, C_EYEBROW, LV_TEXT_ALIGN_LEFT, boardCaption);
   lv_obj_set_style_text_letter_space(hdr.eyebrow, 2, 0);
   hdr.title = make_label(header, 24, 31, 306, F_PROVIDER, C_TITLE, LV_TEXT_ALIGN_LEFT, "Usage Dashboard");
-  novaButton = lv_btn_create(header); lv_obj_set_pos(novaButton, 344, 14); lv_obj_set_size(novaButton, 104, 48);
-  lv_obj_set_style_bg_color(novaButton, lv_color_hex(ui_theme::button), 0);
-  lv_obj_set_style_shadow_width(novaButton, 0, 0); lv_obj_set_style_radius(novaButton, 12, 0);
-  lv_obj_add_event_cb(novaButton, nova_open_cb, LV_EVENT_CLICKED, nullptr);
-  ui_interaction::keep_target(novaButton);
-  auto* novaCaption = make_label(novaButton, 0, 0, 90, F_META, C_TITLE, LV_TEXT_ALIGN_CENTER, "NOVA"); lv_obj_center(novaCaption);
-
   // live dot + halo + label (SVG: dot center (475,30) r4, halo r8)
   hdr.halo = make_dot(header, 467, 22, 16, C_GREEN);
   lv_obj_set_style_bg_opa(hdr.halo, LV_OPA_20, 0);
@@ -508,8 +433,8 @@ void dashboard_init() {
 
   // SET button with gear icon (684,18,92,42)
   lv_obj_t* setBtn = lv_btn_create(header);
-  lv_obj_set_size(setBtn, 104, 48);
-  lv_obj_set_pos(setBtn, 672, 14);
+  lv_obj_set_size(setBtn, 120, 48);
+  lv_obj_set_pos(setBtn, 656, 14);
   lv_obj_set_style_bg_color(setBtn, lv_color_hex(C_SET_BG), 0);
   lv_obj_set_style_bg_opa(setBtn, LV_OPA_COVER, 0);
   lv_obj_set_style_border_color(setBtn, lv_color_hex(C_SET_BORDER), 0);
@@ -521,25 +446,8 @@ void dashboard_init() {
   lv_obj_add_event_cb(setBtn, settings_open_cb, LV_EVENT_CLICKED, nullptr);
   ui_interaction::keep_target(setBtn);
 
-  // gear: outline ring + hub + 8 spokes (icon center at (20,20) in the button)
-  lv_obj_t* gearRing = make_dot(setBtn, 13, 13, 14, C_SET_BG);
-  lv_obj_set_style_bg_opa(gearRing, LV_OPA_TRANSP, 0);
-  lv_obj_set_style_border_color(gearRing, lv_color_hex(C_GEAR), 0);
-  lv_obj_set_style_border_width(gearRing, 2, 0);
-  make_dot(setBtn, 17, 17, 6, C_GEAR);
-  static const lv_point_precise_t spokes[8][2] = {
-      {{20, 9}, {20, 13}},    {{20, 27}, {20, 31}},   {{9, 20}, {13, 20}},    {{27, 20}, {31, 20}},
-      {{12, 12}, {15, 15}},   {{28, 28}, {25, 25}},   {{28, 12}, {25, 15}},   {{12, 28}, {15, 25}},
-  };
-  for (size_t i = 0; i < 8; ++i) {
-    lv_obj_t* ln = lv_line_create(setBtn);
-    lv_line_set_points(ln, spokes[i], 2);
-    lv_obj_set_style_line_color(ln, lv_color_hex(C_GEAR), 0);
-    lv_obj_set_style_line_width(ln, 2, 0);
-    lv_obj_set_pos(ln, 0, 0);
-  }
-  lv_obj_t* setLbl = make_label(setBtn, 38, 15, 44, F_META, C_SET_TXT, LV_TEXT_ALIGN_CENTER, "SET");
-  lv_obj_set_style_text_letter_space(setLbl, 1, 0);
+  auto* setLbl = make_label(setBtn, 0, 0, 96, &lv_font_montserrat_22, C_SET_TXT, LV_TEXT_ALIGN_CENTER, "MENU");
+  lv_obj_center(setLbl);
 
   // ── cards ──
   for (size_t i = 0; i < kBigCards; ++i) big[i] = build_big_card(scr, (lv_coord_t)(20 + i * 388), 96);
@@ -549,16 +457,6 @@ void dashboard_init() {
     ui_interaction::keep_target(card.card);
     for (auto& row : card.rows) lv_obj_set_clickable(row.bar, false);
   }
-  static const lv_coord_t kX[kCompactCards] = {20, 408, 20, 408};
-  static const lv_coord_t kY[kCompactCards] = {96, 96, 258, 258};
-  for (size_t i = 0; i < kCompactCards; ++i) compact[i] = build_compact_card(scr, kX[i], kY[i]);
-  for (auto& card : compact) {
-    lv_obj_set_clickable(card.card, true);
-    lv_obj_add_event_cb(card.card, open_card_cb, LV_EVENT_CLICKED, &card);
-    ui_interaction::keep_target(card.card);
-    for (auto& row : card.rows) lv_obj_set_clickable(row.bar, false);
-  }
-
   hintLabel = make_label(scr, 0, 230, 800, F_ROWLABEL, C_META, LV_TEXT_ALIGN_CENTER, "");
 
   // ── system bar footer (0,432,800,48) ──
@@ -575,19 +473,8 @@ void dashboard_init() {
   footDot = make_dot(footer, 21, 20, 8, C_GREEN);
   footStrong = make_label(footer, 37, 16, 168, &lv_font_montserrat_14, C_FOOTER_STRONG, LV_TEXT_ALIGN_LEFT, "NO HOST");
   footFrames = nullptr;  // frame counts remain in the protocol, outside the daily-use footer
-  footSync = make_label(footer, 212, 16, 116, F_META, C_META, LV_TEXT_ALIGN_LEFT, "Updated -");
-  refreshButton = lv_btn_create(footer);
-  lv_obj_set_pos(refreshButton, 336, 2); lv_obj_set_size(refreshButton, 104, 44);
-  lv_obj_set_style_bg_color(refreshButton, lv_color_hex(ui_theme::button), 0);
-  lv_obj_set_style_bg_color(refreshButton, lv_color_hex(ui_theme::button), LV_STATE_DISABLED);
-  lv_obj_set_style_opa(refreshButton, LV_OPA_50, LV_STATE_DISABLED);
-  lv_obj_set_style_recolor_opa(refreshButton, LV_OPA_TRANSP, LV_STATE_DISABLED);
-  lv_obj_set_style_shadow_width(refreshButton, 0, 0); lv_obj_set_style_radius(refreshButton, 8, 0);
-  lv_obj_add_event_cb(refreshButton, refresh_cb, LV_EVENT_CLICKED, nullptr);
-  ui_interaction::keep_target(refreshButton);
-  refreshLabel = make_label(refreshButton, 0, 0, 94, &lv_font_montserrat_14, C_TITLE, LV_TEXT_ALIGN_CENTER, "UPDATE");
-  lv_obj_center(refreshLabel);
-  footServices = make_label(footer, 552, 16, 224, &lv_font_montserrat_14, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
+  footSync = make_label(footer, 196, 12, 220, &lv_font_montserrat_18, C_META, LV_TEXT_ALIGN_LEFT, "Updated -");
+  footServices = make_label(footer, 552, 12, 224, &lv_font_montserrat_18, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
   pageButton = lv_btn_create(footer);
   lv_obj_set_pos(pageButton, 448, 2);
   lv_obj_set_size(pageButton, 96, 44);
@@ -607,7 +494,6 @@ void dashboard_init() {
   lv_obj_set_state(pageButton, LV_STATE_DISABLED, true);
 
   for (auto& cache : bigCache) cache = CardCaches{};
-  for (auto& cache : compactCache) cache = CardCaches{};
   memset(g_barValue, 0, sizeof(g_barValue));
   memset(g_barColor, 0, sizeof(g_barColor));
   liveCache[0] = clockCache[0] = '\0';
@@ -819,17 +705,9 @@ void dashboard_update() {
   // Do not move, hide or rebind an active touch target. Release activation
   // resolves the saved provider identity against the newest snapshot.
   for (const auto& card : big) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
-  for (const auto& card : compact) if (lv_obj_has_state(card.card, LV_STATE_PRESSED)) return;
   if (lv_obj_has_state(pageButton, LV_STATE_PRESSED)) return;
-  const char* name = app_settings::companion_name(app_settings::appearance().companion);
-  auto* caption = lv_obj_get_child(novaButton, 0);
-  if (strcmp(lv_label_get_text(caption), name) != 0) lv_label_set_text(caption, name);
   const aim::Snapshot snap = aim::read();
   const uint32_t now = millis();
-  const bool busy = refresh_busy(snap.refreshState);
-  lv_obj_set_state(refreshButton, LV_STATE_DISABLED, busy || !snap.hostPresent || !snap.manualRefreshSupported);
-  const char* refreshText = busy ? "WAIT..." : "UPDATE";
-  if (strcmp(lv_label_get_text(refreshLabel), refreshText) != 0) lv_label_set_text(refreshLabel, refreshText);
   const bool recent = snap.frameCount != 0 && (now - snap.lastFrameMs < STALE_MS);
   size_t onlineCount = 0, activeCount = 0, fetchingCount = 0;
   for (size_t i = 0; i < aim::kMaxViews; ++i) {
@@ -900,10 +778,10 @@ void dashboard_update() {
     used++;
   }
 
-  pageCount = static_cast<uint8_t>(std::max<size_t>(1, (used + kCompactCards - 1) / kCompactCards));
+  pageCount = static_cast<uint8_t>(std::max<size_t>(1, (used + kBigCards - 1) / kBigCards));
   if (viewRevision != snap.viewRevision) {
     viewRevision = snap.viewRevision;
-    currentPage = (snap.activeView / kCompactCards) % pageCount;
+    currentPage = (snap.activeView / kBigCards) % pageCount;
     lastPageMs = now;
   }
   currentPage %= pageCount;
@@ -913,40 +791,24 @@ void dashboard_update() {
     lastPageMs = now;
   }
   lv_obj_set_state(pageButton, LV_STATE_DISABLED, pageCount < 2);
+  lv_obj_set_hidden(pageButton, pageCount < 2);
   {
     char text[16];
     snprintf(text, sizeof(text), "%u / %u >", currentPage + 1u, pageCount);
     if (strcmp(lv_label_get_text(pageLabel), text) != 0) lv_label_set_text(pageLabel, text);
   }
-  const size_t start = currentPage * kCompactCards;
-  const size_t onPage = std::min(kCompactCards, used - std::min(start, used));
+  const size_t start = currentPage * kBigCards;
+  const size_t onPage = std::min(kBigCards, used - std::min(start, used));
 
-  if (used >= 1 && used <= kBigCards) {
-    for (size_t i = 0; i < kBigCards; ++i) {
-      if (i < used) {
-        big[i].viewIndex = entries[i].index;
-        snprintf(big[i].providerKey, sizeof(big[i].providerKey), "%s", entries[i].key[0] ? entries[i].key : entries[i].view->providerKey);
-        lv_obj_set_hidden(big[i].card, false);
-        render_card(big[i], bigCache[i], entries[i].view, entries[i].key, i, now, snap.hostPresent,
-                    session_status(snap, now, entries[i].key));
-      } else {
-        lv_obj_set_hidden(big[i].card, true);
-      }
-    }
-    for (size_t i = 0; i < kCompactCards; ++i) lv_obj_set_hidden(compact[i].card, true);
-  } else {
-    for (size_t i = 0; i < kBigCards; ++i) lv_obj_set_hidden(big[i].card, true);
-    for (size_t i = 0; i < kCompactCards; ++i) {
-      if (i < onPage) {
-        compact[i].viewIndex = entries[start + i].index;
-        snprintf(compact[i].providerKey, sizeof(compact[i].providerKey), "%s", entries[start + i].key[0] ? entries[start + i].key : entries[start + i].view->providerKey);
-        lv_obj_set_hidden(compact[i].card, false);
-        render_card(compact[i], compactCache[i], entries[start + i].view, entries[start + i].key, kBigCards + i, now, snap.hostPresent,
-                    session_status(snap, now, entries[start + i].key));
-      } else {
-        lv_obj_set_hidden(compact[i].card, true);
-      }
-    }
+  for(size_t i=0;i<kBigCards;++i) {
+    auto& card=big[i];
+    lv_obj_set_hidden(card.card,i>=onPage);
+    if(i>=onPage)continue;
+    const auto& entry=entries[start+i];
+    card.viewIndex=entry.index;
+    snprintf(card.providerKey,sizeof(card.providerKey),"%s",entry.key[0]?entry.key:entry.view->providerKey);
+    render_card(card,bigCache[i],entry.view,entry.key,i,now,snap.hostPresent,
+        session_status(snap,now,entry.key));
   }
 
   char hintBuf[96];
@@ -986,3 +848,5 @@ void dashboard_update() {
   set_label_cached(footServices, footServicesCache, sizeof(footServicesCache), servicesBuf);
 
 }
+
+void dashboard_show() {if(dashboardScreen){lv_screen_load(dashboardScreen);dashboard_update();}}

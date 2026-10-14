@@ -47,6 +47,9 @@ secrets.json
 *.log
 *.log.*
 *.lock
+tools/permission-endpoint.json
+tools/permission-endpoint.*.tmp
+tools/permission-trust*
 
 # Personal shortcuts, editor state, and operating-system files
 *.lnk

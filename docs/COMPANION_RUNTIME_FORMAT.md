@@ -2,7 +2,8 @@
 
 The P4 experiment selects **raw LZ4 blocks** for the experimental version-1 runtime cache,
 decoded into the existing **RGB565+A8** layout. Built-in NOVA/ORBIT remain the production fallback.
-Runtime pack ingestion and cached images are not enabled in the normal device UI yet.
+The normal P4 companion UI now uses these built-in compressed frames through a startup-allocated
+PSRAM cache. External runtime pack ingestion remains disabled; S3 retains the raw built-ins.
 This is not a physical S3 validation or a change to the existing USB/AIM1 domain.
 
 ## Physical comparison
@@ -26,7 +27,7 @@ The data artifact is [p4-assets-2026-10-13.json](../.ecc/benchmarks/p4-assets-20
 
 LZ4 saves **2,830,077 bytes (84.5%)** of delivered image payload versus raw data. It decodes close
 to raw-copy time, without Deflate's persistent inflater state. That leaves internal RAM available
-for later Hosted/BLE/security work. RLE offers much less compression for similar measured latency.
+for live-agent UI and secure USB permission work. RLE offers much less compression for similar measured latency.
 Deflate remains a valid later delivery alternative if smaller transfers become more valuable than
 the extra state/decoder path. No fictional throughput or S3 timing is inferred from the P4 results.
 
@@ -48,8 +49,9 @@ all six NOVA frames while pinning the active frame across replacements:
 
 Allocation happens during initialization, not lazily in `load` or rendering. The pool and frame
 descriptors must outlive their bindings; all bindings must detach before destroying an owner.
-Production has not allocated this pool or enabled external packs. Built-ins still work if pool
-allocation, validation or decoding fails.
+Production P4 allocates this pool once at startup. All twelve poses remain available compressed.
+One raw work pose per companion stays in flash as a safe fallback if allocation, validation or
+decoding fails; thumbnails and provider logos are unchanged. External packs remain disabled.
 
 ## Rendering and ownership
 
@@ -67,7 +69,9 @@ mandatory. No transport callback can update LVGL, and no permission/live state e
 
 Native LVGL tests cover swaps, conflicting owners, delete/destructor cleanup, fallback origins,
 same-slot position updates, changed external sources and invalid indices. The real cache backend
-was tested on P4 memory; its LVGL binding is tested natively, not physically in the working UI.
+was tested on P4 memory. The production renderer additionally verifies pixel-identical decoding
+of all twelve built-ins in native LVGL, stable crop origins, no per-tick decode, pin retirement and
+raw fallback on failed integrity validation. Working-UI measurement is recorded below when verified.
 
 ## Reproduce the developer experiment
 
@@ -83,6 +87,42 @@ from release board/image selection. Flash only the identified P4 after stopping 
 production partition table and keep a local application backup. Restore its normal application
 afterwards. Never flash these fixtures as a normal installer image or overwrite C6/NVS.
 
-Remaining gates: real runtime source-selection/fallback integration, working-UI memory/render timing,
-physical S3, authenticated transfer and microSD staging/activation. Permission UI and BLE retain
-their separate fail-closed state/transport gates.
+Remaining gates: physical S3, versioned animation manifests and authenticated pack activation.
+MicroSD is deferred until measured pack sizes require it. Permissions retain their separate
+fail-closed USB/local-IPC gates. No Bluetooth product transport is planned.
+
+## Rebuild compressed built-ins
+
+After regenerating SVG artwork, run `python scripts/generate_companion_lz4.py --cc gcc`.
+The generator reads the committed raw pixels, uses the pinned LVGL LZ4 encoder, verifies a
+byte-identical round trip and emits encoded/decoded SHA-256 digests. Production decoding verifies
+both digests before binding a frame. The two-slot cache may reuse a verified resident frame.
+A failed frame is not retried every UI tick.
+
+Hardware diagnostics report allocation, decoded-frame count, failures and maximum measured
+decode-plus-bind time. Startup checkpoints include the normal display/LVGL/companion path.
+
+## Normal P4 firmware measurement - 2026-10-13
+
+The identified P4 was backed up, app-only flashed, digest verified and watchdog restarted.
+The existing USB/live metadata handshake and bounded hardware report passed.
+
+| Metric | Measured result |
+| --- | ---: |
+| Previous app image | 4,611,328 bytes |
+| New app image | 2,347,328 bytes |
+| Actual app saving | 2,264,000 bytes (49.1%) |
+| Free app partition | 4,206,272 bytes |
+| Companion cache allocation | 630,528 bytes |
+| PSRAM free after companion initialization | 29,079,616 bytes |
+| Largest free PSRAM block | 28,835,828 bytes |
+| Internal heap free after companion initialization | 172,612 bytes |
+| First-frame verified decode and LVGL bind | 20,513 us |
+| Companion initialization complete (boot uptime) | 1,411 ms |
+
+The cache reported active with zero failures. This measures one startup frame in the normal UI,
+not p95 latency, all-pose physical timings, touch responsiveness or a soak test. Both SHA-256 checks
+are included in the frame timing. The raw reserve poses explain why firmware savings are smaller
+than the standalone all-payload compression savings.
+
+Evidence: [normal P4 measurement](../.ecc/benchmarks/p4-production-companion-2026-10-13.json).

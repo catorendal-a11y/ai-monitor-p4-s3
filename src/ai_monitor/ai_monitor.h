@@ -47,11 +47,6 @@ struct ViewData {
 enum class RefreshState : uint8_t { idle, requested, waiting, updating, complete, failed };
 enum class HostActivity : uint8_t { idle, fetching, updated, failed };
 
-struct SessionCounts {
-  uint16_t running = 0, waiting = 0, completed = 0, error = 0;
-  uint8_t source = 0;
-};
-
 struct Snapshot {
   ViewData views[kMaxViews];
   char viewKeys[kMaxViews][16];  // keys from the last set_views, "" if unused
@@ -81,9 +76,6 @@ struct Snapshot {
   uint8_t tokenSourceMask = 0;
   uint32_t tokenIdleSeconds = 0, tokenActivityMs = 0;
   uint64_t lastTokenDelta = 0;
-  SessionCounts sessions[kMaxViews];
-  uint8_t sessionCount = 0;
-  uint32_t sessionActivityMs = 0;
 };
 
 // Wire key -> display label + brand color. Header-only so the dashboard can

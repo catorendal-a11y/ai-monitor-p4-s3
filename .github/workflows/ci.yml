@@ -50,7 +50,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-test.txt
-      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libssl-dev g++
       - run: python -X faulthandler -m unittest discover -v -s tests -p 'test_*.py'
 
   firmware:
@@ -70,7 +70,7 @@ jobs:
       - run: python -m pip install 'platformio>=6.1,<7' -r tools/requirements.txt
       - run: python -m platformio run -e ${{ matrix.environment }}
       - if: matrix.environment == 'esp32p4-release'
-        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake libegl1 libopengl0
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake libegl1 libopengl0 libssl-dev
       - if: matrix.environment == 'esp32p4-release'
         run: python scripts/run_tests.py --ui
       - run: python scripts/collect_firmware.py --environment ${{ matrix.environment }} --output work/prebuilt

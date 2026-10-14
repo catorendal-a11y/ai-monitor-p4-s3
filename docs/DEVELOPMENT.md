@@ -107,7 +107,7 @@ Observed token consumption takes priority over NOVA's low-quota expression; quot
 
 ## Screen behavior
 
-NOVA is the default view. Use **DASHBOARD / NOVA** to switch, tap provider cards for details, or open **SET**. Details support previous/next and swipe navigation. **UPDATE ALL** requests an API round and reports waiting, progress and result; minimum intervals and provider backoff still apply.
+NOVA is the default view. Use **MENU > HOME / USAGE** to switch, tap provider cards for details, or open **MENU > SETTINGS**. Details support previous/next and swipe navigation. **REFRESH on the home screen** requests an API round and reports waiting, progress and result; minimum intervals and provider backoff still apply. **MENU > HISTORY** opens the compact Today/24h/7d summaries from the existing PC database. See [device navigation](DEVICE_NAVIGATION.md) for the simplified controls and larger typography.
 
 History stores valid samples in five-minute buckets for up to 24 hours since firmware startup and clears on restart. Failed/stale measurements do not fabricate samples. Dismissed LOW/CRITICAL alerts rearm after recovery with hysteresis. Night scheduling uses time from the host. Settings are stored locally in NVS.
 

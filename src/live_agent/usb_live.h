@@ -40,7 +40,10 @@ class UsbLive {
     UsbLiveSnapshot next{};
     for(const auto entry:agents) {
       const auto row=entry.as<JsonObjectConst>();
-      if(row.isNull() || row.size()!=3)return reject();
+      if(row.isNull() || row.size()<3 || row.size()>5)return reject();
+      for(const auto field:row)if(strcmp(field.key().c_str(),"provider") && strcmp(field.key().c_str(),"id") &&
+          strcmp(field.key().c_str(),"state") && strcmp(field.key().c_str(),"elapsedSeconds") &&
+          strcmp(field.key().c_str(),"observedAgeSeconds"))return reject();
       auto& value=next.agents[next.count];
       if(!identifier(row["provider"],value.provider,sizeof(value.provider)) ||
          !provider(value.provider) || !identifier(row["id"],value.id,sizeof(value.id)) ||
@@ -52,7 +55,17 @@ class UsbLive {
           value.state=static_cast<ActivityState>(i);known=true;break;
         }
       }
+      if(state=="FAILED") {value.state=ActivityState::ERROR;known=true;}
+      if(state=="DONE") {value.state=ActivityState::COMPLETED;known=true;}
       if(!known)return reject();
+      if(row["elapsedSeconds"].isUnbound()==false) {
+        if(!row["elapsedSeconds"].is<uint32_t>() || row["elapsedSeconds"].as<uint32_t>()>604800)return reject();
+        value.hasElapsed=true;value.elapsedSeconds=row["elapsedSeconds"].as<uint32_t>();
+      }
+      if(row["observedAgeSeconds"].isUnbound()==false) {
+        if(!row["observedAgeSeconds"].is<uint16_t>() || row["observedAgeSeconds"].as<uint16_t>()>900)return reject();
+        value.observedAgeSeconds=row["observedAgeSeconds"].as<uint16_t>();
+      }
       for(unsigned i=0;i<next.count;++i)
         if(!strcmp(value.provider,next.agents[i].provider) && !strcmp(value.id,next.agents[i].id))return reject();
       ++next.count;

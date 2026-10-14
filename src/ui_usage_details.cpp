@@ -20,7 +20,7 @@ uint32_t detailStyleWrites = 0;
 uint8_t selected = 0;
 char expectedKey[16] = {};
 lv_obj_t* detailReturnScreen = nullptr;
-UsageHistory history;
+UsageHistory quotaHistory;
 bool historyMode = false;
 lv_obj_t *historyPanel = nullptr, *historyToggleLabel = nullptr, *historyHint = nullptr;
 lv_obj_t *historyPlot = nullptr, *historyLegends[aim::kMaxRows] = {}, *historyTimeLabels[3] = {};
@@ -56,7 +56,7 @@ void select_history_range(lv_event_t* event) {
 }
 void draw_history(lv_event_t* event) {
   historyEdges = 0;
-  const auto& series = history.series(selected);
+  const auto& series = quotaHistory.series(selected);
   if (strcmp(series.key, expectedKey) != 0) return;
   lv_area_t area; lv_obj_get_coords(historyPlot, &area);
   auto* layer = lv_event_get_layer(event);
@@ -214,7 +214,7 @@ void ui_details_show(uint8_t viewIndex) {
 
 void ui_details_update() {
   const auto snapshot = aim::read();
-  history.capture(snapshot, millis());
+  quotaHistory.capture(snapshot, millis());
   if (!screen || lv_screen_active() != screen) return;
   if (historyThemeRevision != ui_theme::revision) {
     historyThemeRevision = ui_theme::revision;
@@ -274,9 +274,9 @@ void ui_details_update() {
     } else snprintf(text, sizeof(text), "Reset time: %s", row.resetsShort[0] ? row.resetsShort : "Not provided");
     detail_text(widgets.reset, text);
   }
-  if (historyMode && !changed && (drawnHistoryRevision != history.revision() || drawnHistoryView != selected || now - graphNow >= 60000u)) {
-    drawnHistoryRevision = history.revision(); drawnHistoryView = selected;
-    const auto& series = history.series(selected);
+  if (historyMode && !changed && (drawnHistoryRevision != quotaHistory.revision() || drawnHistoryView != selected || now - graphNow >= 60000u)) {
+    drawnHistoryRevision = quotaHistory.revision(); drawnHistoryView = selected;
+    const auto& series = quotaHistory.series(selected);
     const size_t samples = strcmp(series.key, expectedKey) == 0 ? series.count : 0;
     graphNow = now;
     const uint32_t window = historyHours[historyRange] * 3600000u;

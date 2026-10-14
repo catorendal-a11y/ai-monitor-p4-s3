@@ -9,6 +9,19 @@ from usb_live import UsbLiveClient, validate_agents
 
 
 class UsbLiveTests(unittest.TestCase):
+    def test_timers_require_v2_capability_and_strict_numeric_limits(self):
+        panel,client=self.fixture();client.open()
+        row=dict(provider='claude',id='opaque',state='NEEDS_ATTENTION',elapsedSeconds=123,observedAgeSeconds=45)
+        client.send([row])
+        self.assertEqual(json.loads(panel.send_line.call_args.args[0])['agents'],
+                         [dict(provider='claude',id='opaque',state='WAITING')])
+        panel.info['liveMetadata']=2
+        client.send([row])
+        self.assertEqual(json.loads(panel.send_line.call_args.args[0])['agents'],[row])
+        for key,value in [('elapsedSeconds',True),('elapsedSeconds',604801),
+                          ('observedAgeSeconds',901),('observedAgeSeconds',-1)]:
+            with self.assertRaises(ValueError):validate_agents([dict(row,**{key:value})])
+
     def fixture(self):
         panel = Mock()
         panel.info = dict(liveProtocol=1, livePermissions=False, bootId=17)

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "board": "guition-p4",
+  "date": "2026-10-14",
+  "scenario": "Post-boot UI with synthetic history transfer and disabled-state reset; no real usage or approval",
+  "before": {
+    "applicationBytes": 2409664,
+    "freeApplicationBytes": 4143936,
+    "internalFree": 233588,
+    "internalLargest": 90100,
+    "psramFree": 29079616,
+    "psramLargest": 28835828,
+    "cacheBytes": 630528,
+    "cacheFailures": 0
+  },
+  "after": {
+    "applicationBytes": 2419040,
+    "freeApplicationBytes": 4134560,
+    "internalFree": 214752,
+    "internalLargest": 81908,
+    "psramFree": 29079616,
+    "psramLargest": 28835828,
+    "cacheBytes": 630528,
+    "cacheFailures": 0
+  },
+  "physicalEnrollmentValidated": false,
+  "physicalTouchValidated": false
+}

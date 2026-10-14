@@ -274,3 +274,271 @@ own executable. It remains the existing PC binary; current lifecycle adapters re
 PC package. No real agent status, physical touch gesture or permission exchange is claimed.
 The new startup telemetry was retained privately for subsequent memory comparison; sustained
 runtime memory/USB latency and real-client validation remain pending. No release or push was made.
+
+## Correct local app/device deployment and updated direction
+
+The user identified that restarting EMBER was the wrong installation. The existing AI Monitor
+desktop shortcut targets AppData/Local/Programs/AI Monitor. A fresh complete Windows package was
+built locally, integrity checked and smoke tested, then its runtime installed at that existing target.
+The private monitor configuration stayed byte-identical; old runtimes were backed up privately.
+The fresh AI Monitor host was verified connected to COM6 by executable identity and fresh status;
+EMBER was stopped. Codex observational hooks were explicitly prepared and the user confirmed
+their trust review. Genuine recent hook delivery has not yet been observed; that remains a gate.
+
+The corrected agent/provider view was separately flashed with backup/digest/startup/read-only USB
+checks. Selected Codex/ZCode now have explicit provider-status rows when live sessions are absent.
+Those rows do not create agent records or infer phases from tokens. Actual live session source
+coverage is still limited. No release/push was made.
+
+The updated user direction is recorded in plans/COMPANION_V2.md: USB-only production, optional
+C6 developer diagnostics, agent-domain cleanup, production LZ4 before event/UX growth, and a separate
+future permission helper with local same-user IPC. Legacy ClaudeLiveProto remains reference code.
+
+Phase 2 source work removes SessionCounts/sessionCount/sessionActivityMs from aim::Snapshot.
+agent::Snapshot now owns the compatibility counts, freshness and revision with independent
+synchronized publication. The existing session_activity command remains compatible; expiry clears
+agent state without turning it into quota/token data. Generic state/event enums are a foundation,
+not implemented task timers/progress. UI consumes separate agent data alongside provider selection.
+354 Python tests, strict native core tests, both actual native LVGL variants and both production
+firmware builds passed. This architecture change has not been flashed or repackaged into the
+installed program; the installed host wire format is compatible. Further LZ4/event/permission
+features remain future phases, not claimed complete.
+
+## Production companion cache checkpoint - 2026-10-13
+
+- Normal P4 rendering now uses verified built-in LZ4 frames and the startup PSRAM cache.
+- All twelve frames remain; raw work-pose fallback exists separately for NOVA and ORBIT.
+- Native LVGL compares every decoded pixel with raw artwork, tests stable origins, repeated-frame
+  reuse, binding retirement and integrity-failure fallback. CTest now supplies its required screenshot
+  paths, avoiding skipped refreshes that produced false layout failures without an argument.
+- 355 Python tests, native protocol/settings/live tests and both native LVGL identities passed.
+- P4 and S3 production builds succeeded. S3 retains raw images without an unused compressed payload.
+- P4 COM6 was app-only flashed with full previous-app backup, ROM/partition checks, digest verification,
+  watchdog restart and read-only live/hardware handshake; the correct AI Monitor GUI/host was restored.
+- Physical normal-UI report: cache active, 630,528 bytes, one verified startup decode, zero failures,
+  20,513 us decode/bind. Actual app image fell from 4,611,328 to 2,347,328 bytes.
+- Installed flasher images/manifest updated for both boards and validated, configuration digest preserved.
+- No release/push, physical S3, touch/soak test, real Codex hook proof or USB permission approval claimed.
+- Evidence: `.ecc/benchmarks/p4-production-companion-2026-10-13.json`.
+
+## Agent lifecycle and timer checkpoint - 2026-10-14
+
+- Live metadata uses generic agent::State, with bounded elapsed/source-age fields and negotiated
+  capability 2. Legacy states/three-field entries remain compatible; quota and permissions are separate.
+- Claude observational support includes tool failures, auto-mode denials, teammate idle and separate
+  task create/complete requests. Child tool events no longer replace the parent. Tasks are not falsely
+  counted successful from hooks that another handler can still veto. No private content is retained.
+- Observed turn/subagent starts, frozen completion timers, rollback rejection, bounded source expiry,
+  concurrent-hook file locking and source age are tested. NOVA reacts to recent explicit agent states.
+- Setup readiness now reports enabled/unobserved Codex hooks correctly instead of unsupported.
+- 362 Python tests passed. Strict native protocol/USB/settings suites and actual native LVGL P4/S3
+  tests passed. Both production firmware builds succeeded after the default-reference syntax fix.
+- P4 COM6 app-only update was backed up, flashed, digest checked, watchdog restarted and verified
+  with metadata capability 2, empty live handshake and active zero-failure companion cache telemetry.
+- All Windows executables were rebuilt; package integrity, corresponding Qt source and GUI/flasher
+  checks passed. The correct installation was replaced with runtime backup and unchanged config digest.
+- Correct AI Monitor host reconnects to COM6. No real Codex hook event was observed in this check;
+  synthetic tests and USB delivery are not presented as a provider-client validation.
+- No push/release, physical S3, interactive permission transmission or physical touch/soak claimed.
+
+## Notification center checkpoint - 2026-10-14
+
+- A UI-owner notification center now observes fresh generic live-agent transitions, current quota
+  warnings and host connection changes. Storage is bounded to 32 entries / 24h / current boot.
+- AGENTS has a fixed EVENTS/unread-count button. Four rows, paging, mark-read and back controls
+  stay fixed; a sixth permanent screen participates in all palettes. Reading events has no command
+  or permission authority. No hints, transcripts or disk persistence are added.
+- Core bounds, duplicate snapshots, expiry/rollover and terminal/attention transitions pass native
+  tests. Native LVGL checks navigation, read marking, empty pages, fixed geometry and theme changes.
+- 363 Python tests and strict native suites passed. P4 production build succeeded and was app-only
+  flashed on COM6 with backup/digest/ROM/partition checks, watchdog reset, metadata handshake and
+  zero-failure active cache telemetry. Physical button interactions/soak are not claimed.
+- Codex read-only hook inventory reports ten enabled/trusted current hooks; the installed wrapper
+  neutral no-op check took 250ms. The running client matches the setup client but predates the hooks.
+  Old loaded configuration is a possible cause, not proven; genuine event delivery remains pending.
+- The center currently observes snapshots; an exhaustive PC event journal, history UX, secure USB
+  permission helper and animation packs remain outstanding. No push/release claimed.
+
+## Generic permission and local IPC checkpoint - 2026-10-14
+
+- Generic interaction request/state/controller types now own the permission UI. Archived
+  ClaudeLiveProto uses compatibility aliases/projection; the interaction domain has no reverse
+  dependency. Local authority uses optedIn/trustedChannel and bounded per-request expiry.
+- A separate Claude PermissionRequest helper validates full bounded canonical arguments,
+  generates random correlation IDs/nonces and returns only an exact supported allow/deny response.
+  Invalid/unavailable/expired requests retain normal Claude permission handling with no output.
+- Current-user Windows named pipes reject remote clients and use explicit SID access control.
+  The host broker/service reserves request IDs/nonces, permits one pending request and rechecks
+  host/device/session/expiry before the sole response. Helper disconnect and context changes cancel.
+  No hints are logged or persisted; endpoint files contain only host PID/instance metadata.
+- 382 Python tests and all strict native protocol/settings/live/LVGL P4/S3 regressions passed.
+  Real Windows pipe tests cover peer PID, ACL descriptor, bounded JSON, idle accept re-arming,
+  one synthetic denial response, helper disconnect and scoped endpoint cleanup.
+- Both production firmware builds passed. The separate Windows helper EXE built successfully;
+  --check, unavailable-host and oversized-request fallback passed with empty stdout/stderr.
+- These checks do not establish actual USB trust or physical approval. No permission service is
+  started by production host, interactive hook installed or tool approved. Authenticated USB
+  enrollment/adapter, explicit opt-in setup and real device/provider validation remain pending.
+- No new flash, installed-host replacement, push or public release in this checkpoint. The
+  previously verified COM6 notification-center firmware and correct installed host remain active.
+
+See [USB permission implementation status](USB_PERMISSION_HELPER.md).
+
+## Device navigation/readability checkpoint - 2026-10-14
+
+- Normal home now has one MENU button. Secondary navigation and refresh move to large menu
+  targets; provider paging controls are hidden when unnecessary without moving other controls.
+- Usage always uses two full-size cards per page. The compact four-card widgets are removed.
+  Settings replaces eight brightness/dimming buttons with two large dropdowns. Agent, provider,
+  notification and status text is enlarged; all four palettes include the seventh menu screen.
+- Native LVGL P4/S3 suites pass with large-dropdown layout, menu return/refresh behavior, provider
+  identity rebinding, pagination and all existing touch/dimming/permission scenarios. Both actual
+  firmware builds passed. Preview images use synthetic data, not physical screenshots.
+- P4 COM6 was backed up and app-only flashed. Digest, board identity, boot, live open/empty
+  snapshot/close and hardware/cache diagnostics passed. NVS/partition table/bootloader unchanged.
+  Correct installed host was restored and confirmed connected to COM6. Physical touch/soak and
+  physical S3 remain unverified.
+- P4 app size is 2,350,992 bytes versus 2,352,880 before this UI change. At the same startup
+  diagnostic checkpoint, internal free heap was 240,724 bytes versus 203,872; largest block
+  116,724 versus 90,100. PSRAM cache remains 630,528 bytes, active with zero failures.
+- Both board firmware files in the installed desktop program were refreshed and install/update
+  manifests validated. Original firmware backup retained; host configuration digest unchanged.
+  No host executable replacement, push or public release in this checkpoint.
+
+## USB authentication foundation checkpoint - 2026-10-14
+
+- Current remote main was fetched/read: e03f7ca; local committed base remains 8be8a93 plus the
+  reviewed working tree. No checkout/reset/merge/push was performed.
+- PC P-256 ECDH/HKDF enrollment and current-user DPAPI storage are implemented. Explicit code
+  confirmation and device proof are required before creating trust; default/empty keys fail closed.
+- C++/Python session proof and directional HMAC-SHA256 packet interoperability use real Windows
+  CNG/OpenSSL in native tests. Strict schema/types/body bounds, sequence/replay/reflection, expiry,
+  clock rollover, crypto failure and request nonce correlation are tested.
+- The separate bounded device interaction core accepts request/heartbeat/cancel/close only.
+  Request lifetimes do not renew with channel heartbeats. Earned decisions are consumed once.
+  The PC adapter uses the existing Panel owner and connects signed decisions to the helper/broker
+  contract. It opens no serial port/network listener and is not started by normal host startup.
+- ProtoCore exposes optional interaction command/tick hooks with no permission state in
+  aim::Snapshot. With no production adapter, interactionProtocol is 0 and commands fail closed.
+- 399 Python tests and all strict native protocol/settings/reference/live/LVGL P4/S3 suites passed.
+  Both production firmware builds passed. CI native-crypto tests receive OpenSSL development
+  headers; repository write permissions and pinned actions remain unchanged.
+- Private P4 crypto benchmark physically passed hardware-seeded DRBG, known-answer HMAC,
+  ephemeral P-256 agreement and HKDF derivation. Two keygens 11,114 us; two agreements 10,080 us;
+  one HMAC 81 us. No enrolled key, NVS write, interactive hook or provider approval was involved.
+- Original UI application restored from verified full app backup; digest/boot checked and the
+  correct installed host confirmed connected on COM6. Installed release images were not replaced
+  with the benchmark. No physical S3, permission gestures/provider integration, release or push claimed.
+
+See [USB authentication foundation](USB_INTERACTION_AUTH.md) for remaining activation gates.
+
+## Home refresh correction (2026-10-14)
+
+- NOVA/ORBIT home now retains a fixed 164 x 48 REFRESH target alongside MENU.
+  NEXT keeps its own fixed position and appears only when needed. Footer status cannot overlap.
+- Native P4/S3 LVGL tests passed, including activation, host/capability/busy gating,
+  caption bounds and fixed geometry. Preview uses synthetic data.
+- P4 production build passed: app 2,352,336 bytes. Application flashed on verified COM6
+  with full previous-app backup and digest verification; boot, read-only live metadata and
+  companion cache checks passed. Correct installed host restored and confirmed connected.
+- No real provider refresh request, physical touch gesture, S3 flash, release or push claimed.
+
+## Device enrollment core (2026-10-14)
+
+- Added a transport-independent enrollment core and compile-checked ESP Mbed TLS adapter.
+  Local arming, revision-bound physical code confirmation and a valid PC proof are required.
+  A successful storage callback is required before acknowledgment; enrollment leaves permission
+  opt-in disabled. No production instance, USB command registration or NVS write is installed.
+- Native Windows CNG and Python cryptography perform actual P-256 ECDH, SHA-256, HKDF and HMAC.
+  Matching comparison codes and a subsequent authenticated session prove cross-language key
+  agreement without exporting the stored native key. Linux/OpenSSL code is provided but this
+  local checkpoint does not claim a Linux execution.
+- Eight new native enrollment scenarios cover wire-only attempts, malformed types/curve points,
+  repeated offers/confirmations, stale physical UI revisions, old proofs, disconnect cancellation,
+  deadlines/rollover and failures in cryptography/storage. PC close also clears stale display codes.
+- 407 Python tests passed. Strict native protocol/settings/reference/live and actual P4/S3 LVGL
+  suites passed; the final additional enrollment case passed in the Python suite. Both production
+  firmware builds passed. P4 app remains 2,352,336 bytes with the dormant adapter dead-stripped.
+- Physical enrollment, transactional NVS integration, UI/setup and real Claude permission/unplug
+  validation remain required. No new flash, packaged install, interactive hook, release or push.
+
+## Connected enrollment setup (2026-10-14)
+
+- Added fixed 104-byte device trust storage with checksum, strict version/identity/key validation,
+  readback and scoped erasure. It never stores/restores permission opt-in. Synthetic write/read/
+  corruption/erase and final local-gate loss cases fail closed.
+- Connected the enrollment core to the serial owner and separate UI-owner queues/publication.
+  Keys never cross the UI boundary. Local arming, current UI revision, awake/visible freshness and
+  explicit physical hold are required; the local gate is checked before/after storage.
+- Actual LVGL comparison screen has two fixed 72-pixel targets, 40-pixel code and 24-pixel instructions.
+  Fourteen native pointer scenarios cover hold, tap, drag-out, failed touch read, expiry, changed code,
+  hidden/occluded/clipped UI, invalid code, programmatic click and failed queue delivery.
+- Explicit PC setup pauses/restores only its own host, validates the selected board/reboot,
+  keeps the USB heartbeat alive during comparison, commits once and verifies current-user DPAPI
+  storage. It neither modifies AI hooks nor enables approvals.
+- 422 Python tests passed. Strict native protocol/settings/reference/live suites passed. The final
+  LVGL P4/S3 suites passed after updating the single-line brightness expectation and checking that
+  CONNECT PC does not overlap it. Both production firmware builds passed.
+- Fresh Windows programs built from source and GUI/helper/flasher checks passed. Correct installed
+  application updated with runtime backup; private config digest unchanged; host reconnected COM6.
+- P4 app fw_3e5c_408b72.bin flashed with full previous-app backup/digest/boot verification. Default
+  enrollment state is closed; enrollmentProtocol 1, interactionProtocol 0 and livePermissions false
+  physically verified. Read-only live exchange and companion cache checks passed.
+- User postponed physical code-comparison/hold/reboot/unplug tests until after work. No physical
+  enrollment, real permission, Claude interactive hook, public release or push is claimed.
+
+## Device history and enrollment disconnect review (2026-10-14)
+
+- Added a separate compact device history domain, reusing the existing opt-in SQLite backend.
+  Reads run off the serial owner. Seven daily and 24 hourly token bins retain unknown gaps;
+  quota trends require matching reported windows. No session, active-time or task totals are invented.
+- Actual native LVGL tests cover readable Today/24h/7d views, unavailable/error/stale data,
+  fixed navigation and dropdown identity stability. BACK returns to the original screen.
+- 430 Python regressions and strict native protocol/history/settings/live/P4/S3 UI suites passed.
+  Maximum integer telemetry serialization passed separately. Both production targets built.
+- Installed the new Windows programs without changing private configuration. P4 history firmware
+  flashed with app backup, digest and startup checks. Atomic synthetic history delivery and disabled
+  reset passed without changing token counters; no synthetic usage was stored in the history database.
+- P4 app: 2,419,040 bytes; app partition free: 4,134,560 bytes. Internal heap after history UI:
+  214,752 bytes, largest block 81,908. PSRAM free: 29,079,616, largest block 28,835,828.
+  Companion cache remains 630,528 bytes with zero failures. These are measurements from that build.
+- Final source review adds a three-second enrollment-specific lease and P4 hardware CDC check.
+  Native lease tests cover expiry, reconnect without revival, explicit restart and clock rollover.
+  This does not count as a physical unplug/hold test; the user postponed those until after work.
+- After the lease fix, 39 setup/authentication tests and strict native lease tests passed; P4 and S3
+  production builds passed. P4 app file is 2,419,296 bytes (256 bytes above the installed history
+  build). The final lease fix was then included in the installed firmware bundle and flashed on
+  COM6 with a previous-app backup, matching digest, boot identity and closed-enrollment checks.
+  Read-only live exchange, atomic history delivery/reset and companion cache checks passed again.
+  The installed GUI/flasher smoke checks passed; private configuration was unchanged.
+- A final local ZIP and per-user v1.19.0 installer were built with verified package checksums and
+  both firmware manifests. This is local preparation, not a published/signed release or a fresh-PC
+  installation claim. Windows signing and physical enrollment/provider tests remain release gates.
+- History remains disabled in the user's saved preferences. Real permission control stays disabled;
+  no public push or release was made.
+
+## Permission host lifecycle and UI handoff (2026-10-14)
+
+- Added an explicit serial-owner PermissionRuntime and Panel attachment/event/pump/close hooks.
+  Default startup remains unchanged: no permission runtime, trust-file read or IPC listener.
+  Both user opt-in and a locally constructed validation gate are required before attachment.
+- Shared the host-instance replay ledger across service/USB replacement. Failed authentication is
+  not retried on the same connection. A service that cannot confirm shutdown prevents replacement
+  for the remainder of that host instance, without stopping normal quota/token USB monitoring.
+- Normal shutdown sends one authenticated close without waiting/retrying. Native real-crypto tests
+  verify that it clears the device request/session; shutdown-failure tests reject reopening.
+- Added a bounded UI-to-serial delivery gate. Native controller tests reject forged, stale, expired,
+  changed, disconnected or already-consumed envelopes. Actual LVGL hold/deny paths pass through
+  PermissionView.commit and the new gate on both P4 and S3. This is synthetic pointer validation;
+  ESP task synchronization and immediate final serial transmission are still pending integration.
+- Full native protocol/history/settings/live and P4/S3 LVGL suites passed. The final Python suite
+  includes additional lifecycle/reconnection/shutdown regressions; see the local validation logs.
+- Fresh Windows executables were built. Embedded Python code objects for the four changed host
+  modules were compared against current tested source before installation. Complete reviewed
+  local source export, firmware manifests/checksums, GUI/helper/flasher checks and installer build
+  passed. Installed runtime was backed up; private configuration digest was unchanged.
+- Correct installed host reconnected to COM6; Codex and ZCode health reported ready. No production
+  permission endpoint exists. P4 firmware is unchanged from the verified enrollment/history build.
+- No permission opt-in, interactive Claude hook, real approval, public release or push was enabled.
+  Physical enrollment remains postponed by the user. Device runtime integration and explicit
+  provider opt-in/setup still need completion before physical permission tests.

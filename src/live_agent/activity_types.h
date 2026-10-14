@@ -1,14 +1,16 @@
 #pragma once
 #include <cstdint>
+#include "../agent/types.h"
 namespace live_agent {
-enum class ActivityState : uint8_t { UNKNOWN, IDLE, THINKING, EDITING, SEARCHING, BUILDING,
-                                    TESTING, WAITING, FAILED, DONE };
-inline constexpr const char* activity_names[]={"UNKNOWN","IDLE","THINKING","EDITING","SEARCHING",
-                                              "BUILDING","TESTING","WAITING","FAILED","DONE"};
+using ActivityState=agent::State;
+inline constexpr auto& activity_names=agent::state_names;
 inline constexpr uint32_t activity_lease_ms=30000;
 struct AgentMetadata {
   char provider[13]{},id[65]{};
   ActivityState state=ActivityState::UNKNOWN;
+  uint32_t elapsedSeconds=0;
+  uint16_t observedAgeSeconds=0;
+  bool hasElapsed=false;
 };
 struct UsbLiveSnapshot {
   AgentMetadata agents[8]{};

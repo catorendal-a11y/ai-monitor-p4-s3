@@ -28,5 +28,11 @@ def hardware_text(health):
     for stage in data.get('startupMemory',[]):
         if stage['captured']:
             lines.append(f'{stage["stage"]}: heap free {mib(stage["internalHeap"]["free"])} / PSRAM free {mib(stage["psram"]["free"])}')
+    cache=data.get('companionCache')
+    if cache:
+        state='active' if cache['active'] else ('ready / fallback' if cache['enabled'] else 'raw fallback')
+        lines.append(f'Companion cache: {state} / {mib(cache["allocatedBytes"])} / '
+                     f'{cache["decodedFrames"]} decoded / {cache["failures"]} failures / '
+                     f'max decode and bind {cache["maxSwitchUs"]/1000:.2f} ms')
     lines.append('Values were sampled at connection. Reconnect to sample again; this is not continuous telemetry.')
     return '\n'.join(lines)

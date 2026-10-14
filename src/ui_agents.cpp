@@ -7,6 +7,8 @@
 #include "ai_monitor/ai_monitor.h"
 #include "ui_nova.h"
 #include "ui_settings.h"
+#include "ui_event_center.h"
+#include "ui_menu.h"
 #include "ui/theme.h"
 #include "ui/interaction.h"
 
@@ -15,6 +17,7 @@ static lv_obj_t *screen=nullptr,*empty=nullptr,*help=nullptr,*summary=nullptr,*n
 struct Row {lv_obj_t *card=nullptr,*provider=nullptr,*identity=nullptr,*state=nullptr;};
 static Row rows[4];
 static uint8_t page=0;
+static uint8_t pages=1;
 static uint32_t epoch=0;
 static void text(lv_obj_t* label,const char* value) {
   if(strcmp(lv_label_get_text(label),value))lv_label_set_text(label,value);
@@ -34,33 +37,33 @@ static lv_obj_t* button(int x,int width,const char* caption,lv_event_cb_t callba
   lv_obj_set_style_bg_color(object,lv_color_hex(ui_theme::button),LV_STATE_DISABLED);
   lv_obj_set_style_opa(object,LV_OPA_50,LV_STATE_DISABLED);
   lv_obj_set_style_border_width(object,0,0);lv_obj_set_style_shadow_width(object,0,0);
-  auto* captionLabel=label(object,0,0,width-16,caption,&lv_font_montserrat_16,ui_theme::text);
+  auto* captionLabel=label(object,0,0,width-16,caption,&lv_font_montserrat_22,ui_theme::text);
   lv_obj_set_style_text_align(captionLabel,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(captionLabel);
   ui_interaction::keep_target(object);lv_obj_add_event_cb(object,callback,LV_EVENT_CLICKED,nullptr);return object;
 }
 static void back(lv_event_t*) {ui_nova_show();}
-static void settings(lv_event_t*) {ui_settings_show();}
-static void next_page(lv_event_t*) {page=page?0:1;ui_agents_update();}
+static void show_menu(lv_event_t*) {ui_menu_show();}
+static void next_page(lv_event_t*) {page=static_cast<uint8_t>((page+1)%pages);ui_agents_update();}
 void init() {
   screen=lv_obj_create(nullptr);ui_theme::watch(screen);
   lv_obj_set_style_bg_color(screen,lv_color_hex(ui_theme::background),0);
   lv_obj_set_style_pad_all(screen,0,0);lv_obj_set_style_border_width(screen,0,0);lv_obj_set_scrollable(screen,false);
-  label(screen,24,14,740,"AI MONITOR / LIVE AGENTS",&lv_font_montserrat_26,ui_theme::text);
-  label(screen,24,54,752,"Last reported events / read-only / up to 8 entries",&lv_font_montserrat_16,ui_theme::muted);
+  label(screen,24,14,600,"LIVE AGENTS",&lv_font_montserrat_32,ui_theme::text);
+  auto* events=button(656,120,"MENU",show_menu);lv_obj_set_y(events,14);
   for(unsigned i=0;i<4;++i) {
     auto& row=rows[i];row.card=lv_obj_create(screen);
-    lv_obj_set_pos(row.card,24,96+i*72);lv_obj_set_size(row.card,752,68);
+    lv_obj_set_pos(row.card,24,94+i*80);lv_obj_set_size(row.card,752,76);
     lv_obj_set_style_pad_all(row.card,0,0);lv_obj_set_style_bg_color(row.card,lv_color_hex(ui_theme::surface),0);
     lv_obj_set_style_border_color(row.card,lv_color_hex(ui_theme::border),0);
     lv_obj_set_scrollable(row.card,false);lv_obj_set_clickable(row.card,false);
-    row.provider=label(row.card,16,7,350,"",&lv_font_montserrat_20,ui_theme::text);
-    row.identity=label(row.card,16,36,360,"",&lv_font_montserrat_16,ui_theme::muted);
-    row.state=label(row.card,414,20,310,"",&lv_font_montserrat_20,ui_theme::accent);
+    row.provider=label(row.card,16,4,350,"",&lv_font_montserrat_26,ui_theme::text);
+    row.identity=label(row.card,16,43,380,"",&lv_font_montserrat_20,ui_theme::muted);
+    row.state=label(row.card,410,20,320,"",&lv_font_montserrat_24,ui_theme::accent);
   }
   empty=label(screen,24,112,752,"No recent agent events",&lv_font_montserrat_26,ui_theme::text);
-  help=label(screen,24,162,752,"Link session events in the PC app. Missing phases stay unknown.",&lv_font_montserrat_16,ui_theme::muted);
-  summary=label(screen,24,392,752,"Waiting for USB live data",&lv_font_montserrat_16,ui_theme::muted);
-  button(24,224,"COMPANION",back);next=button(288,224,"NEXT PAGE",next_page);button(552,224,"SETTINGS",settings);
+  help=label(screen,24,162,752,"Enable agent events in the PC app.",&lv_font_montserrat_24,ui_theme::muted);
+  summary=label(screen,24,56,600,"Waiting for USB live data",&lv_font_montserrat_20,ui_theme::muted);
+  button(24,224,"HOME",back);next=button(552,224,"NEXT PAGE",next_page);
 }
 void show() {
   if(!screen)return;
@@ -71,32 +74,64 @@ void update() {
   const auto snapshot=live_agent::read_usb();
   const uint32_t age=millis()-snapshot.receivedAt;
   const bool fresh=snapshot.fresh && age<live_agent::activity_lease_ms;
-  const unsigned count=fresh?(snapshot.count<=8?snapshot.count:0):0;
+  const unsigned agents=fresh?(snapshot.count<=8?snapshot.count:0):0;
+  // Presentation-only fallback: selected providers are not fabricated live agents.
+  // Keep their quota/token snapshot separate from the live domain and permission authority.
+  const auto quota=aim::read();
+  const aim::ProviderStyle* available[8]{};unsigned providerCount=0;
+  if(quota.hostPresent && quota.viewsConfigured)for(unsigned i=0;i<quota.viewCount && i<8;++i) {
+    const auto* style=aim::provider_style(quota.viewKeys[i]);if(!style)continue;
+    bool represented=false;
+    for(unsigned j=0;j<agents;++j)if(!strcmp(snapshot.agents[j].provider,style->key))represented=true;
+    for(unsigned j=0;j<providerCount;++j)if(available[j]==style)represented=true;
+    if(!represented)available[providerCount++]=style;
+  }
+  const unsigned count=agents+providerCount;
+  pages=static_cast<uint8_t>(count?((count+3)/4):1);
   if(epoch!=snapshot.epoch) {epoch=snapshot.epoch;page=0;}
-  if(count<=4)page=0;
+  if(page>=pages)page=0;
   lv_obj_set_hidden(empty,count!=0);lv_obj_set_hidden(help,count!=0);
   for(unsigned i=0;i<4;++i) {
     auto& row=rows[i];const unsigned index=page*4+i;
     lv_obj_set_hidden(row.card,index>=count);
     if(index>=count) {text(row.provider,"");text(row.identity,"");text(row.state,"");continue;}
-    const auto& agent=snapshot.agents[index];
-    const auto* style=aim::provider_style(agent.provider);
+    if(index>=agents) {
+      const auto* style=available[index-agents];text(row.provider,style->label);
+      const bool counter=quota.tokenUsageKnown && millis()-quota.tokenActivityMs<35000 &&
+          (quota.tokenSourceMask&style->activityMask)!=0;
+      text(row.identity,counter?"Token activity available":"No recent token activity");
+      text(row.state,!strcmp(style->key,"codex") || !strcmp(style->key,"claude")?"NO RECENT EVENTS":"ACTIVITY ONLY");
+      lv_obj_set_style_text_color(row.state,lv_color_hex(ui_theme::muted),0);
+      continue;
+    }
+    const auto& entry=snapshot.agents[index];
+    const auto* style=aim::provider_style(entry.provider);
     text(row.provider,style?style->label:"UNKNOWN PROVIDER");
-    char identifier[48];snprintf(identifier,sizeof(identifier),"Session %.12s",agent.id);text(row.identity,identifier);
-    const unsigned state=static_cast<unsigned>(agent.state);
-    text(row.state,state<10?live_agent::activity_names[state]:"UNKNOWN");
-    const uint32_t color=agent.state==live_agent::ActivityState::FAILED?0xFF6B6B:
-        agent.state==live_agent::ActivityState::WAITING?0xFFCF66:
-        state<2 || state>=10?ui_theme::muted:ui_theme::accent;
+    char identifier[64];
+    if(entry.hasElapsed)snprintf(identifier,sizeof(identifier),"%lu:%02lu:%02lu / event %us ago",
+        static_cast<unsigned long>(entry.elapsedSeconds/3600),
+        static_cast<unsigned long>((entry.elapsedSeconds/60)%60),static_cast<unsigned long>(entry.elapsedSeconds%60),entry.observedAgeSeconds);
+    else snprintf(identifier,sizeof(identifier),"Start unknown / event %us ago",entry.observedAgeSeconds);
+    text(row.identity,identifier);
+    const unsigned state=static_cast<unsigned>(entry.state);
+    char phase[32];snprintf(phase,sizeof(phase),"%s",state<agent::state_count?live_agent::activity_names[state]:"UNKNOWN");
+    for(auto* c=phase;*c;++c)if(*c=='_')*c=' ';
+    text(row.state,phase);
+    const uint32_t color=entry.state==live_agent::ActivityState::FAILED?0xFF6B6B:
+        (entry.state==live_agent::ActivityState::WAITING || entry.state==agent::State::NEEDS_ATTENTION)?0xFFCF66:
+        state<2 || state>=agent::state_count?ui_theme::muted:ui_theme::accent;
     if(!lv_color_eq(lv_obj_get_style_text_color(row.state,LV_PART_MAIN),lv_color_hex(color)))
       lv_obj_set_style_text_color(row.state,lv_color_hex(color),0);
   }
   if(count>4)lv_obj_remove_state(next,LV_STATE_DISABLED);else lv_obj_add_state(next,LV_STATE_DISABLED);
+  lv_obj_set_hidden(next,count<=4);
   char status[100];
-  if(!fresh)snprintf(status,sizeof(status),"USB live data unavailable / reconnect or link events in the PC app");
-  else if(!count)snprintf(status,sizeof(status),"No recent events / source status expires after 30 seconds");
-  else snprintf(status,sizeof(status),"Page %u/%u / %u reported entries / USB update %lu seconds ago",
-      page+1,count>4?2:1,count,static_cast<unsigned long>(age/1000));
+  if(providerCount)snprintf(status,sizeof(status),"Page %u/%u / %u agents / %u providers",
+      page+1,pages,agents,providerCount);
+  else if(!fresh)snprintf(status,sizeof(status),"Waiting for host / check the PC app");
+  else if(!count)snprintf(status,sizeof(status),"No recent events / enable events on PC");
+  else snprintf(status,sizeof(status),"Page %u/%u / %u agents / updated %lus ago",
+      page+1,pages,count,static_cast<unsigned long>(age/1000));
   text(summary,status);
 }
 }

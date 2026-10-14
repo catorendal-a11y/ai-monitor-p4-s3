@@ -16,6 +16,10 @@
 #include "ui_notifications.h"
 #include "ui_nova.h"
 #include "ui_agents.h"
+#include "ui_event_center.h"
+#include "ui_menu.h"
+#include "ui_enrollment.h"
+#include "ui_history.h"
 #include "ui/theme.h"
 #include "diagnostics/hardware_types.h"
 #include "diagnostics/ppa_benchmark.h"
@@ -43,6 +47,10 @@ static void uiTask(void*) {
   ui_notifications_init();
   ui_nova_init();
   ui_agents_init();
+  ui_event_center_init();
+  ui_menu_init();
+  ui_enrollment_init();
+  ui_history_init();
   ui_nova_show();
   diagnostics::capture_startup_memory(diagnostics::StartupStage::afterCompanion);
 
@@ -63,6 +71,10 @@ static void uiTask(void*) {
       ui_nova_update();
       ui_agents_update();
       ui_notifications_update();
+      ui_event_center_update();
+      ui_menu_update();
+      ui_enrollment_update();
+      ui_history_update();
     }
     lv_timer_handler();
     vTaskDelay(pdMS_TO_TICKS(5));

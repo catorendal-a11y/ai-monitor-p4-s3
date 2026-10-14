@@ -9,6 +9,10 @@
 #include "ui/interaction.h"
 #include "app_settings.h"
 #include "ui_settings.h"
+#include "ui_event_center.h"
+#include "ui_menu.h"
+#include "ui_enrollment.h"
+#include "ui_history.h"
 
 namespace quota_banner {
 static QuotaNotifications policy;
@@ -69,7 +73,12 @@ void ui_notifications_update() {
   // including when its quota recovers while the finger is down.
   if (lv_obj_has_state(dismissButton, LV_STATE_PRESSED)) return;
   const auto* alert = policy.current();
-  if (!alert || ui_settings_is_active()) { lv_obj_set_hidden(banner, true); return; }
+  static QuotaNotifications::Alert recorded;
+  if(!alert)recorded={};
+  if(alert && (recorded.severity!=alert->severity || strcmp(recorded.provider,alert->provider) || strcmp(recorded.title,alert->title))) {
+    ui_event_center_quota(alert->provider,alert->severity==2);recorded=*alert;
+  }
+  if (!alert || ui_settings_is_active() || ui_event_center_is_active() || ui_menu_is_active() || ui_enrollment_is_active() || ui_history_is_active()) { lv_obj_set_hidden(banner, true); return; }
   // Dismiss exactly the alert whose text was visible when this tap began.
   const bool critical = alert->severity == 2;
   const uint32_t color = critical ? 0xFF5252 : 0xFFAA00;

@@ -124,6 +124,9 @@ class WorkerSignals(QObject):
     output = Signal(str)
     finished = Signal(bool, str)
 
+class EnrollmentSignals(QObject):
+    comparison = Signal(object)
+
 
 class ResultSignals(QObject):
     finished = Signal(object)
@@ -237,6 +240,8 @@ class MonitorWindow(QMainWindow):
     def __init__(self, root: Path = control.ROOT, monitor: bool = True):
         super().__init__()
         self.root = root
+        self.enrollment_signals = EnrollmentSignals(self)
+        self.enrollment_signals.comparison.connect(self._compare_device_code, Qt.ConnectionType.QueuedConnection)
         self.busy = False
         self.unsaved = False
         self.worker = None
@@ -626,6 +631,11 @@ class MonitorWindow(QMainWindow):
         self.usb_help = InformationPanel('', 4, 'Available USB ports and connection help')
         form.addWidget(self.usb_help)
         form.addWidget(self.check_usb_button)
+        self.connect_pc_button = self._button('Connect this PC to the display', self.connect_display_pc)
+        form.addWidget(self.connect_pc_button)
+        form.addWidget(label('Optional secure connection for future physical permissions. '
+                             'Open MENU > SETTINGS > CONNECT PC on the display first. '
+                             'Connecting does not enable AI approvals.', 'muted', True))
         self.board_help = InformationPanel('', 2, 'Selected display guidance')
         form.addWidget(self.board_help)
         form.addWidget(self._button('Choose and set up my AIs', lambda: self.tabs.setCurrentIndex(1), primary=True))
@@ -1230,6 +1240,35 @@ class MonitorWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes: return
         self.recover_after_action = True
         self._run('Recovering local settings', lambda emit: desktop.reset_invalid_settings(self.root, emit=emit))
+
+    def connect_display_pc(self):
+        if not self._ready(): return
+        from enrollment_setup import connect_device
+        answer = QMessageBox.question(self, 'Connect this PC',
+            'Start the host, then open MENU > SETTINGS > CONNECT PC on the display. '
+            'Keep the display awake. Click Yes when that screen is open. '
+            'The host will pause briefly and return after setup. AI approvals remain disabled.',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self._run('Connecting PC to display', lambda emit: connect_device(self.root, self.enrollment_signals.comparison.emit, emit))
+
+    @Slot(object)
+    def _compare_device_code(self, prompt):
+        dialog = QDialog(self); dialog.setWindowTitle('Compare PC and display codes'); dialog.setMinimumWidth(560)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(label('Only connect if every group matches', 'headline', True))
+        code = label(prompt.code, 'metric', True); code.setAccessibleName('PC display connection comparison code')
+        layout.addWidget(code)
+        layout.addWidget(label('Compare with the physical display. Hold HOLD TO CONFIRM there for 1.8 seconds, '
+                               'then choose Codes match here. Cancel if anything differs.', 'muted', True))
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        match = buttons.addButton('Codes match', QDialogButtonBox.ButtonRole.AcceptRole)
+        match.setAutoDefault(False); match.setDefault(False)
+        buttons.accepted.connect(dialog.accept); buttons.rejected.connect(dialog.reject); layout.addWidget(buttons)
+        timer = QTimer(dialog); timer.setSingleShot(True); timer.timeout.connect(dialog.reject); timer.start(45000)
+        cancelled = QTimer(dialog); cancelled.timeout.connect(lambda: dialog.reject() if prompt.cancelled else None); cancelled.start(100)
+        prompt.decide(dialog.exec() == QDialog.DialogCode.Accepted)
+        dialog.deleteLater()
 
     def _apply_preferences(self):
         if self.config['close_to_tray']:

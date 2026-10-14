@@ -4,12 +4,43 @@
 
 - `src/main.cpp`: task startup and UI loop.
 - `src/ai_monitor/`: bounded AIM1/JSON protocol, snapshots and USB receiver.
+- `src/agent/`: independent session/activity domain. Counts, phases, tasks and timers never belong
+  in aim::Snapshot. Existing session_activity packets remain a compatibility transport adapter.
+- `src/interaction/`: generic permission model/controller. Never depend on ClaudeLiveSnapshot;
+  opt-in and trustedChannel are local authority, not JSON flags. Preserve every fail-closed UI gate.
+- `src/interaction/auth_session.h`, `usb_interaction.h`: bounded authenticated transport/request
+  domain. Empty keys and absent opt-in fail closed; no wire flag establishes trust. The serial
+  adapter cannot earn UI authorization. Keep production integration disabled until enrollment,
+  persistence, UI final gates and real provider/hardware tests pass.
+- `src/interaction/enrollment.h`, `enrollment_esp.*`: local-only arming and revision-bound physical
+  comparison. Preserve deadlines, explicit PC proof, successful storage before acknowledgment,
+  ephemeral-key cleanup and separate permission opt-in. Never confirm from a wire boolean.
+- `tools/interaction_auth.py`, `interaction_trust.py`, `usb_interaction.py`: ECDH/HMAC sessions,
+  current-user DPAPI and the existing serial-owner adapter. Never start a second serial owner,
+  retry ambiguous approvals, log hints/keys or auto-select/enable Claude.
+- `tools/aim_permission.py`, `tools/permission_ipc.py`: separate interactive helper, bounded bytes
+  over same-user Windows named pipes; no TCP/pickle/shell or changes to observational hooks.
+- `tools/permission_runtime.py`: explicit existing-serial-owner lifecycle. Preserve the host-instance
+  replay ledger across USB/service replacement. No automatic activation, approval retry or service
+  replacement after unconfirmed shutdown; user opt-in cannot substitute for local validation.
+- `src/interaction/permission_delivery.h`: only a real UI-owner commit admits a decision. Preserve
+  one-shot consumption, current-request matching and fresh local visibility at the serial gate;
+  queued envelopes do not authorize delayed transmission. Add task synchronization before activation.
 - Hardware initialization: inspect display/touch sources before changing board pins.
 - `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
 - `src/ui/`: state/format/history helpers, theme and generated assets.
 - `src/ui_agents.cpp`: UI-owner read-only live metadata view; never add agent state or permissions
   to quota snapshots, infer tool phases from counters or move navigation controls with incoming data.
-- `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions; no runtime image allocation.
+- `src/ui_menu.cpp`: shared UI-owner navigation; refresh remains directly on the home screen. Keep MENU targets
+  fixed, return to the calling screen, and show provider paging only when necessary. Normal usage
+  always uses two full-size provider cards rather than shrinking to a four-card grid.
+- `src/history/`, `src/ui_history.cpp`, `tools/device_history.py`, `usb_history.py`: separate bounded
+  history domain from the existing SQLite backend. Unknown gaps are null, not zero. No inferred
+  sessions/active time/tasks, transcripts or database transfer. Read SQLite off the serial owner;
+  publish complete transactions only and preserve dropdown identities until touch release.
+- `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions;
+  allocate the P4 LZ4 cache once at startup, verify encoded/decoded bytes, pin live LVGL sources,
+  and retain raw work-pose fallback per companion. No allocation per render.
 - `src/app_settings.*`: validated NVS settings/save feedback.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.

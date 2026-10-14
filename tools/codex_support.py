@@ -89,6 +89,19 @@ def setup_codex(ask=input):
 
 
 def read_rate_limits(command, timeout=20):
+    return _read_app_server(command,'account/rateLimits/read',None,timeout)
+
+
+def read_hook_status(command, cwd, timeout=10):
+    """Read-only inventory; no thread/model requests or hook-trust/config writes."""
+    path=Path(cwd)
+    if not path.is_absolute():raise ValueError('Hook diagnostics require an absolute working directory')
+    return _read_app_server(command,'hooks/list',{'cwds':[str(path)]},timeout)
+
+
+def _read_app_server(command, method, params, timeout):
+    if method not in ('account/rateLimits/read','hooks/list'):
+        raise ValueError('Unsupported read-only Codex diagnostic')
     process = start_child(command + ['app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     replies = queue.Queue(maxsize=64)
@@ -126,7 +139,9 @@ def read_rate_limits(command, timeout=20):
     try:
         send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':numeric_version(HOST_VERSION)}}})
         response(1); send({'method':'initialized','params':{}})
-        send({'method':'account/rateLimits/read','id':2})
+        request={'method':method,'id':2}
+        if params is not None:request['params']=params
+        send(request)
         return response(2)
     finally:
         stop_child(process)

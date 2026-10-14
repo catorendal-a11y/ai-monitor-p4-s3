@@ -70,7 +70,7 @@ static void permission_ui_controller_rechecks_queue_delivery_and_gesture_cancell
     if (reason==2) { controller.pressing(1000,true,false);controller.pressing(1900,true);CHECK(!controller.queued());continue; }
     controller.pressing(1900,true);CHECK(controller.queued());
     auto changed=core.snapshot();auto context=trusted;
-    if (reason==3)context.secure=false;
+    if (reason==3)context.trustedChannel=false;
     if (reason==4)context.connected=false;
     if (reason==5)++changed.epoch;
     if (reason==6)changed.prompt.hint[0]='X';

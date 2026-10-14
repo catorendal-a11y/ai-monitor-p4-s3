@@ -14,6 +14,7 @@
 #include "ui/quota_window.h"
 #include "ui/usage_format.h"
 #include "ui/interaction.h"
+#include "ui_enrollment.h"
 
 static lv_obj_t* settingsScreen = nullptr;
 static lv_obj_t* dashScreen = nullptr;
@@ -25,11 +26,9 @@ struct AlertTarget { char provider[16] = {}, title[36] = {}; uint32_t window = 0
 static AlertTarget alertTargets[25];
 static uint8_t alertTargetCount = 1, alertTargetIndex = 0;
 static uint32_t shownSaveRevision = 0, savedAtMs = 0;
-static lv_obj_t* dimButtons[4] = {};
-static lv_obj_t* dimLabels[4] = {};
-static lv_obj_t* presetButtons[4] = {};
-static lv_obj_t* presetLabels[4] = {};
+static lv_obj_t *dimChoice=nullptr,*brightnessChoice=nullptr;
 static lv_obj_t* previewButton = nullptr;
+static lv_obj_t* connectPcButton = nullptr;
 static lv_obj_t *alertsButton = nullptr, *alertsOverlay = nullptr, *warningSlider = nullptr, *warningValue = nullptr;
 static lv_obj_t *warningPrev = nullptr, *warningNext = nullptr, *warningInherit = nullptr;
 static lv_obj_t *nightButton = nullptr, *nightOverlay = nullptr, *nightToggleLabel = nullptr, *nightValue = nullptr;
@@ -46,7 +45,6 @@ static char quotaProviders[8][16] = {};
 static uint8_t quotaProviderCount = 0, quotaProviderIndex = 0, quotaChoiceCount = 0;
 static app_settings::NovaWindow quotaChoices[3];
 static const uint8_t kDimChoices[] = {0, 1, 5, 10};
-static const char* kDimNames[] = {"OFF", "1 MIN", "5 MIN", "10 MIN"};
 static const uint8_t kBrightnessPresets[] = {25, 50, 75, 100};
 static uint8_t lastDimChoice = 255, lastPresetValue = 255;
 static uint8_t brightnessBeforeDrag = 0;
@@ -99,20 +97,14 @@ static void refresh_choices() {
   const uint8_t minutes = app_settings::dim_minutes();
   if (minutes != lastDimChoice) {
     lastDimChoice = minutes;
-    for (size_t i = 0; i < 4; ++i) {
-      const bool selected = minutes == kDimChoices[i];
-      style_button(dimButtons[i], selected);
-      lv_obj_set_style_text_color(dimLabels[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
-    }
+    for (size_t i = 0; i < 4; ++i)if(minutes==kDimChoices[i])lv_dropdown_set_selected(dimChoice,i);
   }
   const uint8_t percent = brightness_percent(display_get_brightness());
   if (percent != lastPresetValue) {
     lastPresetValue = percent;
-    for (size_t i = 0; i < 4; ++i) {
-      const bool selected = percent == kBrightnessPresets[i];
-      style_button(presetButtons[i], selected);
-      lv_obj_set_style_text_color(presetLabels[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
-    }
+    unsigned selected=0;
+    for(size_t i=0;i<4;++i)if(percent==kBrightnessPresets[i])selected=i+1;
+    lv_dropdown_set_selected(brightnessChoice,selected);
   }
 }
 
@@ -132,15 +124,15 @@ static void brightness_slider_cb(lv_event_t* event) {
   refresh_brightness();
 }
 
-static void brightness_preset_cb(lv_event_t* event) {
-  const auto index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
-  if (index >= 4) return;
-  display_apply_brightness(brightness_raw(kBrightnessPresets[index]), true);
+static void brightness_preset_cb(lv_event_t*) {
+  const auto index = lv_dropdown_get_selected(brightnessChoice);
+  if (index == 0 || index > 4) return;
+  display_apply_brightness(brightness_raw(kBrightnessPresets[index-1]), true);
   refresh_brightness();
 }
 
-static void dim_select_cb(lv_event_t* event) {
-  const auto index = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event));
+static void dim_select_cb(lv_event_t*) {
+  const auto index = lv_dropdown_get_selected(dimChoice);
   if (index >= 4) return;
   app_settings::set_dim_minutes(kDimChoices[index]);
   refresh_choices();
@@ -157,10 +149,27 @@ static lv_obj_t* make_button(lv_obj_t* parent, int x, int y, int width, const ch
   style_button(button, false);
   lv_obj_add_event_cb(button, callback, LV_EVENT_CLICKED, data);
   ui_interaction::keep_target(button);
-  auto* label = make_label(button, 0, 0, width - 8, text, &lv_font_montserrat_16, ui_theme::text, LV_TEXT_ALIGN_CENTER);
+  auto* label = make_label(button, 0, 0, width - 8, text, &lv_font_montserrat_20, ui_theme::text, LV_TEXT_ALIGN_CENTER);
   lv_obj_center(label);
   if (labelOut) *labelOut = label;
   return button;
+}
+
+static lv_obj_t* make_choice(lv_obj_t* parent,int x,int y,const char* options,lv_event_cb_t callback) {
+  auto* choice=lv_dropdown_create(parent);lv_obj_set_pos(choice,x,y);lv_obj_set_size(choice,340,56);
+  lv_dropdown_set_options(choice,options);
+  lv_obj_set_style_text_font(choice,&lv_font_montserrat_26,0);
+  lv_obj_set_style_text_color(choice,lv_color_hex(ui_theme::text),0);
+  lv_obj_set_style_bg_color(choice,lv_color_hex(ui_theme::button),0);
+  auto* list=lv_dropdown_get_list(choice);
+  lv_obj_set_style_text_font(list,&lv_font_montserrat_26,0);
+  lv_obj_set_style_text_line_space(list,20,0);
+  lv_obj_set_style_text_color(list,lv_color_hex(ui_theme::text),0);
+  lv_obj_set_style_bg_color(list,lv_color_hex(ui_theme::surface),0);
+  lv_obj_set_style_bg_color(list,lv_color_hex(ui_theme::pressed),LV_PART_SELECTED);
+  lv_obj_set_style_max_height(list,270,0);
+  lv_obj_add_event_cb(choice,callback,LV_EVENT_VALUE_CHANGED,nullptr);ui_interaction::keep_target(choice);
+  return choice;
 }
 
 static void refresh_appearance() {
@@ -539,23 +548,16 @@ void ui_settings_init() {
   lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_PRESSED, nullptr);
   lv_obj_add_event_cb(brightnessSlider, brightness_slider_cb, LV_EVENT_PRESS_LOST, nullptr);
 
-  for (size_t i = 0; i < 4; ++i) {
-    char text[12];
-    snprintf(text, sizeof(text), "%u %%", kBrightnessPresets[i]);
-    presetButtons[i] = make_button(card, 24 + i * 130, 104, 118, text, brightness_preset_cb,
-                                   reinterpret_cast<void*>(i), &presetLabels[i]);
-  }
-  actualBrightnessLabel = make_wrap_label(card, 552, 112, 176, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
-  make_label(card, 24, 174, 400, "DIM AFTER", &lv_font_montserrat_16, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
-  for (size_t i = 0; i < 4; ++i) {
-    dimButtons[i] = make_button(card, 24 + i * 130, 204, 118, kDimNames[i], dim_select_cb,
-                               reinterpret_cast<void*>(i), &dimLabels[i]);
-  }
+  brightnessChoice=make_choice(card,24,104,"CUSTOM\n25 %\n50 %\n75 %\n100 %",brightness_preset_cb);
+  actualBrightnessLabel = make_wrap_label(card, 400, 108, 328, "", &lv_font_montserrat_20, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
+  connectPcButton=make_button(card,400,148,328,"CONNECT PC",[](lv_event_t*){ui_enrollment_show();},nullptr);
+  make_label(card, 24, 174, 400, "DIM AFTER", &lv_font_montserrat_20, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
+  dimChoice=make_choice(card,24,204,"OFF\n1 MINUTE\n5 MINUTES\n10 MINUTES",dim_select_cb);
   previewButton = make_button(card, 560, 204, 168, "TEST DIM", dim_preview_cb, nullptr);
   make_label(card, 24, 278, 704, board_profile::visual_dimming ?
              "Visual dimming; LEDs stay on above 0%. First touch wakes only." :
              "First touch wakes only. Release before the next tap.",
-             &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+             &lv_font_montserrat_18, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(settingsScreen, 24, 424, 152, "<  BACK", back_cb, nullptr);
   nightButton = make_button(settingsScreen, 200, 424, 176, "NIGHT MODE", open_night, nullptr);
   make_button(settingsScreen, 392, 424, 176, "APPEARANCE", open_appearance, nullptr);
@@ -699,7 +701,8 @@ static void refresh_brightness() {
   snprintf(text, sizeof(text), "%u %%", percent);
   if (strcmp(lv_label_get_text(brightnessValue), text) != 0) lv_label_set_text(brightnessValue, text);
   char actual[48];
-  snprintf(actual, sizeof(actual), "Actual %u %%\n%s", brightness_percent(display_get_applied_brightness()), idle_dim_mode());
+  snprintf(actual, sizeof(actual), "Actual %u %% / %s", brightness_percent(display_get_applied_brightness()), idle_dim_mode());
+  lv_obj_set_state(connectPcButton,LV_STATE_DISABLED,!aim::read().hostPresent);
   if (strcmp(lv_label_get_text(actualBrightnessLabel), actual) != 0) lv_label_set_text(actualBrightnessLabel, actual);
   refresh_choices();
 }

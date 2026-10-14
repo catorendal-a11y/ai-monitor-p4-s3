@@ -1,8 +1,8 @@
 #pragma once
 #include <lvgl.h>
-#include "../live_agent/permission_controller.h"
+#include "../interaction/permission_controller.h"
 
-namespace live_agent {
+namespace interaction {
 // Dormant until a trusted adapter explicitly creates/shows it. Never reads quota/AIM1 data.
 class PermissionView {
  public:
@@ -14,9 +14,9 @@ class PermissionView {
   bool initialize();
   void show();
   void hide();
-  void update(const ClaudeLiveSnapshot&,const PermissionContext&);
-  PermissionEnvelope take(const ClaudeLiveSnapshot&,const PermissionContext&,uint32_t now);
-  bool commit(const PermissionEnvelope&,const ClaudeLiveSnapshot&,const PermissionContext&,uint32_t now);
+  void update(const InteractionSnapshot&,const PermissionContext&);
+  PermissionEnvelope take(const InteractionSnapshot&,const PermissionContext&,uint32_t now);
+  bool commit(const PermissionEnvelope&,const InteractionSnapshot&,const PermissionContext&,uint32_t now);
   void delivery_failed();
   PermissionState state() const { return controller_.state(); }
   lv_obj_t* root() const { return root_; }
@@ -45,6 +45,8 @@ class PermissionView {
   void refresh();
   bool fits(lv_obj_t*) const;
   bool reviewable() const;
-  bool details_match(const ClaudeLiveSnapshot&) const;
+  bool details_match(const InteractionSnapshot&) const;
 };
 }
+
+namespace live_agent {using PermissionView=interaction::PermissionView;}

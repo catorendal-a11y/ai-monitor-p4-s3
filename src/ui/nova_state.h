@@ -10,10 +10,11 @@ class NovaState {
  public:
   void greet(uint32_t now) { greeted_ = true; greetedMs_ = now; }
   template<typename Warning>
-  NovaMood evaluate(const aim::Snapshot& snapshot, uint32_t now, bool resting, Warning warning) const {
+  NovaMood evaluate(const aim::Snapshot& snapshot, uint32_t now, bool resting, Warning warning,
+                    const agent::Snapshot& agents=agent::read(),const live_agent::UsbLiveSnapshot& live=live_agent::UsbLiveSnapshot{}) const {
     if (greeted_ && now - greetedMs_ < 2200u) return NovaMood::greeting;
     if (!snapshot.hostPresent) return NovaMood::offline;
-    const auto sessions = session_status(snapshot, now);
+    const auto sessions = session_status(snapshot, now,255u,agents,live);
     if (sessions.waiting) return NovaMood::attention;
     if (sessions.error) return NovaMood::session_error;
     if (sessions.running) return NovaMood::session_working;

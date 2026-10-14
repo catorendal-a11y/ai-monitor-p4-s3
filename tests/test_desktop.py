@@ -163,6 +163,21 @@ class DesktopSettingsTests(unittest.TestCase):
 
 
 class DesktopWindowTests(unittest.TestCase):
+    def test_device_comparison_dialog_requires_explicit_matching_code_confirmation(self):
+        from enrollment_setup import ComparisonPrompt
+        from PySide6.QtWidgets import QLabel, QPushButton
+        prompt=ComparisonPrompt('A1B2-C3D4-E5F6-0123')
+        def inspect(dialog):
+            self.assertTrue(any(item.text()==prompt.code for item in dialog.findChildren(QLabel)))
+            match=next(button for button in dialog.findChildren(QPushButton) if button.text()=='Codes match')
+            self.assertFalse(match.autoDefault());self.assertFalse(match.isDefault())
+            return QDialog.DialogCode.Rejected
+        with patch.object(QDialog,'exec',inspect):self.window._compare_device_code(prompt)
+        self.assertFalse(prompt.wait(0))
+        expired=ComparisonPrompt(prompt.code);self.assertFalse(expired.wait(0))
+        with patch.object(QDialog,'exec',return_value=QDialog.DialogCode.Accepted):self.window._compare_device_code(expired)
+        self.assertFalse(expired.wait(0))
+
     @classmethod
     def setUpClass(cls):
         cls.application = QApplication.instance() or QApplication([])

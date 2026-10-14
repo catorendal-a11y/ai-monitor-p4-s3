@@ -20,12 +20,15 @@
 #include <string>
 
 static unsigned failures = 0;
+static agent::Snapshot agentSample;
+namespace agent {Snapshot read() {return agentSample;}}
 #define CHECK(condition) do { if (!(condition)) { \
   std::cerr << __func__ << ":" << __LINE__ << ": " #condition "\n"; ++failures; \
 } } while (false)
 
 static void feed(aim::ProtoCore& core, const std::string& text) {
   for (char byte : text) core.feed_byte(byte);
+  agentSample=core.agent_snapshot();
 }
 
 static std::string frame(const std::string& rows, const char* provider = "codex", int index = 0) {
@@ -46,27 +49,35 @@ static void session_events_are_bounded_selected_and_expire() {
   NovaState state;
   const auto warning=[](const char*,const aim::Row&) { return static_cast<uint8_t>(20); };
   CHECK(state.evaluate(core.snapshot(),now,false,warning)==NovaMood::session_working);
-  const auto before=core.snapshot();
+  const auto before=core.agent_snapshot();
   for (const std::string& rows : {"["+row+","+row+"]",std::string("[{\"provider\":\"claude\",\"running\":true,\"waiting\":0,\"completed\":0,\"error\":0}]"),
       std::string("[{\"provider\":\"claude\",\"running\":65,\"waiting\":0,\"completed\":0,\"error\":0}]"),std::string("[null]")}) {
     core.clear_out(); feed(core,"{\"cmd\":\"session_activity\",\"providers\":"+rows+"}\n");
     CHECK(core.out().find("error")!=std::string::npos);
-    CHECK(core.snapshot().sessions[0].running==before.sessions[0].running);
+    CHECK(core.agent_snapshot().sessions[0].running==before.sessions[0].running);
+    CHECK(core.agent_snapshot().revision==before.revision);
   }
-  auto snapshot=core.snapshot(); snapshot.sessions[0].running=0; snapshot.sessions[0].waiting=1;
+  auto snapshot=core.snapshot(); agentSample.sessions[0].running=0; agentSample.sessions[0].waiting=1;
   CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::attention);
-  snapshot.sessions[0].waiting=0; snapshot.sessions[0].completed=1;
+  agentSample.sessions[0].waiting=0; agentSample.sessions[0].completed=1;
   CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::completed);
-  snapshot.sessions[0].completed=0; snapshot.sessions[0].error=1;
+  agentSample.sessions[0].completed=0; agentSample.sessions[0].error=1;
   CHECK(state.evaluate(snapshot,now,false,warning)==NovaMood::session_error);
   CHECK(!session_status(snapshot,now+35000u).known);
   std::snprintf(snapshot.viewKeys[0],sizeof(snapshot.viewKeys[0]),"%s","codex");
   CHECK(!session_status(snapshot,now).known);
-  snapshot.viewsConfigured=false; snapshot.sessionActivityMs=0xfffffff0u;
+  snapshot.viewsConfigured=false; agentSample.sessionActivityMs=0xfffffff0u;
   CHECK(session_status(snapshot,10u).known);
   snapshot.hostPresent=false; CHECK(!session_status(snapshot,10u).known);
   feed(core,"{\"cmd\":\"session_activity\",\"providers\":[]}\n");
-  CHECK(core.snapshot().sessionCount==0);
+  CHECK(core.agent_snapshot().sessionCount==0);
+  now=0xfffffff0u;feed(core,"{\"cmd\":\"session_activity\",\"providers\":["+row+"]}\n");
+  const auto revision=core.agent_snapshot().revision;
+  now=16;core.poll();CHECK(core.agent_snapshot().fresh);
+  now=35000;core.poll();
+  CHECK(!core.agent_snapshot().fresh && core.agent_snapshot().sessionCount==0);
+  CHECK(core.agent_snapshot().revision==revision+1);
+  CHECK(core.snapshot().frameCount==0 && !core.snapshot().tokenUsageSeen);
 }
 
 static void timestamp_and_ack() {
@@ -796,6 +807,7 @@ static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
   value.psramTotal = 30u * 1024u * 1024u; value.hostedCompiled = true;
   value.hostedVersion = "2.12.13"; value.sdkVersion = "test-sdk";
   value.ppaSupported = true; value.applicationBytes = 4500000; value.partitionBytes = 6553600;
+  value.companion={630528,12,0,12000,18000,true,true};
   value.display.drawBytes = 1536000; value.display.rotationBytes = 768000;
   value.display.framebufferBytes = 1536000; value.display.drawCount = value.display.framebufferCount = 2;
   for (unsigned i=0;i<4;++i)
@@ -815,6 +827,9 @@ static void hardware_baseline_is_read_only_bounded_and_never_guesses_radio() {
   CHECK(reply["psram"]["sizeBytes"].as<uint32_t>() == value.psramSize);
   CHECK(reply["psram"]["heapTotal"].as<uint32_t>() == value.psramTotal);
   CHECK(reply["flash"]["freeApplicationBytes"].as<uint32_t>()==2053600);
+  CHECK(reply["companionCache"]["active"]==true);
+  CHECK(reply["companionCache"]["allocatedBytes"].as<uint32_t>()==630528);
+  CHECK(reply["companionCache"]["maxSwitchUs"].as<uint32_t>()==18000);
   CHECK(reply["startupMemory"].size()==4);
   CHECK(reply["startupMemory"][3]["stage"]=="after-companion");
   CHECK(reply["startupMemory"][3]["captured"]==true);
@@ -972,6 +987,55 @@ static void byte_rle_requires_exact_complete_output() {
 }
 
 int main() {
+  {
+    aim::ProtoCore core;core.tick=[]{return UINT32_MAX;};core.heap=[]{return UINT32_MAX;};core.psram_free=[]{return UINT32_MAX;};
+    core.boot_id=UINT32_MAX;core.firmware_version="v1.19.0";
+    feed(core,"{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":255,\"idleSeconds\":4294967295,\"delta\":18446744073709551615}\n");
+    core.clear_out();feed(core,"{\"cmd\":\"get_info\"}\n");JsonDocument info;
+    CHECK(deserializeJson(info,core.out())==DeserializationError::Ok);
+    CHECK(info["historyProtocol"]==1 && info["bootId"].as<uint32_t>()==UINT32_MAX);
+  }
+  {
+    aim::ProtoCore core;core.tick=[] {return 100u;};
+    feed(core,"{\"cmd\":\"get_info\"}\n");
+    CHECK(core.out().find("\"interactionProtocol\":0")!=std::string::npos);
+    CHECK(core.out().find("\"enrollmentProtocol\":0")!=std::string::npos);
+    core.clear_out();feed(core,"{\"cmd\":\"interaction_enroll\",\"schema\":1}\n");
+    CHECK(core.out().find("USB enrollment unavailable")!=std::string::npos);
+    unsigned enrollments=0;
+    core.enrollment_command=[&](JsonObjectConst,uint32_t now,std::string& reply) {
+      ++enrollments;CHECK(now==100);reply="{\"type\":\"test_enrollment\"}";return true;
+    };
+    core.clear_out();feed(core,"{\"cmd\":\"interaction_enroll_status\",\"schema\":1}\n");
+    CHECK(enrollments==1 && core.out()=="{\"type\":\"test_enrollment\"}\n");
+    core.clear_out();feed(core,"{\"cmd\":\"get_info\"}\n");
+    CHECK(core.out().find("\"enrollmentProtocol\":1")!=std::string::npos && core.out().find("\"interactionProtocol\":0")!=std::string::npos);
+    core.enrollment_command=[](JsonObjectConst,uint32_t,std::string& reply){reply.assign(4096,'x');return true;};
+    core.clear_out();feed(core,"{\"cmd\":\"interaction_enroll_commit\",\"schema\":1}\n");
+    CHECK(core.out().find("USB enrollment unavailable")!=std::string::npos && core.out().size()<512);
+    core.clear_out();feed(core,"{\"cmd\":\"interaction\",\"schema\":1,\"trustedChannel\":true}\n");
+    CHECK(core.out().find("USB interaction unavailable")!=std::string::npos);
+    unsigned called=0,polled=0;
+    core.interaction_command=[&](JsonObjectConst object,uint32_t now,std::string& reply) {
+      ++called;CHECK(now==100 && object["schema"]==1);
+      reply="{\"type\":\"test_interaction\"}";return true;
+    };
+    core.interaction_tick=[&](uint32_t now){CHECK(now==100);++polled;};
+    core.clear_out();feed(core,"{\"cmd\":\"interaction_open\",\"schema\":1}\n");
+    CHECK(called==1 && core.out()=="{\"type\":\"test_interaction\"}\n");
+    CHECK(core.snapshot().tokenSourceMask==0 && core.agent_snapshot().sessionCount==0);
+    core.poll();CHECK(polled==1);
+    core.clear_out();feed(core,"{\"cmd\":\"get_info\"}\n");
+    CHECK(core.out().find("\"interactionProtocol\":1")!=std::string::npos);
+    core.interaction_command=[](JsonObjectConst,uint32_t,std::string& reply){reply.assign(4096,'x');return true;};
+    core.clear_out();feed(core,"{\"cmd\":\"interaction_open\"}\n");
+    CHECK(core.out().find("USB interaction unavailable")!=std::string::npos && core.out().size()<512);
+    unsigned measured=0;
+    core.crypto_benchmark=[&]{++measured;return std::string("{\"type\":\"crypto_benchmark\"}");};
+    core.clear_out();feed(core,"{\"cmd\":\"get_crypto_benchmark\\u0000shadow\"}\n");CHECK(measured==0);
+    core.clear_out();feed(core,"{\"cmd\":\"get_crypto_benchmark\",\"extra\":true}\n");CHECK(measured==0);
+    core.clear_out();feed(core,"{\"cmd\":\"get_crypto_benchmark\"}\n");CHECK(measured==1);
+  }
   byte_rle_requires_exact_complete_output();
   startup_memory_is_ordered_once_only_and_handles_clock_rollover();
   ppa_benchmark_queries_are_read_only();

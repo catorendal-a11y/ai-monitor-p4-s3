@@ -92,6 +92,12 @@ def build_package(output, package, version, args):
             '--paths',str(ROOT/'tools'),'--exclude-module','PySide6','--exclude-module','esptool',
             str(ROOT/'tools/aim_events.py'))
         shutil.copytree(events_dist/'AI-Monitor-Events',package,dirs_exist_ok=True)
+        permission_dist=scratch/'permission-dist'
+        build_desktop(*common,'--distpath',str(permission_dist),'--onedir','--console',
+            '--contents-directory','permission-runtime','--name','AI-Monitor-Permission',
+            '--paths',str(ROOT/'tools'),'--exclude-module','PySide6','--exclude-module','esptool',
+            str(ROOT/'tools/aim_permission.py'))
+        shutil.copytree(permission_dist/'AI-Monitor-Permission',package,dirs_exist_ok=True)
         run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Console', '--paths', str(ROOT / 'tools'),
             '--exclude-module', 'esptool', '--exclude-module', 'PySide6',
             str(ROOT / 'tools/aim_control.py'))
@@ -108,7 +114,7 @@ def build_package(output, package, version, args):
             raise RuntimeError('Private/generated path in tracked release source')
         if relative.parts[:2] == ('tools', 'activity'):
             raise RuntimeError('Runtime activity records must not be exported')
-        if relative.name.startswith('aim_host.invalid-') or relative.name in {'aim_host.json', 'aim_host.status.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
+        if relative.name.startswith(('aim_host.invalid-','permission-trust','permission-endpoint.')) or relative.name in {'aim_host.json', 'aim_host.status.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
                 (relative.name.startswith('.env.') and relative.name != '.env.example') or \
                 relative.suffix in {'.log', '.db', '.sqlite', '.sqlite3', '.jsonl', '.lock', '.bin', '.exe', '.lnk', '.pem', '.key'}:
             raise RuntimeError('Private/generated file in tracked release source')
@@ -138,6 +144,7 @@ def build_package(output, package, version, args):
     # Test the exact app only after source, both images and their manifest are
     # present: its diagnostics also launch the actual packaged flasher child.
     subprocess.run([str(package / 'AI-Monitor.exe'), '--gui-check'], cwd=package, check=True, timeout=30)
+    subprocess.run([str(package / 'AI-Monitor-Permission.exe'), '--check'],cwd=package,check=True,timeout=10)
     licenses = package / 'licenses'
     licenses.mkdir()
     for distribution in metadata.distributions():
