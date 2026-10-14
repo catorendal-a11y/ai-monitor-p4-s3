@@ -1560,7 +1560,7 @@ int main(int argc, char** argv) {
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),""));
     lv_area_t after{};lv_obj_update_layout(agents_ui::screen);lv_obj_get_coords(agents_ui::next,&after);
     CHECK(before.x1==after.x1 && before.y1==after.y1 && before.x2==after.x2 && before.y2==after.y2);
-    liveSample={};ui_agents_update();screenshot(screenshots,"live-agents-disconnected");
+    liveSample=live_agent::UsbLiveSnapshot{};ui_agents_update();screenshot(screenshots,"live-agents-disconnected");
     liveSample.fresh=true;liveSample.epoch=3;liveSample.count=8;
     fakeTick=0xfffffff0u;liveSample.receivedAt=fakeTick;ui_agents_update();
     fakeTick=16;ui_agents_update();CHECK(!lv_obj_is_hidden(agents_ui::rows[0].card));
@@ -1572,7 +1572,7 @@ int main(int argc, char** argv) {
     touchPressed=true;lv_indev_read(pointer);
     liveSample.count=0;ui_agents_update();touchPressed=false;lv_indev_read(pointer);
     CHECK(agents_ui::page==0 && lv_obj_has_state(agents_ui::next,LV_STATE_DISABLED));
-    liveSample={};sample.hostPresent=true;sample.viewsConfigured=true;sample.viewCount=2;
+    liveSample=live_agent::UsbLiveSnapshot{};sample.hostPresent=true;sample.viewsConfigured=true;sample.viewCount=2;
     strcpy(sample.viewKeys[0],"codex");strcpy(sample.viewKeys[1],"zcode");
     sample.tokenUsageKnown=true;sample.tokenSourceMask=3;sample.tokenActivityMs=fakeTick;
     ui_agents_update();
@@ -1589,7 +1589,7 @@ int main(int argc, char** argv) {
     sample=savedQuota;
   }
   {
-    event_center_ui::center.clear();liveSample={};sample.hostPresent=true;fakeTick=10000;
+    event_center_ui::center.clear();liveSample=live_agent::UsbLiveSnapshot{};sample.hostPresent=true;fakeTick=10000;
     liveSample.fresh=true;liveSample.receivedAt=fakeTick;liveSample.epoch=9;liveSample.revision=1;liveSample.count=1;
     strcpy(liveSample.agents[0].provider,"claude");strcpy(liveSample.agents[0].id,"fixture");
     liveSample.agents[0].state=agent::State::WAITING;
