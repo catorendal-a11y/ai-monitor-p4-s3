@@ -74,7 +74,7 @@ jobs:
       - if: matrix.environment == 'esp32p4-release'
         run: python scripts/run_tests.py --ui
       - run: python scripts/collect_firmware.py --environment ${{ matrix.environment }} --output work/prebuilt
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: firmware-${{ matrix.environment }}
           path: work/prebuilt/*/*.bin
@@ -112,7 +112,7 @@ jobs:
           $installer = Get-ChildItem work/windows-release -Filter 'AI-Monitor-Setup-*.exe' | Select-Object -First 1
           python scripts/test_windows_install.py --installer $installer.FullName
           if ($LASTEXITCODE -ne 0) { throw 'Fresh-profile installer verification failed.' }
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-candidate
           path: |
