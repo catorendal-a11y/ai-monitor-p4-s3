@@ -35,6 +35,8 @@ secrets.json
 *.pfx
 .codex/
 .zcode/
+.claude/
+settings.ai-monitor-*backup*.json
 
 # Runtime records may contain private account or activity information
 *.db
@@ -61,3 +63,6 @@ Desktop.ini
 *.bak
 *.tmp
 *~
+
+# Private one-shot device capture mailbox
+tools/screen-capture/

@@ -58,6 +58,7 @@ bool PermissionView::initialize() {
 }
 void PermissionView::show() {
   if(!root_)return;
+  release_barrier(); // A finger held on the previous screen is not a new approval gesture.
   if(screen_)lv_obj_remove_event_cb_with_user_data(screen_,screen_event,this);
   screen_=lv_screen_active();
   lv_obj_add_event_cb(screen_,screen_event,LV_EVENT_SCREEN_UNLOAD_START,this);
@@ -65,6 +66,7 @@ void PermissionView::show() {
   lv_obj_set_hidden(root_,false);
 }
 void PermissionView::hide() {
+  if(cancel_)cancel_();
   cancel_pointer();controller_.hide();
   if(screen_)lv_obj_remove_event_cb_with_user_data(screen_,screen_event,this);
   screen_=nullptr;
@@ -72,17 +74,26 @@ void PermissionView::hide() {
 }
 void PermissionView::screen_event(lv_event_t* event) {
   auto* self=static_cast<PermissionView*>(lv_event_get_user_data(event));
+  if(self->cancel_)self->cancel_();
   self->cancel_pointer();self->controller_.hide();
   if(self->root_)lv_obj_set_hidden(self->root_,true);
   if(lv_event_get_code(event)==LV_EVENT_DELETE)self->screen_=nullptr;
 }
 void PermissionView::deleted(lv_event_t* event) {
   auto* self=static_cast<PermissionView*>(lv_event_get_user_data(event));
-  if(lv_event_get_target_obj(event)==self->root_) { self->cancel_pointer();self->controller_.hide();self->root_=nullptr; }
+  if(lv_event_get_target_obj(event)==self->root_) {
+    if(self->cancel_)self->cancel_();
+    self->cancel_pointer();self->controller_.hide();self->root_=nullptr;
+  }
 }
 void PermissionView::cancel_pointer() {
   if(pointer_)lv_indev_wait_release(pointer_);
   pointer_=nullptr;controller_.release();
+}
+void PermissionView::release_barrier() {
+  for(auto* input=lv_indev_get_next(nullptr);input;input=lv_indev_get_next(input))
+    if(lv_indev_get_type(input)==LV_INDEV_TYPE_POINTER && lv_indev_get_state(input)==LV_INDEV_STATE_PRESSED)
+      lv_indev_wait_release(input);
 }
 bool PermissionView::fits(lv_obj_t* object) const {
   for(auto* current=object;current;current=lv_obj_get_parent(current))
@@ -122,7 +133,9 @@ void PermissionView::update(const InteractionSnapshot& value,const PermissionCon
   if(!root_)return;
   const uint32_t now=clock_();context_=context;context_.visible &= reviewable();
   if (value.epoch!=renderedEpoch_ || value.revision!=renderedRevision_ ||
-      !value.request.equals(controller_.snapshot().request) || !context_.eligible())cancel_pointer();
+      !value.request.equals(controller_.snapshot().request) || !context_.eligible()) {
+    cancel_pointer();release_barrier();
+  }
   controller_.update(value,context_,now);
   const bool present=value.fresh && value.leaseMs>0 && value.leaseMs<=lease_ms && now-value.receivedAt<value.leaseMs && value.request.present;
   if(present) {

@@ -163,6 +163,22 @@ class DesktopSettingsTests(unittest.TestCase):
 
 
 class DesktopWindowTests(unittest.TestCase):
+    def test_permission_preview_is_explicit_off_and_restricted_to_p4_claude(self):
+        window=self.window
+        self.assertFalse(window.usb_permissions.isChecked())
+        self.assertFalse(window.usb_permissions.isEnabled())
+        self.assertFalse(window.permission_link.isEnabled())
+        window.board.setCurrentIndex(window.board.findData('guition-p4'))
+        window.providers['claude'].setChecked(True)
+        self.assertTrue(window.usb_permissions.isEnabled())
+        window.usb_permissions.setChecked(True)
+        self.assertFalse(window.permission_link.isEnabled())  # Unsaved preference is not consent.
+        window.providers['claude'].setChecked(False)
+        self.assertFalse(window.usb_permissions.isChecked())
+        window.providers['claude'].setChecked(True)
+        window.board.setCurrentIndex(window.board.findData('waveshare-s3-43'))
+        self.assertFalse(window.usb_permissions.isEnabled())
+
     def test_device_comparison_dialog_requires_explicit_matching_code_confirmation(self):
         from enrollment_setup import ComparisonPrompt
         from PySide6.QtWidgets import QLabel, QPushButton

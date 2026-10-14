@@ -50,6 +50,10 @@ def main():
         subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
                         "-I",str(json_include),str(ROOT/"tests/test_history_usb.cpp"),"-o",str(history_binary)],cwd=ROOT,check=True)
         subprocess.run([str(history_binary)],cwd=ROOT,check=True)
+        animation_binary=Path(directory)/("animation-tests.exe" if os.name=="nt" else "animation-tests")
+        subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
+                        "-I",str(json_include),str(ROOT/"tests/test_animation.cpp"),"-o",str(animation_binary)],cwd=ROOT,check=True)
+        subprocess.run([str(animation_binary)],cwd=ROOT,check=True)
         subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
                         "-I", str(ROOT / "tests/native"), str(ROOT / "tests/test_settings.cpp"), "-o", str(settings_binary)],
                        cwd=ROOT, check=True)
@@ -81,6 +85,10 @@ def main():
         subprocess.run([str(binary), str(screenshots)], cwd=ROOT, check=True)
         s3_binary = build / ("test_ui_s3.exe" if os.name == "nt" else "test_ui_s3")
         subprocess.run([str(s3_binary), str(screenshots / 's3')], cwd=ROOT, check=True)
+        permission_binary = build / ("test_ui_permissions.exe" if os.name == "nt" else "test_ui_permissions")
+        subprocess.run([str(permission_binary), str(screenshots / 'permission-wrapper')], cwd=ROOT, check=True)
+        mirror_binary=build/("test_mirror.exe" if os.name=="nt" else "test_mirror")
+        subprocess.run([str(mirror_binary)],cwd=ROOT,check=True)
     print("All requested regressions passed.")
 
 

@@ -1,3 +1,20 @@
+# AI Monitor v1.19.1-rc1
+
+Local candidate; not an announcement of a published or physically qualified release.
+
+- Add explicit PC/device permission setup with a separate Claude helper and a default-off preview.
+  Production approval stays disabled until physical enrollment/hold/deny/unplug tests pass.
+- Connect authenticated developer USB decisions to the existing permission UI and serial owner.
+  Cancel stale/hidden/disconnected requests, never retry ambiguous writes, and require a new touch.
+- Add opt-in fixed lifecycle history for Codex/Claude, observed session/active-time/turn summaries
+  and bounded history protocol 2. Preserve numeric records and unknown values; record no transcripts.
+- Add bounded animation format 2 and shared NOVA/ORBIT timing/loop playback through the verified
+  renderer/cache. External companion-pack installation remains disabled.
+- Add explicit real USB device-screen capture, including ordinary overlays, bounded image transfer,
+  private temporary storage and STALE marking. No simulated images, virtual touch or approval.
+- Add a read-only CI candidate installer job for clean Windows installation/upgrade/uninstall
+  validation without publishing or overwriting a release.
+
 # AI Monitor v1.19.0
 
 This release adds clearer connection checks, optional numeric history and explicitly enabled Claude session events.

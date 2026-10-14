@@ -993,7 +993,7 @@ int main() {
     feed(core,"{\"cmd\":\"token_activity\",\"known\":true,\"seen\":true,\"sources\":255,\"idleSeconds\":4294967295,\"delta\":18446744073709551615}\n");
     core.clear_out();feed(core,"{\"cmd\":\"get_info\"}\n");JsonDocument info;
     CHECK(deserializeJson(info,core.out())==DeserializationError::Ok);
-    CHECK(info["historyProtocol"]==1 && info["bootId"].as<uint32_t>()==UINT32_MAX);
+    CHECK(info["historyProtocol"]==2 && info["bootId"].as<uint32_t>()==UINT32_MAX);
   }
   {
     aim::ProtoCore core;core.tick=[] {return 100u;};

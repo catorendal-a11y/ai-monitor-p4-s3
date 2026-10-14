@@ -12,7 +12,7 @@ STATES = frozenset(('starting', 'waiting_usb', 'connecting', 'connected',
 OPTIONS = {'reconnect_s': (2, 60, 5), 'token_poll_s': (2, 15, 2),
            'log_font_size': (10, 18, 10)}
 FLAGS = {'start_host_on_open': False, 'keep_host_on_close': True,
-         'minimize_to_tray': True, 'close_to_tray': False, 'usage_history': False}
+         'minimize_to_tray': True, 'close_to_tray': False, 'usage_history': False, 'usb_permissions': False}
 
 
 def validate_options(config):

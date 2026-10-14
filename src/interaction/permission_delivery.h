@@ -29,6 +29,10 @@ class PermissionDelivery {
   }
   void cancel() { pending_={};observed_=false;local_={};context_={};observedAt_=0; }
   bool queued()const{return pending_.decision!=Decision::none;}
+  bool local_valid(const PermissionEnvelope& value,const InteractionSnapshot& current,
+                   const PermissionContext& context,uint32_t now)const {
+    return eligible(value,current,context,now);
+  }
  private:
   InteractionSnapshot local_;
   PermissionContext context_;

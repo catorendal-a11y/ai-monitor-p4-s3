@@ -18,18 +18,22 @@ ERRORS = frozenset(('History numeric limit reached','History queue full; some ob
 
 def connect(directory, create=False):
     path = Path(directory)/'history.db'
+    if path.is_symlink(): raise ValueError('Invalid history database path')
     if not create and not path.is_file(): return None
     if create: path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
     database = sqlite3.connect(path if create else path.resolve().as_uri()+'?mode=ro',
                                uri=not create, timeout=.1)
     try:
+        deadline = time.monotonic()+.5
+        database.set_progress_handler(lambda: time.monotonic()>deadline, 1000)
         database.execute('PRAGMA trusted_schema=OFF')
         if not create: database.execute('PRAGMA query_only=ON')
         if exists:
             if database.execute('PRAGMA application_id').fetchone()[0] != APPLICATION_ID:
                 raise ValueError('Unsupported history database')
-            if database.execute('PRAGMA user_version').fetchone()[0] != 1:
+            schema=database.execute('PRAGMA user_version').fetchone()[0]
+            if schema not in (1,2):
                 raise ValueError('Unsupported history schema')
         else:
             database.executescript(f'''
@@ -40,8 +44,11 @@ def connect(directory, create=False):
                     kind TEXT NOT NULL, used REAL NOT NULL, reset INTEGER NOT NULL, epoch INTEGER NOT NULL,
                     PRIMARY KEY(provider,minute,window,kind));
             ''')
-        deadline = time.monotonic()+.5
-        database.set_progress_handler(lambda: time.monotonic()>deadline, 1000)
+        if create:
+            from agent_history import create_schema
+            with database:
+                create_schema(database)
+                database.execute('PRAGMA user_version=2')
         return database
     except Exception:
         database.close(); raise
@@ -69,6 +76,7 @@ def quota_rows(provider, rows, timestamp):
 
 class HistoryRecorder:
     def __init__(self, directory, enabled=False, clock=time.time):
+        if type(enabled) is not bool: raise ValueError('History preference must be boolean')
         self.directory, self.clock = Path(directory), clock
         self.enabled, self.closed = bool(enabled), False
         self.condition = threading.Condition()
@@ -83,10 +91,22 @@ class HistoryRecorder:
     def configure(self, enabled):
         if type(enabled) is not bool: raise ValueError('History preference must be boolean')
         with self.condition:
+            if self.closed or self.enabled == enabled: return
             self.enabled = enabled
             self.generation += 1
             self.epoch = time.time_ns()
             if not enabled: self.tokens.clear(); self.quotas.clear()
+            self.condition.notify()
+
+    def _publish_consent(self, enabled, epoch):
+        """Publish off the queue lock, then revoke a superseded publication."""
+        from agent_history import configure
+        configure(self.directory,enabled,epoch)
+        with self.condition:
+            stale = self.closed or self.epoch != epoch or self.enabled != enabled
+            current_epoch = self.epoch
+        if enabled and stale:
+            configure(self.directory,False,current_epoch)
 
     def record_tokens(self, deltas):
         minute = int(self.clock())//60
@@ -112,20 +132,26 @@ class HistoryRecorder:
             self.condition.notify()
 
     def _write(self):
+        published_epoch=0
         while True:
             with self.condition:
-                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed)
-                if self.closed and not (self.tokens or self.quotas): return
-                tokens, quotas, generation = self.tokens, list(self.quotas), self.generation
+                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed or self.epoch!=published_epoch)
+                tokens, quotas, generation, enabled, epoch = self.tokens, list(self.quotas), self.generation, self.enabled, self.epoch
                 self.tokens=OrderedDict(); self.quotas.clear()
-                if not self.enabled: continue
+                stopped=self.closed
             # No disk I/O under the queue lock: quota submission/USB stays
             # responsive. Disabling discards queued work; an in-flight sample
             # that was observed before disabling may finish its transaction.
             try:
+                from agent_history import configure
+                if not enabled or (stopped and not (tokens or quotas)):
+                    self._publish_consent(False,epoch);published_epoch=epoch
+                    if stopped:return
+                    continue
                 with closing(connect(self.directory,create=True)) as database, database:
                     with self.condition:
                         if generation != self.generation or not self.enabled: continue
+                    self._publish_consent(True,epoch);published_epoch=epoch
                     for (provider,minute),count in tokens.items():
                         old=database.execute('SELECT tokens FROM tokens WHERE provider=? AND minute=?',
                                              (provider,minute)).fetchone()
@@ -136,8 +162,17 @@ class HistoryRecorder:
                     oldest=int(self.clock()-RETENTION_SECONDS)//60
                     database.execute('DELETE FROM tokens WHERE minute<?',(oldest,))
                     database.execute('DELETE FROM quota WHERE minute<?',(oldest,))
+                if stopped:
+                    configure(self.directory,False,epoch)
+                    return
             except (ValueError,OSError,sqlite3.Error):
                 self.last_error='History unavailable; check local storage. Some observations were missed.'
+                published_epoch=epoch
+                # A failed DB/migration must not leave observational hooks writing
+                # under an old enabled marker, especially after host shutdown.
+                try: self._publish_consent(False,epoch)
+                except (ValueError,OSError): pass
+                if stopped:return
 
     def close(self):
         with self.condition:

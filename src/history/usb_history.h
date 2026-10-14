@@ -15,7 +15,8 @@ class UsbHistory {
   void poll(uint32_t now){if(pending_ && now-started_>=3000)cancel();}
   bool handle(JsonObjectConst message,uint32_t boot,uint32_t now) {
     poll(now);
-    if(!text_field(message["cmd"],0,32) || !message["schema"].is<uint32_t>() || message["schema"].as<uint32_t>()!=1)return fail();
+    if(!text_field(message["cmd"],0,32) || !message["schema"].is<uint32_t>() ||
+       (message["schema"].as<uint32_t>()!=1 && message["schema"].as<uint32_t>()!=2))return fail();
     const char* cmd=message["cmd"];
     if(!strcmp(cmd,"history_begin")) {
       if(!fields(message,{"cmd","schema","bootId","epoch","revision","enabled","error","providers","date","sampleAgeSeconds"}) || !boot || !message["bootId"].is<uint32_t>() || message["bootId"].as<uint32_t>()!=boot ||
@@ -24,7 +25,7 @@ class UsbHistory {
          !message["providers"].is<JsonArrayConst>() || message["providers"].size()>8 || !date(message["date"]))return fail();
       const uint32_t epoch=message["epoch"],revision=message["revision"];
       if(epoch==epoch_ && revision<=sequence_)return fail();
-      cancel();epoch_=epoch;sequence_=revision;staging_={};staging_.fresh=true;
+      cancel();epoch_=epoch;sequence_=revision;schema_=message["schema"];staging_={};staging_.fresh=true;
       ageMs_=message["sampleAgeSeconds"].as<uint32_t>()*1000;
       staging_.enabled=message["enabled"];staging_.error=message["error"];strcpy(staging_.date,message["date"]);
       staging_.count=message["providers"].size();
@@ -38,11 +39,27 @@ class UsbHistory {
       if(!staging_.count){publish(now);return true;}
       started_=now;pending_=true;return true;
     }
-    if(strcmp(cmd,"history_provider") || !fields(message,{"cmd","schema","epoch","revision","index","today","daily","hourly","quota"}) || !pending_ || !number(message["epoch"]) || !number(message["revision"]) ||
+    const bool shape=message["schema"].as<uint32_t>()==2?
+      fields(message,{"cmd","schema","epoch","revision","index","today","daily","hourly","quota","agents"}):
+      fields(message,{"cmd","schema","epoch","revision","index","today","daily","hourly","quota"});
+    if(strcmp(cmd,"history_provider") || !shape || !pending_ || message["schema"].as<uint32_t>()!=schema_ || !number(message["epoch"]) || !number(message["revision"]) ||
        message["epoch"].as<uint32_t>()!=epoch_ || message["revision"].as<uint32_t>()!=sequence_ || !message["index"].is<uint32_t>())return fail();
     const uint32_t index=message["index"];
     if(index>=staging_.count || (received_&(1u<<index)))return fail();
     auto& provider=staging_.providers[index];
+    if(schema_==2) {
+      const auto agents=message["agents"];
+      if(!agents.is<JsonObjectConst>() || !fields(agents.as<JsonObjectConst>(),{"sessions","activeSeconds","completedTurns","failedTurns"}))return fail();
+      unsigned i=0;uint32_t* values[]={&provider.sessions,&provider.activeSeconds,&provider.completedTurns,&provider.failedTurns};
+      for(const char* key:{"sessions","activeSeconds","completedTurns","failedTurns"}) {
+        const auto value=agents[key];
+        if(!value.isNull()) {
+          if(!value.is<uint32_t>() || value.as<uint32_t>()>(i==1?100800u:50000u))return fail();
+          *values[i]=value;provider.agentKnown|=1u<<i;
+        }
+        ++i;
+      }
+    }
     if(!series(message["daily"],provider.daily,provider.dailyKnown) || !series(message["hourly"],provider.hourly,provider.hourlyKnown))return fail();
     const auto today=message["today"];
     if(today.isNull()!=!(provider.dailyKnown&(1u<<6)) || (!today.isNull() && (!count(today) || today.as<uint64_t>()!=provider.daily[6])))return fail();
@@ -55,7 +72,7 @@ class UsbHistory {
       provider.usedPercent=quota["usedPercent"];provider.changeKnown=!quota["changePercent"].isNull();
       if(provider.changeKnown)provider.changePercent=quota["changePercent"];
     }
-    if(staging_.error && (provider.dailyKnown || provider.hourlyKnown || provider.quotaKnown))return fail();
+    if(staging_.error && (provider.dailyKnown || provider.hourlyKnown || provider.quotaKnown || provider.agentKnown))return fail();
     received_|=1u<<index;
     if(received_==((1u<<staging_.count)-1))publish(now);
     return true;
@@ -102,6 +119,6 @@ class UsbHistory {
   void cancel(){pending_=false;received_=0;staging_={};}
   void publish(uint32_t now){staging_.receivedAt=now-ageMs_;staging_.revision=published_.revision+1;published_=staging_;cancel();}
   ProviderKnown known_;Snapshot published_,staging_;
-  bool pending_=false;uint32_t started_=0,received_=0,epoch_=0,sequence_=0,ageMs_=0;
+  bool pending_=false;uint32_t started_=0,received_=0,epoch_=0,sequence_=0,ageMs_=0,schema_=1;
 };
 }

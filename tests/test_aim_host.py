@@ -60,6 +60,39 @@ def panel_with(serial):
 
 
 class PanelTests(unittest.TestCase):
+    def test_short_reply_reads_first_byte_then_available_without_fill_timeout(self):
+        class BurstSerial(FakeSerial):
+            def __init__(self):
+                super().__init__()
+                self.pending = bytearray(b'{"type":"refresh_request","requestId":7}\n{"type":"ack","frameId":101}\n')
+                self.calls = []
+                self.fill_timeouts = 0
+                self.first = True
+            @property
+            def in_waiting(self):
+                # Simulate arriving first byte, then partial bursts while preserving JSON.
+                if self.first: return 0
+                return min(13, len(self.pending))
+            def read(self, count):
+                self.calls.append(count)
+                available = 1 if self.first else min(13, len(self.pending))
+                self.first = False
+                if count > available: self.fill_timeouts += 1
+                result = bytes(self.pending[:min(count, available)])
+                del self.pending[:len(result)]
+                return result
+        serial = BurstSerial(); panel = panel_with(serial)
+        self.assertEqual(panel.wait_for('ack', frame_id=101)['frameId'], 101)
+        self.assertEqual(serial.calls[0], 1)
+        self.assertEqual(serial.fill_timeouts, 0)
+        self.assertTrue(all(count <= 13 for count in serial.calls))
+        self.assertEqual(panel.take_refresh_request(), 7)
+
+    def test_wait_reply_serial_error_keeps_reconnect_signal(self):
+        serial = FakeSerial()
+        with patch.object(serial, 'read', side_effect=host.serial.SerialException('disconnected')):
+            with self.assertRaises(host.serial.SerialException): panel_with(serial).wait_for('ack')
+
     def test_activity_signals_are_negotiated_with_firmware(self):
         serial = FakeSerial([b'{"type":"info","hostActivity":true}\n'])
         panel = panel_with(serial)

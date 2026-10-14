@@ -540,3 +540,73 @@ class NativeAuthTests(unittest.TestCase):
         self.call('empty_key')
         self.assertFalse(self.call('open', message=self.host.hello())['ok'])
         self.assertFalse(self.call('layer_handle', message=self.host.hello())['layerTrusted'])
+
+    def prepare_serial_decision(self, deny=False):
+        challenge = self.call('serial_handle', now=100, message=self.host.hello())
+        self.assertTrue(challenge['ok'])
+        ready = self.call('serial_handle', now=101, message=self.host.challenge(challenge['reply']))
+        self.host.ready(ready['reply'])
+        received = self.call('serial_handle', now=102, message=self.host.encode(self.request()))
+        self.assertEqual(self.host.decode(received['reply'])['kind'], 'received')
+        earned = self.call('serial_earn', now=1920, deny=deny)
+        self.assertTrue(earned['ok']);self.assertTrue(earned['serialQueued'])
+
+    def test_serial_owner_final_gate_signs_and_writes_an_earned_allow_once(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921)
+        self.assertTrue(result['ok']);self.assertEqual(result['serialWrites'], 1)
+        self.assertEqual(self.host.decode(result['reply'])['decision'], 'allow')
+        self.assertFalse(self.call('serial_transmit', now=1922)['ok'])
+        self.assertEqual(self.call('serial_transmit', now=1923)['serialWrites'], 1)
+
+    def test_serial_owner_physical_denial_uses_the_same_final_gate(self):
+        self.prepare_serial_decision(deny=True)
+        result = self.call('serial_transmit', now=1921)
+        self.assertTrue(result['ok']);self.assertEqual(self.host.decode(result['reply'])['decision'], 'deny')
+
+    def test_serial_owner_cannot_send_after_local_visibility_cancellation(self):
+        self.prepare_serial_decision()
+        self.call('serial_observe', now=1921, visible=False, awake=True)
+        result = self.call('serial_transmit', now=1922)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+
+    def test_serial_owner_rechecks_ui_deadline_after_real_crypto(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, signDelay=100)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+        self.assertFalse(result['serialQueued'])
+
+    def test_serial_owner_never_retries_ambiguous_partial_write(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, partial=True)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 1)
+        self.assertFalse(self.call('serial_transmit', now=1922)['ok'])
+        self.assertEqual(self.call('serial_transmit', now=1923)['serialWrites'], 1)
+
+    def test_serial_owner_waits_for_capacity_without_queuing_stale_wire_bytes(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, capacity=0)
+        self.assertFalse(result['ok']);self.assertTrue(result['serialQueued']);self.assertEqual(result['serialWrites'], 0)
+        result = self.call('serial_transmit', now=2020)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+
+    def test_serial_owner_disconnect_or_ui_cancel_prevents_a_write(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, connected=False)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+
+    def test_serial_owner_cancels_a_disconnect_during_signing_before_write(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, disconnectOnSign=True)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+
+    def test_serial_owner_ui_cancellation_revokes_before_serial_poll(self):
+        self.prepare_serial_decision()
+        self.call('serial_cancel', now=1921)
+        result = self.call('serial_transmit', now=1922)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)
+
+    def test_serial_owner_rechecks_freshness_after_a_slow_capacity_check(self):
+        self.prepare_serial_decision()
+        result = self.call('serial_transmit', now=1921, capacityDelay=100)
+        self.assertFalse(result['ok']);self.assertEqual(result['serialWrites'], 0)

@@ -104,3 +104,36 @@ class DeviceHistoryTests(unittest.TestCase):
             with self.assertRaises(ValueError):compact_history(self.root,['codex'],True,now,self.boundaries)
         for date in ('2026-02-30','2026/10/14'):
             with self.assertRaises(ValueError):compact_history(self.root,['codex'],True,self.now,(date,self.starts))
+
+    def test_daily_agent_summary_is_observed_and_token_only_provider_stays_unknown(self):
+        import hashlib
+        from agent_history import configure,record
+        self.rows([('codex',self.starts[6],5),('zcode',self.starts[6],99)])
+        configure(self.root,True,17)
+        identity=hashlib.sha256(b'synthetic daily agent').hexdigest()
+        start=self.starts[6]*60
+        for event,state,offset in [('SessionStart','IDLE',1),('UserPromptSubmit','WORKING',10),
+                                   ('PermissionRequest','WAITING',30),('PreToolUse','EDITING',50),
+                                   ('Stop','COMPLETED',70)]:
+            record(self.root,'codex',identity,7,event,state,start+offset,True)
+        codex,zcode=self.summary()['providers']
+        self.assertEqual(codex['agents'],dict(sessions=1,activeSeconds=40,completedTurns=1,failedTurns=0))
+        self.assertTrue(all(value is None for value in zcode['agents'].values()))
+        self.assertNotIn('task',str(codex['agents']).lower())
+
+    def test_schema_one_device_reader_preserves_token_history_with_unknown_agent_metrics(self):
+        self.rows([('codex',self.starts[6],42)])
+        with closing(connect(self.root,create=True)) as database,database:
+            database.execute('DROP TABLE agent_events');database.execute('PRAGMA user_version=1')
+        result=self.summary();self.assertFalse(result['error'])
+        self.assertEqual(result['providers'][0]['today'],42)
+        self.assertTrue(all(value is None for value in result['providers'][0]['agents'].values()))
+
+    def test_corrupt_agent_journal_clears_all_summaries_including_valid_tokens(self):
+        self.rows([('codex',self.starts[6],42),('zcode',self.starts[6],9)])
+        with closing(connect(self.root,create=True)) as database,database:
+            database.execute('INSERT INTO agent_events VALUES(?,?,?,?,?,?,?,?,?)',
+                ('invalid','codex','private raw id',7,17,'Stop','COMPLETED',self.now-1,1))
+        result=self.summary();self.assertTrue(result['error'])
+        self.assertTrue(all(p['today'] is None and all(v is None for v in p['agents'].values())
+                            for p in result['providers']))

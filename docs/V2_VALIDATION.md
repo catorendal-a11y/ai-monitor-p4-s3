@@ -542,3 +542,74 @@ See [USB authentication foundation](USB_INTERACTION_AUTH.md) for remaining activ
 - No permission opt-in, interactive Claude hook, real approval, public release or push was enabled.
   Physical enrollment remains postponed by the user. Device runtime integration and explicit
   provider opt-in/setup still need completion before physical permission tests.
+
+## ESP permission serial/UI integration (2026-10-14)
+
+- Connected the tested authenticated request owner and UI handoff in PermissionSerial. Real native
+  HMAC interoperability tests now cover earned allow/deny, one write, cancellation before polling,
+  disconnect during signing, UI timeout during signing/capacity checks, insufficient capacity and
+  partial writes. A failed or ambiguous write never re-queues the decision.
+- Added the P4 developer ESP adapter with a recursive task mutex, immediate atomic cancellation,
+  versioned latest local consent and serial-owner-only trust loading. An older enable cannot survive
+  a newer disable through a full queue; there is no consent action queue. Consent starts off,
+  remains nonpersistent and cannot wrap. No incoming USB field can enable it.
+- Connected the actual PermissionView wrapper to the UI task. Hide, screen unload and deletion
+  revoke before waiting for the transport mutex. Failed publication reads revoke before dismissing;
+  they cannot masquerade as a harmless empty request during signing.
+- Added a third actual LVGL native target for the wrapper. A synthetic physical-pointer hold reaches
+  the commit callback; an unavailable publication cancels immediately. Standard P4/S3 pointer,
+  navigation and screen tests remain intact. All three native UI targets pass.
+- 454 Python tests passed; strict native protocol/history/settings/live and delivery regressions
+  passed. The additional serial cases use fixture authority, never a real provider/hardware approval.
+- Developer integration and normal P4/S3 builds passed. The first developer build measurement was
+  2,453,824 app-file bytes and 60,908 static RAM bytes, versus 2,419,456 app-file bytes and 52,132 static
+  RAM bytes in the ordinary P4 build. Static RAM is compiler output, not measured free heap/latency.
+- Normal firmware keeps interactionProtocol 0. The developer environment has no enabled consent
+  at boot and is not a release target. This new integration was not flashed or installed; existing
+  verified production firmware and private PC configuration remain unchanged.
+- Linux CI fixture fixes were pushed separately. They isolate the helper's platform mock from
+  pathlib and initialize live snapshots explicitly for the Linux compiler. CI for b5aa0bf passed all
+  six jobs, including both firmware targets. The new developer integration remains local.
+- Remaining: explicit desktop/device opt-in UI, dedicated Claude setup, postponed physical
+  enrollment, real hold/deny/reboot/unplug testing and final packaged-program validation. No real
+  approval, interactive hook or new release has been enabled.
+
+## Integrated v2 candidate v1.19.1-rc1 (2026-10-14)
+
+- Completed explicit PC/device opt-in UI and separate Claude setup/removal. Settings backups,
+  literal executable arguments, preservation of unrelated rules/hooks and default-off release gates
+  have synthetic tests. Native pointer tests reject a finger already held before the dialog appears.
+- Added opt-in event journaling in the existing SQLite backend and history protocol 2. Tests cover
+  migration, idle-writer disable/shutdown, stale consent publication, epoch boundaries, equal-time
+  ordering, concurrent agent intervals, gaps, unknown values and complete atomic USB publication.
+  Today displays observed sessions/active time/turns. Task success is never inferred from pre-veto hooks.
+- Added bounded animation manifest 2 and allocation-free timing/loop playback for NOVA/ORBIT.
+  The existing verified LZ4/cache/fallback remains the rendering owner. External pack loading stays off.
+- Added real read-only USB mirror from actual P4/S3 LVGL flushes, including normal overlays.
+  Native Release checks execute with real CHECK assertions (not disabled NDEBUG assertions), actual
+  RGB565 composition, partial refresh coverage, worst-case RLE, nonce/replay/deadlines and protection.
+- 493 Python tests pass. Four actual native LVGL targets and strict protocol/history/animation/
+  settings/interaction/live tests pass. Normal P4, P4 developer permission and S3 builds pass.
+- P4 normal app file: 2,431,504 bytes; compiler static RAM: 52,628 bytes. Developer static RAM is
+  61,404 bytes. S3 compiler static RAM is 116,692 bytes; physical S3 remains untested.
+- The first mirror trial exposed a 200 ms short-read delay per packet in Panel.wait_for. It now waits
+  for one byte, then drains available bytes. New partial-burst/unsolicited/error regressions pass.
+  Failed integration trials restored the previous application; retained backups were not overwritten.
+- Application-only P4 flashing/digest/boot/live/history checks passed on COM6. NVS, bootloader and
+  partition table were preserved. Actual mirror transfer: 800×480, 600 chunks, 3.094 s. PSRAM free
+  was 29,079,772 bytes both before and after capture. The 816,000-byte capture allocation is released.
+- Rebuilt all five Windows executables and both board images, created a checksummed ZIP/installer,
+  and compared 18 frozen modules with final tested source. Actual per-user installer upgrade and
+  all five installed executable smoke checks passed; private configuration remained byte-identical.
+- The correct installed GUI/host now run v1.19.1-rc1. A real capture through its same-user mailbox
+  finished in 4.922 s with Codex/ZCode ready, one logical host and cleaned request/response files.
+  Permission IPC remained absent. Captured pixels were inspected locally, not published as fake UI.
+- A 1,000-event synthetic journal measurement: median append 3.997 ms, p95 4.999 ms, max 98.868 ms,
+  summary 2.327 ms, database 241,664 bytes. This is local fixture timing, not a universal I/O guarantee.
+- Installed Codex CLI 0.159.3 showed active reviewed hooks. No model prompt/turn was submitted;
+  lifecycle delivery cannot be claimed from the menu alone. The empty test task was archived.
+- Added a read-only workflow-dispatch Windows candidate packaging/clean-profile installer job with
+  no publication permissions. Fresh-profile result and new main CI are tracked separately after push.
+- Still unverified: user-postponed physical enrollment/permission/provider gestures, long soak,
+  S3 hardware and Windows publisher signing. No real approval/helper opt-in or public release enabled.
+  Current source work and future items are separated in [v2 status](V2_STATUS.md).

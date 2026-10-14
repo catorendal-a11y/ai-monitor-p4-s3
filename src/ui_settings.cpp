@@ -15,6 +15,7 @@
 #include "ui/usage_format.h"
 #include "ui/interaction.h"
 #include "ui_enrollment.h"
+#include "ui_connection.h"
 
 static lv_obj_t* settingsScreen = nullptr;
 static lv_obj_t* dashScreen = nullptr;
@@ -550,7 +551,7 @@ void ui_settings_init() {
 
   brightnessChoice=make_choice(card,24,104,"CUSTOM\n25 %\n50 %\n75 %\n100 %",brightness_preset_cb);
   actualBrightnessLabel = make_wrap_label(card, 400, 108, 328, "", &lv_font_montserrat_20, ui_theme::muted, LV_TEXT_ALIGN_CENTER);
-  connectPcButton=make_button(card,400,148,328,"CONNECT PC",[](lv_event_t*){ui_enrollment_show();},nullptr);
+  connectPcButton=make_button(card,400,148,328,"CONNECT PC",[](lv_event_t*){ui_connection_show();},nullptr);
   make_label(card, 24, 174, 400, "DIM AFTER", &lv_font_montserrat_20, ui_theme::accent, LV_TEXT_ALIGN_LEFT);
   dimChoice=make_choice(card,24,204,"OFF\n1 MINUTE\n5 MINUTES\n10 MINUTES",dim_select_cb);
   previewButton = make_button(card, 560, 204, 168, "TEST DIM", dim_preview_cb, nullptr);

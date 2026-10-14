@@ -28,3 +28,19 @@ target_include_directories(test_ui_s3 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${P
 target_compile_definitions(test_ui_s3 PRIVATE AIM_BOARD_WAVESHARE_S3=1 AIM_COMPANION_CACHE_TEST=1)
 target_link_libraries(test_ui_s3 PRIVATE lvgl_native)
 add_test(NAME s3_ui_regressions COMMAND test_ui_s3 "${CMAKE_CURRENT_BINARY_DIR}/ctest-previews/s3")
+
+# Exercise the actual permission-screen wrapper with bounded local publication fixtures.
+# ESP/serial/IPC are not opened by this target; transport crypto has separate native tests.
+add_executable(test_ui_permissions test_ui.cpp "${PROJECT_ROOT}/src/ui/idle_dim.cpp" "${PROJECT_ROOT}/src/ui/nova_assets.cpp" "${PROJECT_ROOT}/src/companions/builtin_lz4.cpp")
+target_include_directories(test_ui_permissions PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${PROJECT_ROOT}/src" "${PROJECT_ROOT}/.pio/libdeps/esp32p4-release/ArduinoJson/src")
+target_compile_definitions(test_ui_permissions PRIVATE AIM_USB_PERMISSION_RUNTIME=1 AIM_COMPANION_CACHE_TEST=1)
+target_link_libraries(test_ui_permissions PRIVATE lvgl_native)
+add_test(NAME permission_wrapper_regressions COMMAND test_ui_permissions "${CMAKE_CURRENT_BINARY_DIR}/ctest-previews/permission-wrapper")
+
+add_executable(test_mirror test_mirror.cpp)
+target_include_directories(test_mirror PRIVATE "${PROJECT_ROOT}/.pio/libdeps/esp32p4-release/ArduinoJson/src")
+target_link_libraries(test_mirror PRIVATE lvgl_native)
+if(NOT MSVC)
+  target_compile_options(test_mirror PRIVATE -Wall -Wextra -Werror)
+endif()
+add_test(NAME mirror_regressions COMMAND test_mirror)

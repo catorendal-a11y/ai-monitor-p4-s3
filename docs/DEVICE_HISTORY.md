@@ -20,9 +20,23 @@ The quota line identifies its exact model window. Percentage-point change is sho
 observations of the same window, reset and recorder epoch. Tool/MCP quotas are not mixed with
 model quotas. This is observation history, not billing, forecasting or task progress.
 
-The current numeric backend does not store reliable session counts, active time or completed-task
-results. Those values remain unavailable; token changes cannot establish them. The live-agent
-screen's current session timers remain a separate source/domain.
+The opt-in event journal stores fixed Codex/Claude lifecycle events and hashed session identities
+in the same local SQLite backend. Schema-1 numeric databases migrate transactionally to schema 2
+without changing token/quota records. Hooks retain no prompt, tool arguments, output or permission hint.
+The journal is capped at 50,000 events and 30 days; hook writes use a 20 ms lock timeout.
+
+Today also shows observed sessions, active time, completed turns and failed turns when their real
+events are available. Session counts require SessionStart. Turn counts require a prompt-start event
+and its matching Stop/StopFailure. Waiting is excluded; intervals longer than 15 minutes are unknown.
+Concurrent agent activity is unioned, rather than counted twice. Time means observed intervals,
+not guaranteed total work time. Missing events/unsupported providers stay `--`.
+These are turns, not completed tasks. TaskCreated/TaskCompleted hooks can precede a veto and do not
+prove task success. Task totals remain unavailable until an integration supplies confirmed results.
+The live-agent screen's current session timers remain a separate source/domain.
+
+History protocol 2 adds a strictly bounded `agents` summary to each provider packet. Schema 1 is
+still accepted; the host sends schema 1 to old historyProtocol-1 devices. No event log/database is
+transferred to the display. Collection stops when local history is disabled or the recorder shuts down.
 
 One coalesced background reader queries the existing database with its hard SQLite deadline.
 The serial owner sends one begin packet and at most eight provider packets, each under AIM1's

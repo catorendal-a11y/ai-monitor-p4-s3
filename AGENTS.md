@@ -25,7 +25,12 @@
   replacement after unconfirmed shutdown; user opt-in cannot substitute for local validation.
 - `src/interaction/permission_delivery.h`: only a real UI-owner commit admits a decision. Preserve
   one-shot consumption, current-request matching and fresh local visibility at the serial gate;
-  queued envelopes do not authorize delayed transmission. Add task synchronization before activation.
+  queued envelopes do not authorize delayed transmission.
+- `src/interaction/permission_serial.h`, `permission_runtime_esp.*`, `src/ui_permission.cpp`: developer
+  runtime only until physical validation. Keep ordinary USB output separate from immediate decision
+  writes, recheck after signing/capacity, never retry partial writes, and revoke atomically before
+  mutex waits. Failed UI publication reads are cancellation, not an empty-request dismissal. Local
+  consent must supersede older actions and remain off at boot; no wire/config flag creates it.
 - Hardware initialization: inspect display/touch sources before changing board pins.
 - `src/dashboard.cpp`, `src/ui_nova.cpp`, `src/ui_usage_details.cpp`, `src/ui_settings.cpp`, `src/ui_notifications.cpp`: LVGL screens/interactions.
 - `src/ui/`: state/format/history helpers, theme and generated assets.
@@ -38,6 +43,14 @@
   history domain from the existing SQLite backend. Unknown gaps are null, not zero. No inferred
   sessions/active time/tasks, transcripts or database transfer. Read SQLite off the serial owner;
   publish complete transactions only and preserve dropdown identities until touch release.
+- `tools/agent_history.py`: opt-in fixed lifecycle journal in the existing SQLite store. Preserve
+  numeric migration, consent epochs, bounded hook writes and disable/shutdown revocation. Waiting
+  and unobserved gaps are not active time; concurrent intervals are unioned. Turns are not tasks.
+- `src/companions/animation_types.h`, `animation.h`, `builtin_animation.h`: bounded versioned mood
+  sequences and UI-owned playback. No allocation per frame, inferred phases or cache lifetime changes.
+- `src/mirror/`, `tools/usb_mirror.py`, `mirror_service.py`, `desktop_mirror.py`: real read-only USB
+  pixels through the existing serial owner. Bound coverage/RLE/nonce/leases and scrub/free buffers.
+  Never expose protected screens, virtual touch or approval authority. Captures are not history.
 - `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions;
   allocate the P4 LZ4 cache once at startup, verify encoded/decoded bytes, pin live LVGL sources,
   and retain raw work-pose fallback per companion. No allocation per render.

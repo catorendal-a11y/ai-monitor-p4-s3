@@ -14,6 +14,7 @@
 #include "../diagnostics/hardware_types.h"
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/rotation.h"
+#include "../mirror/runtime.h"
 static TouchInputGuard touchInputGuard;
 
 #include "freertos/FreeRTOS.h"
@@ -102,6 +103,7 @@ void lvgl_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map) {
   }
 
   const uint16_t* src = (const uint16_t*)px_map;
+  mirror::flushed(area->x1,area->y1,area->x2,area->y2,src,lv_display_flush_is_last(disp));
 
 #if AIM_GRAPHICS_TELEMETRY
   const int64_t began = esp_timer_get_time();

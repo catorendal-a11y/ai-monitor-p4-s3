@@ -103,10 +103,12 @@ Checkpoint: generic interaction/UI dependency cleanup, dedicated helper, current
 IPC and bounded host broker/service are implemented with synthetic/native tests. The service
 now has explicit Panel-owner lifecycle hooks, persistent host-instance replay protection and
 safe shutdown, but is not enabled by production startup. A tested bounded UI-to-serial handoff
-requires an actual PermissionView commit and fresh local visibility. ESP task synchronization
-and immediate final transmission remain to be integrated. Physical authenticated USB enrollment,
+requires an actual PermissionView commit and fresh local visibility. ESP task synchronization,
+UI publication and immediate final transmission are connected in a developer-only P4 target,
+with atomic cancellation and no opt-in at boot. Normal production builds remain disabled.
+Physical authenticated USB enrollment,
 permission protocol integration,
-explicit setup and physical provider validation remain required. See
+explicit setup is implemented; physical provider validation remains required. See
 [implementation status](../docs/USB_PERMISSION_HELPER.md).
 
 Authenticated session/request transport, PC ECDH enrollment/DPAPI storage and the existing
@@ -143,7 +145,9 @@ before harmless real physical approval/denial and unplug-during-hold integration
 
 Checkpoint: compact Today/24h/7d token and reliable quota summaries are implemented, tested natively
 and installed on P4. Atomic synthetic USB history delivery passed without changing activity counters.
-The existing backend does not store reliable session/active-time/task totals; these remain unavailable.
+The new candidate adds a bounded lifecycle journal and observed session/active-time/turn summaries.
+It migrates the existing numeric backend, excludes waiting/gaps and unions overlapping agent activity.
+Task success is not inferred from pre-veto hooks; unsupported metrics remain unavailable.
 History is opt-in, stays off in the user's saved preferences, and never transfers the SQLite database.
 See [device history](../docs/DEVICE_HISTORY.md) and [validation](../docs/V2_VALIDATION.md).
 
@@ -153,6 +157,11 @@ trends and structured completed/failed task counts only when backed by observed 
 Add small graphs and a daily AI summary; unsupported values remain unavailable.
 
 ## Phase 9: versioned animation packs
+
+Checkpoint: bounded schema 2 and allocation-free playback are implemented in the candidate.
+Built-in NOVA/ORBIT now use multi-pose mood sequences through the existing renderer/cache.
+See [animation format](../docs/COMPANION_ANIMATIONS.md). External installation/activation remains
+disabled pending its independent storage/staging/recovery gates; microSD is not required.
 
 Separate mood from animation before public runtime packs. Support bounded multi-frame states,
 frame duration, loops/nonloops, idle/blink/work/testing/attention/success/error sequences and runtime
@@ -184,8 +193,8 @@ The device enrollment core now interoperates with PC enrollment using actual nat
 it requires local arming, a matching physical UI revision, PC proof and successful storage before
 acknowledging enrollment. Its real ESP crypto adapter is registered for enrollment only.
 Device key storage/readback, physical hold-to-compare UI and explicit PC connection setup are now
-connected for enrollment only. Physically validate this path, then implement separate permission
-opt-in and final permission publication/transmission gates. Keep production permissions
+connected for enrollment only. Separate permission opt-in and developer publication/transmission
+gates are now implemented. Physically validate enrollment and the final exchange. Keep production permissions
 disabled until exact packaged programs and physical provider/unplug tests pass.
 The user confirmed Codex hook review/trust, but real hook delivery still requires observation.
 Do not treat that confirmation or a saved marker as proof of lifecycle exchange.

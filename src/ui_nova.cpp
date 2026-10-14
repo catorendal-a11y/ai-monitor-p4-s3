@@ -10,6 +10,7 @@
 #include "ui/nova_state.h"
 #include "ui/nova_assets.h"
 #include "ui/companion_renderer.h"
+#include "companions/builtin_animation.h"
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
 #include "companions/psram_cache.h"
 #include "diagnostics/hardware_types.h"
@@ -38,6 +39,8 @@ struct ProviderCard {
   const lv_image_dsc_t* logo = nullptr;
 };
 static ProviderCard providers[2];
+static companions::AnimationPlayer animation;
+static uint8_t animatedCompanion=255;
 static NovaState state;
 static NovaMood mood = NovaMood::waiting;
 static uint8_t page = 0, pageCount = 1;
@@ -218,7 +221,25 @@ void update() {
     case NovaMood::greeting: heading = "Hi there!"; message = "Ready when you are"; pose = &nova_assets::done; break;
     case NovaMood::ready: if (!token_signal_fresh(snapshot, now)) message = "Token signal unavailable"; break;
   }
-  if ((mood == NovaMood::ready || mood == NovaMood::working || mood == NovaMood::session_working) && now % 4600u >= 3950u && now % 4600u < 4130u) pose = &nova_assets::blink;
+  auto animationMood=companions::Mood::working;
+  if(pose==&nova_assets::sleep)animationMood=companions::Mood::resting;
+  else if(pose==&nova_assets::done)animationMood=companions::Mood::success;
+  else if(pose==&nova_assets::low)animationMood=companions::Mood::warning;
+  else if(pose==&nova_assets::critical)animationMood=companions::Mood::critical;
+  if(mood==NovaMood::attention)animationMood=companions::Mood::attention;
+  if(mood==NovaMood::session_error)animationMood=companions::Mood::error;
+  // Detailed testing is used only when a current trusted lifecycle source explicitly reports it.
+  if(mood==NovaMood::session_working && live.fresh && now-live.receivedAt<live_agent::activity_lease_ms)
+    for(unsigned i=0;i<live.count && i<8;++i) {
+      const auto& item=live.agents[i];const auto* style=aim::provider_style(item.provider);
+      if(item.state==agent::State::TESTING && item.observedAgeSeconds<=30 && style &&
+         session_status(snapshot,now,style->activityMask,agentCounts,live).running)animationMood=companions::Mood::testing;
+    }
+  animation.select(companions::builtin_animation(animationMood),now,animatedCompanion!=static_cast<uint8_t>(companion));
+  animatedCompanion=static_cast<uint8_t>(companion);
+  const lv_image_dsc_t* animatedPoses[]={&nova_assets::work,&nova_assets::done,&nova_assets::low,
+    &nova_assets::critical,&nova_assets::sleep,&nova_assets::blink};
+  pose=animatedPoses[animation.frame(now)];
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
   if (now - previousMotion >= 160u) {
     previousMotion = now;

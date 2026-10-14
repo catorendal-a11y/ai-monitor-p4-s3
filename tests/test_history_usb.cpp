@@ -52,6 +52,25 @@ int main() {
   auto disabled=start(41);disabled["enabled"]=false;disabled["providers"].to<JsonArray>();
   CHECK(core.handle(disabled.as<JsonObjectConst>(),17,400));CHECK(!core.snapshot().enabled && !core.snapshot().count);
   CHECK(core.snapshot().revision==revision+1);
+  for(unsigned fault=0;fault<7;++fault) {
+    auto begin=start(50+fault);begin["schema"]=2;CHECK(core.handle(begin.as<JsonObjectConst>(),17,500));
+    auto first=row(0,50+fault);first["schema"]=2;
+    auto stats=first["agents"].to<JsonObject>();stats["sessions"]=2;stats["activeSeconds"]=180;
+    stats["completedTurns"]=nullptr;stats["failedTurns"]=0;
+    if(fault==1)stats["sessions"]=true;
+    if(fault==2)stats["activeSeconds"]=100801;
+    if(fault==3)stats["failedTurns"]=-1;
+    if(fault==4)stats["prompt"]="forbidden";
+    if(fault==5)first["schema"]=1;
+    if(fault==6)stats["completedTurns"]=50001;
+    if(fault){CHECK(!core.handle(first.as<JsonObjectConst>(),17,501));continue;}
+    CHECK(core.handle(first.as<JsonObjectConst>(),17,501));
+    auto second=row(1,50);second["schema"]=2;auto unknown=second["agents"].to<JsonObject>();
+    for(const char* key:{"sessions","activeSeconds","completedTurns","failedTurns"})unknown[key]=nullptr;
+    CHECK(core.handle(second.as<JsonObjectConst>(),17,502));
+    CHECK(core.snapshot().providers[0].agentKnown==11 && core.snapshot().providers[0].activeSeconds==180);
+    CHECK(core.snapshot().providers[1].agentKnown==0);
+  }
   if(failures)return 1;
   std::cout<<"Atomic bounded history, unknown gaps, strict fields, replay and rollback tests passed\n";
 }

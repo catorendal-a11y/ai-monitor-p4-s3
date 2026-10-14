@@ -24,6 +24,8 @@
 #include "../diagnostics/graphics_types.h"
 #include "../diagnostics/ppa_benchmark.h"
 #include "../interaction/enrollment_runtime.h"
+#include "../interaction/permission_runtime_esp.h"
+#include "../mirror/runtime.h"
 #if defined(AIM_USB_AUTH_BENCHMARK)
 #include "../interaction/crypto_benchmark.h"
 #endif
@@ -106,6 +108,7 @@ void apply_pending_controls() {
 static void ai_monitor_task(void*) {
   static ProtoCore core;  // ~13 KB state in .bss, off the task stack
   core.tick = [] { return millis(); };
+  if(mirror::initialize())core.mirror_command=mirror::command;
   core.heap = [] { return ESP.getFreeHeap(); };
   core.psram_free = [] { return ESP.getFreePsram(); };
   core.hardware = diagnostics::hardware_baseline;
@@ -118,6 +121,9 @@ static void ai_monitor_task(void*) {
   core.boot_id = esp_random();
   if(!core.boot_id)core.boot_id=1;
   if(interaction::enrollment_runtime_initialize(core.boot_id))core.enrollment_command=interaction::enrollment_runtime_command;
+#if defined(AIM_USB_PERMISSION_RUNTIME)
+  if(interaction::permission_runtime_initialize(core.boot_id))core.interaction_command=interaction::permission_runtime_command;
+#endif
   core.brightness = [] { return brightness_percent(display_get_brightness()); };
   core.apply_brightness = [](uint8_t pct, bool persist) {
     const BrightnessControl control{pct, persist};
@@ -149,6 +155,8 @@ static void ai_monitor_task(void*) {
     if (refresh) core.request_refresh();
     const bool changed = core.poll();
     interaction::enrollment_runtime_poll(millis(),core.snapshot().hostPresent);
+    mirror::poll(millis(),core.snapshot().hostPresent);
+    interaction::permission_runtime_poll(millis(),core.snapshot().hostPresent);
     if(core.agent_snapshot().revision!=agentRevision) {
       agentRevision=core.agent_snapshot().revision;agent::publish(core.agent_snapshot());
     }
@@ -172,6 +180,8 @@ static void ai_monitor_task(void*) {
         const size_t bytes = std::min(outBuf.size(), static_cast<size_t>(available));
         core.consume_out(Serial.write(outBuf.data(), bytes));
       }
+    } else {
+      interaction::permission_runtime_transmit();
     }
     if (n == 0) vTaskDelay(pdMS_TO_TICKS(2));
   }

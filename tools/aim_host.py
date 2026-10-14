@@ -502,6 +502,7 @@ class Panel:
         self.live_client = None
         self.live_retry_at = 0
         self.permission_runtime = None  # Explicit validated setup only; never auto-enable from USB.
+        self.mirror_service = None
 
     def attach_permission_runtime(self, runtime):
         from permission_runtime import PermissionRuntime
@@ -518,6 +519,8 @@ class Panel:
             runtime = getattr(self, 'permission_runtime', None)
             if runtime is not None: runtime.close()
         finally:
+            mirror = getattr(self, "mirror_service", None)
+            if mirror is not None: mirror.close()
             self.ser.close()
 
     def refresh_status(self, request_id, state, message):
@@ -613,10 +616,12 @@ class Panel:
             status.update('connected', self.name)
 
     def report_tokens(self):
+        mirror = getattr(self, "mirror_service", None)
+        if mirror is not None: mirror.pump(self)
         runtime = getattr(self, 'permission_runtime', None)
         if runtime is not None: runtime.pump()
         sampler=getattr(self,'history_sampler',None)
-        if sampler is not None and type(self.info.get('historyProtocol')) is int and self.info['historyProtocol']==1:
+        if sampler is not None and type(self.info.get('historyProtocol')) is int and self.info['historyProtocol'] in (1,2):
             summary=sampler.take()
             if summary is not None:
                 from usb_history import UsbHistoryClient
@@ -690,7 +695,11 @@ class Panel:
                     continue
                 if message.get("type") == message_type:
                     return message
-            chunk = self.ser.read(512)
+            available = getattr(self.ser, "in_waiting", 0)
+            # Blocking read(512) waits for the full count even when a short JSON
+            # reply is already complete. Wait for one byte, then drain available bytes.
+            count = min(512, available) if type(available) is int and available > 0 else 1
+            chunk = self.ser.read(count)
             if chunk:
                 self._rx.extend(chunk)
                 if len(self._rx) > 16384:
@@ -869,6 +878,7 @@ class ConfigWatcher:
 
 
 def wait_connected(panel, seconds, minimum_wait=0):
+    from mirror_service import MirrorService
     deadline = time.monotonic() + seconds
     refresh_after = time.monotonic() + minimum_wait
     next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
@@ -876,7 +886,9 @@ def wait_connected(panel, seconds, minimum_wait=0):
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return
-        time.sleep(min(1, remaining))
+        mirror = getattr(panel, "mirror_service", None)
+        capture_active = isinstance(mirror, MirrorService) and mirror.client is not None
+        time.sleep(min(.05 if capture_active else 1, remaining))
         panel.collect_requests()
         if isinstance(panel, Panel): panel.report_tokens()
         watcher = getattr(panel, "config_watcher", None)
@@ -945,6 +957,10 @@ def _run_loop(cfg, interval, zai_key, views):
     history = HistoryRecorder(HERE / 'activity', cfg.get('usage_history',False))
     from device_history import HistorySampler
     history_sampler=HistorySampler(HERE/'activity',views,cfg.get('usage_history',False))
+    from permission_runtime import PermissionRuntime
+    from permission_policy import selected as permission_selected, release_ready
+    permissions=PermissionRuntime(HERE.parent,release_ready)
+    permissions.configure(permission_selected(cfg))
     tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
@@ -954,6 +970,7 @@ def _run_loop(cfg, interval, zai_key, views):
             if changed_config is not None:
                 previous = cfg
                 cfg = changed_config
+                permissions.configure(permission_selected(cfg))
                 history.configure(cfg.get('usage_history',False))
                 health.data['board'] = cfg.get('board', '')
                 interval = cfg["interval_s"]
@@ -974,7 +991,8 @@ def _run_loop(cfg, interval, zai_key, views):
                     # newly saved key while its first request is pending.
                     health.data['providers'].pop('zcode', None)
                     health.update()
-                if cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views:
+                if (cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views
+                        or cfg.get('usb_permissions',False)!=previous.get('usb_permissions',False)):
                     if panel is not None: panel.close()
                     panel = None
                 views = changed_views
@@ -997,6 +1015,9 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.token_reporter = tokens
                     panel.history = history
                     panel.history_sampler=history_sampler
+                    from mirror_service import MirrorService
+                    panel.mirror_service=MirrorService(HERE.parent)
+                    panel.attach_permission_runtime(permissions)
                     health.data.pop('hardware', None)
                     health.data.pop('hardware_at', None)
                     if panel.info.get('hardwareDiagnostics') is True:
@@ -1045,6 +1066,7 @@ def _run_loop(cfg, interval, zai_key, views):
         tokens.close()
         history.close()
         history_sampler.close()
+        permissions.close()
         fetcher.close()
         if panel is not None:
             panel.close()

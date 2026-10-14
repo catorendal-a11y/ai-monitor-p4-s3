@@ -7,7 +7,9 @@ namespace interaction {
 class PermissionView {
  public:
   using Clock=uint32_t(*)();
-  explicit PermissionView(PermissionController& controller,Clock clock) : clock_(clock),controller_(controller) {}
+  using Cancel=void(*)();
+  explicit PermissionView(PermissionController& controller,Clock clock,Cancel cancel=nullptr)
+      : clock_(clock),controller_(controller),cancel_(cancel) {}
   PermissionView(const PermissionView&)=delete;
   PermissionView& operator=(const PermissionView&)=delete;
   ~PermissionView();
@@ -28,6 +30,7 @@ class PermissionView {
  private:
   Clock clock_;
   PermissionController& controller_; // Interaction authority outlives the view and its widgets.
+  Cancel cancel_=nullptr;
   PermissionContext context_;
   lv_obj_t *root_=nullptr,*card_=nullptr,*request_=nullptr,*tool_=nullptr,*hint_=nullptr,
       *status_=nullptr,*progress_=nullptr,*approve_=nullptr,*deny_=nullptr,*close_=nullptr;
@@ -42,6 +45,7 @@ class PermissionView {
   static void screen_event(lv_event_t*);
   bool pointer_inside(lv_obj_t*) const;
   void cancel_pointer();
+  static void release_barrier();
   void refresh();
   bool fits(lv_obj_t*) const;
   bool reviewable() const;

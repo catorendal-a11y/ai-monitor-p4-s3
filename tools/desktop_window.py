@@ -634,7 +634,7 @@ class MonitorWindow(QMainWindow):
         self.connect_pc_button = self._button('Connect this PC to the display', self.connect_display_pc)
         form.addWidget(self.connect_pc_button)
         form.addWidget(label('Optional secure connection for future physical permissions. '
-                             'Open MENU > SETTINGS > CONNECT PC on the display first. '
+                             'Open MENU > SETTINGS > CONNECT PC, then tap CONNECT PC on that page. '
                              'Connecting does not enable AI approvals.', 'muted', True))
         self.board_help = InformationPanel('', 2, 'Selected display guidance')
         form.addWidget(self.board_help)
@@ -782,10 +782,19 @@ class MonitorWindow(QMainWindow):
         self.keep_host = QCheckBox('Keep the host running when I quit AI Monitor')
         self.minimize_tray = QCheckBox('Minimize to the NOVA system tray icon')
         self.close_tray = QCheckBox('Close button hides the app in the system tray')
-        self.history_enabled=QCheckBox('Keep local numeric usage history (up to 30 days)')
-        self.history_enabled.setToolTip('Opt-in: observed token increases and numeric quota snapshots only. No prompts or keys.')
-        for field in (self.auto_start, self.keep_host, self.minimize_tray, self.close_tray, self.history_enabled):
+        self.history_enabled=QCheckBox('Keep local usage and session history (up to 30 days)')
+        self.history_enabled.setToolTip('Opt-in: token increases, quota and fixed lifecycle events. Observed active time excludes waiting and long gaps. No prompts, tool arguments or keys.')
+        self.usb_permissions=QCheckBox('Use physical Claude Code permissions over USB (preview)')
+        self.usb_permissions.setToolTip('Requires Claude Code, P4, PC enrollment and separate display opt-in. Never enables automatic approvals.')
+        for field in (self.auto_start, self.keep_host, self.minimize_tray, self.close_tray, self.history_enabled, self.usb_permissions):
             field.toggled.connect(self._changed); layout.addWidget(field)
+        layout.addWidget(label('Physical permissions: connect this PC to the display, enable permissions on the display, '
+            'select Claude, save this opt-in and link the permission helper below. '
+            'Production approval remains disabled until the physical validation gates pass.', 'muted', True))
+        self.permission_link=self._button('Link Claude permission helper…',lambda:self.claude_permissions(False))
+        self.permission_unlink=self._button('Remove permission helper…',lambda:self.claude_permissions(True))
+        permission_row=QHBoxLayout();permission_row.addWidget(self.permission_link);permission_row.addWidget(self.permission_unlink)
+        layout.addLayout(permission_row)
         layout.addWidget(label('Click the NOVA icon near the clock to reopen. Right-click it for host controls and Quit. '
                                'Hiding or minimizing never stops the host or discards unsaved settings. '
                                'If a system tray is unavailable, the window uses normal minimize/close behavior.', 'muted', True))
@@ -799,6 +808,8 @@ class MonitorWindow(QMainWindow):
             'Connect the host to read device memory. No estimated hardware values are shown.', 12, 'Device diagnostics')
         layout.addWidget(label('DEVICE DIAGNOSTICS', 'eyebrow'))
         layout.addWidget(self.hardware_diagnostics)
+        self.device_screen_button = self._button("Device screen…", self.device_screen)
+        layout.addWidget(self.device_screen_button)
         self.recover_button = self._button('Recover invalid settings…', self.recover_settings)
         reserve_hidden_space(self.recover_button)
         self.recover_button.setVisible(self.config_error)
@@ -808,6 +819,16 @@ class MonitorWindow(QMainWindow):
         layout.addStretch()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(content)
         return scroll
+
+    def device_screen(self):
+        from desktop_mirror import MirrorDialog
+        current = getattr(self, "mirror_dialog", None)
+        if current is not None and current.isVisible():
+            current.raise_(); current.activateWindow(); return
+        self.mirror_dialog = MirrorDialog(self.root, self)
+        self.mirror_dialog.finished.connect(lambda _: setattr(self, "mirror_dialog", None))
+        self.mirror_dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.mirror_dialog.show()
 
     def _firmware_tab(self):
         widget = QWidget()
@@ -861,6 +882,7 @@ class MonitorWindow(QMainWindow):
         self.minimize_tray.setChecked(self.config['minimize_to_tray'])
         self.close_tray.setChecked(self.config['close_to_tray'])
         self.history_enabled.setChecked(self.config['usage_history'])
+        self.usb_permissions.setChecked(self.config['usb_permissions'])
         self._apply_preferences()
         self.unsaved = False
         self._changed(mark=False)
@@ -869,6 +891,10 @@ class MonitorWindow(QMainWindow):
                             'Choose your board and AI providers. Save settings before starting.')
 
     def _changed(self, *_args, mark=True):
+        if hasattr(self,'usb_permissions'):
+            eligible=self.providers['claude'].isChecked() and self.board.currentData()=='guition-p4'
+            self.usb_permissions.setEnabled(not self.busy and eligible)
+            if not eligible and self.usb_permissions.isChecked():self.usb_permissions.setChecked(False)
         self.key_row.setVisible(self.providers['zcode'].isChecked())
         self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
         board_id = self.board.currentData()
@@ -934,6 +960,8 @@ class MonitorWindow(QMainWindow):
         self.claude_session_remove.setEnabled(ready and 'claude' in self.config['providers'])
         self.codex_session_button.setEnabled(ready and 'codex' in self.config['providers'])
         self.codex_session_remove.setEnabled(ready and 'codex' in self.config['providers'])
+        self.permission_link.setEnabled(ready and 'claude' in self.config['providers'] and self.config.get('usb_permissions') is True)
+        self.permission_unlink.setEnabled(ready and 'claude' in self.config['providers'])
         self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
 
     def continue_setup(self):
@@ -1015,6 +1043,20 @@ class MonitorWindow(QMainWindow):
             try: emit(claude_session_link(self.root,remove=remove))
             except ValueError as error: raise control.SetupError(str(error)) from None
         self._run('Updating Claude session events',update)
+
+    def claude_permissions(self,remove):
+        if not self._ready() or 'claude' not in self.config['providers']:return
+        if not remove and self.config.get('usb_permissions') is not True:return
+        question=('Remove only this installation\'s interactive permission helper? Other hooks and rules are preserved.' if remove else
+            'Install the separate Claude PermissionRequest helper? A private settings backup is kept. '
+            'It requires an enrolled PC, display opt-in and a separate physical hold for each approval. '
+            'Unavailable requests use Claude permission handling. It does not grant permanent permission rules. '
+            'Production physical approval is still gated by validation. Restart Claude Code after setup.')
+        answer=QMessageBox.question(self,'Claude physical permissions',question,
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes:return
+        from claude_permission_setup import update
+        self._run('Updating Claude permission helper',lambda emit:emit(update(self.root,remove=remove,opted_in=self.config.get('usb_permissions') is True)))
 
     def codex_sessions(self,remove):
         if not self._ready() or 'codex' not in self.config['providers']: return
@@ -1111,7 +1153,7 @@ class MonitorWindow(QMainWindow):
                          'log_font_size': self.log_size.value(), 'start_host_on_open': self.auto_start.isChecked(),
                          'keep_host_on_close': self.keep_host.isChecked(),
                          'minimize_to_tray': self.minimize_tray.isChecked(), 'close_to_tray': self.close_tray.isChecked(),
-                         'usage_history':self.history_enabled.isChecked()})
+                         'usage_history':self.history_enabled.isChecked(), 'usb_permissions':self.usb_permissions.isChecked()})
         except (control.SetupError, ValueError, OSError):
             self._error('Choose a supported board, at least one provider and a valid USB port. '
                         'API keys must be a single printable token. Nothing was saved.')
@@ -1245,8 +1287,9 @@ class MonitorWindow(QMainWindow):
         if not self._ready(): return
         from enrollment_setup import connect_device
         answer = QMessageBox.question(self, 'Connect this PC',
-            'Start the host, then open MENU > SETTINGS > CONNECT PC on the display. '
-            'Keep the display awake. Click Yes when that screen is open. '
+            'Start the host, open MENU > SETTINGS > CONNECT PC on the display, '
+            'then tap CONNECT PC on that page to open code comparison. '
+            'Keep the display awake. Click Yes when the comparison screen is open. '
             'The host will pause briefly and return after setup. AI approvals remain disabled.',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
         if answer == QMessageBox.StandardButton.Yes:

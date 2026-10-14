@@ -21,6 +21,24 @@
 #include "agent/types.h"
 #include "history/types.h"
 #include "interaction/permission_delivery.h"
+#include "interaction/permission_ui_api.h"
+namespace interaction {
+static PermissionPublication permissionFixture;
+static unsigned wrapperCancellations=0,wrapperOffers=0;
+PermissionPublication permission_read(){return permissionFixture;}
+bool permission_local_opt_in(bool enabled) {
+  if(!permissionFixture.available)return false;
+  permissionFixture.context.optedIn=permissionFixture.consentRequested=enabled;return true;
+}
+void permission_cancel_ui(){++wrapperCancellations;}
+void permission_observe_ui(bool,bool,uint32_t){}
+bool permission_offer_ui(const PermissionEnvelope& value,bool visible,bool awake,uint32_t now,
+                         PermissionDelivery::Commit commit,void* owner) {
+  auto context=permissionFixture.context;context.visible=visible;context.awake=awake;
+  if(!commit(owner,value,permissionFixture.snapshot,context,now))return false;
+  ++wrapperOffers;return true;
+}
+}
 
 static uint32_t fakeTick = 1000;
 static aim::Snapshot sample{};
@@ -31,6 +49,7 @@ static uint8_t selectedBrightness = 160, actualBrightness = 160, dimMinutes = 1;
 static bool lastPersisted = false;
 static unsigned failures = 0;
 static unsigned requestedRefreshes = 0;
+static unsigned permissionCancellations = 0;
 static uint8_t warningPercent = 25;
 static app_settings::NightSettings nightSettings;
 static app_settings::Appearance testAppearance;
@@ -101,6 +120,8 @@ void display_apply_brightness(uint8_t value, bool persist) {
 #include "../../src/dashboard.cpp"
 #include "../../src/ui/enrollment_view.cpp"
 #include "../../src/ui_history.cpp"
+#include "../../src/ui_connection.cpp"
+#include "../../src/ui_permission.cpp"
 #include "../../src/ui_settings.cpp"
 #include "../../src/ui_usage_details.cpp"
 #include "../../src/ui_notifications.cpp"
@@ -650,6 +671,7 @@ int main(int argc, char** argv) {
   ui_event_center_init();
   ui_menu_init();
   ui_history_init();
+  ui_connection_init();
   settle_backlight();
 
   // First activity-only frame clears initialized quota headings and remains
@@ -1378,13 +1400,16 @@ int main(int argc, char** argv) {
     CHECK(!cache.slot(first)->pinned && lv_image_get_src(other)==&nova_assets::work);
     lv_obj_delete(other);
   }
-  for (unsigned scenario=0;scenario<22;++scenario) {
+  for (unsigned scenario=0;scenario<23;++scenario) {
     auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
     touchPressed=touchFailed=false;lv_indev_read(pointer);
     {
       interaction::PermissionController authority;
-      interaction::PermissionView view(authority,[] { return fakeTick; });
-      CHECK(view.initialize());view.show();
+      const auto cancellationsBefore=permissionCancellations;
+      interaction::PermissionView view(authority,[] { return fakeTick; },[]{++permissionCancellations;});
+      CHECK(view.initialize());
+      if(scenario==22){touchPressed=true;lv_indev_read(pointer);}
+      view.show();
       interaction::InteractionSnapshot live;live.fresh=true;
       live.epoch=1;live.revision=1;live.receivedAt=fakeTick;
       live.request.present=live.request.displaySupported=true;
@@ -1442,14 +1467,17 @@ int main(int argc, char** argv) {
         ++fakeTick;lv_indev_read(pointer);
       }
       interaction::PermissionEnvelope prepared;
-      if(scenario==6 || scenario==12 || scenario>=16) {
+      if(scenario==6 || scenario==12 || (scenario>=16 && scenario<22)) {
         prepared=view.take(live,context,fakeTick);CHECK(prepared.decision==interaction::Decision::once);
       }
       lv_obj_t* cover=nullptr;
       if(scenario==6) { cover=lv_obj_create(lv_layer_top());lv_obj_set_size(cover,800,480); }
       if(scenario==12) { cover=lv_obj_create(lv_layer_sys());lv_obj_set_size(cover,800,480); }
       auto* previousScreen=lv_screen_active();lv_obj_t* navigated=nullptr;
-      if(scenario==16) { navigated=lv_obj_create(nullptr);lv_screen_load(navigated); }
+      if(scenario==16) {
+        navigated=lv_obj_create(nullptr);lv_screen_load(navigated);
+        CHECK(permissionCancellations>cancellationsBefore);
+      }
       if(scenario==17)lv_obj_set_hidden(view.hint_label(),true);
       if(scenario==18)lv_obj_set_style_opa(view.root(),LV_OPA_50,0);
       if(scenario==19) { lv_obj_set_x(view.root(),100);lv_obj_update_layout(view.root()); }
@@ -1460,6 +1488,7 @@ int main(int argc, char** argv) {
         touchPoint={(closeArea.x1+closeArea.x2)/2,(closeArea.y1+closeArea.y2)/2};
         touchPressed=true;lv_indev_read(pointer);touchPressed=false;lv_indev_read(pointer);
         CHECK(lv_obj_is_hidden(view.root()));
+        CHECK(permissionCancellations>cancellationsBefore);
       }
       const auto decision=view.take(live,context,fakeTick);
       CHECK(decision.decision==(scenario==1?interaction::Decision::once:scenario==10?interaction::Decision::deny:interaction::Decision::none));
@@ -1493,6 +1522,7 @@ int main(int argc, char** argv) {
       if(scenario!=19)CHECK(approveAfter.x1==approveBefore.x1 && approveAfter.y1==approveBefore.y1 &&
             approveAfter.x2==approveBefore.x2 && approveAfter.y2==approveBefore.y2);
       touchPressed=false;lv_indev_read(pointer);view.hide();
+      CHECK(permissionCancellations>cancellationsBefore);
     }
     lv_indev_delete(pointer);
   }
@@ -1738,11 +1768,13 @@ int main(int argc, char** argv) {
     auto& first=historySample.providers[0];strcpy(first.key,"codex");first.dailyKnown=64;first.daily[6]=12345;
     first.hourlyKnown=1u<<23;first.hourly[23]=12345;first.quotaKnown=first.changeKnown=true;
     first.usedPercent=42;first.changePercent=10;first.windowMinutes=300;first.quotaAgeMinutes=1;
+    first.agentKnown=15;first.sessions=2;first.activeSeconds=180;first.completedTurns=1;first.failedTurns=0;
     strcpy(historySample.providers[1].key,"zcode");sample.hostPresent=true;
     ui_menu_show();lv_obj_send_event(find_caption_button(menu_ui::screen,"HISTORY"),LV_EVENT_CLICKED,nullptr);
     CHECK(ui_history_is_active());CHECK(!strcmp(lv_label_get_text(history_ui::total),"12.3K"));
     CHECK(history_ui::count==2);check_inside(history_ui::screen,history_ui::provider);
     check_readable_text(history_ui::status);check_readable_text(history_ui::quota);
+    check_readable_text(history_ui::metrics);CHECK(strstr(lv_label_get_text(history_ui::metrics),"Sessions 2"));
     CHECK(lv_obj_get_height(history_ui::bars[23])==100 && lv_obj_get_height(history_ui::bars[0])==3);
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[0],LV_PART_MAIN),lv_color_hex(ui_theme::muted)));
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[23],LV_PART_MAIN),lv_color_hex(ui_theme::accent)));
@@ -1755,6 +1787,7 @@ int main(int argc, char** argv) {
     lv_dropdown_set_selected(history_ui::provider,1);lv_obj_send_event(history_ui::provider,LV_EVENT_VALUE_CHANGED,nullptr);
     CHECK(!strcmp(lv_label_get_text(history_ui::total),"--"));
     CHECK(strstr(lv_label_get_text(history_ui::quota),"not recorded"));
+    CHECK(strstr(lv_label_get_text(history_ui::metrics),"no observed"));
     lv_dropdown_open(history_ui::provider);historySample.providers[0]=historySample.providers[1];historySample.count=1;++historySample.revision;
     ui_history_update();CHECK(history_ui::count==2 && !strcmp(history_ui::keys[0],"codex"));
     lv_dropdown_close(history_ui::provider);ui_history_update();CHECK(history_ui::count==1 && !strcmp(history_ui::keys[0],"zcode"));
@@ -1769,6 +1802,47 @@ int main(int argc, char** argv) {
     ui_menu_show();lv_obj_send_event(find_caption_button(menu_ui::screen,"HISTORY"),LV_EVENT_CLICKED,nullptr);CHECK(ui_history_is_active());
     lv_obj_send_event(find_caption_button(history_ui::screen,"BACK"),LV_EVENT_CLICKED,nullptr);CHECK(ui_nova_is_active());
   }
+  {
+    ui_settings_show();sample.hostPresent=true;
+    lv_obj_send_event(connectPcButton,LV_EVENT_CLICKED,nullptr);CHECK(ui_connection_is_active());
+    check_inside(connection_ui::root,connection_ui::connectButton);
+    check_inside(connection_ui::root,connection_ui::consentButton);
+    check_readable_text(connection_ui::help);check_readable_text(connection_ui::status);
+    CHECK(lv_obj_has_state(connection_ui::consentButton,LV_STATE_DISABLED));
+    screenshot(screenshots,"connection-permissions-preview");
+    auto& publication=interaction::permissionFixture;publication.available=true;
+    ui_connection_update();CHECK(!lv_obj_has_state(connection_ui::consentButton,LV_STATE_DISABLED));
+    lv_obj_send_event(connection_ui::consentButton,LV_EVENT_CLICKED,nullptr);ui_connection_update();
+    CHECK(publication.context.optedIn);CHECK(strstr(lv_label_get_text(connection_ui::status),"ON"));
+    lv_obj_send_event(connection_ui::consentButton,LV_EVENT_CLICKED,nullptr);ui_connection_update();
+    CHECK(!publication.context.optedIn);
+    publication.available=false;ui_connection_hide();CHECK(!ui_connection_is_active());ui_settings_hide();
+  }
+#if defined(AIM_USB_PERMISSION_RUNTIME)
+  {
+    // Actual wrapper, synthetic local authority: successful hold then publication-read failure.
+    ui_nova_show();nightSettings.enabled=false;dimMinutes=0;selectedBrightness=actualBrightness=160;
+    idle_dim_update();ui_permission_init();
+    auto& publication=interaction::permissionFixture;
+    publication.available=true;publication.context={true,true,true,true,true,false};
+    publication.snapshot.fresh=true;publication.snapshot.receivedAt=fakeTick;
+    publication.snapshot.epoch=80;publication.snapshot.revision=1;publication.snapshot.leaseMs=25000;
+    auto& request=publication.snapshot.request;request.present=request.displaySupported=true;
+    strcpy(request.id,"synthetic_wrapper_request");strcpy(request.nonce,"synthetic_wrapper_nonce");
+    strcpy(request.tool,"Read");strcpy(request.hint,"{\"file_path\":\"fixture.txt\"}");
+    ui_permission_update();CHECK(ui_permission_is_active());
+    auto* approve=find_caption_button(lv_layer_top(),"HOLD TO APPROVE");CHECK(approve);
+    auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
+    lv_area_t area{};lv_obj_get_coords(approve,&area);
+    touchPoint={(area.x1+area.x2)/2,(area.y1+area.y2)/2};touchFailed=touchPressed=false;lv_indev_read(pointer);
+    touchPressed=true;lv_indev_read(pointer);fakeTick+=1800;lv_indev_read(pointer);
+    ui_permission_update();CHECK(interaction::wrapperOffers==1);
+    const unsigned cancelled=interaction::wrapperCancellations;
+    publication.available=false;ui_permission_update();
+    CHECK(!ui_permission_is_active() && interaction::wrapperCancellations>cancelled);
+    touchPressed=false;lv_indev_read(pointer);lv_indev_delete(pointer);
+  }
+#endif
   if (failures) { std::cerr << failures << " UI checks failed\n"; return EXIT_FAILURE; }
   std::cout << "Real LVGL UI regressions passed\n";
 }

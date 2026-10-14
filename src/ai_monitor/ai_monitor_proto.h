@@ -52,6 +52,7 @@ class ProtoCore {
   // A missing adapter fails closed; registering a callback does not establish host trust.
   std::function<bool(JsonObjectConst,uint32_t,std::string&)> interaction_command;
   std::function<bool(JsonObjectConst,uint32_t,std::string&)> enrollment_command;
+  std::function<bool(JsonObjectConst,uint32_t,std::string&)> mirror_command;
   std::function<void(uint32_t)> interaction_tick;
   std::function<std::string()> crypto_benchmark; // Developer-only, no enrolled key/permission path.
 
@@ -267,11 +268,11 @@ class ProtoCore {
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
-          "\"liveProtocol\":1,\"liveMetadata\":2,\"historyProtocol\":1,\"livePermissions\":false,\"interactionProtocol\":%u,\"enrollmentProtocol\":%u,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
+          "\"liveProtocol\":1,\"liveMetadata\":2,\"historyProtocol\":2,\"livePermissions\":false,\"interactionProtocol\":%u,\"enrollmentProtocol\":%u,\"mirrorProtocol\":%u,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
-          interaction_command ? 1u : 0u, enrollment_command ? 1u : 0u, hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
+          interaction_command ? 1u : 0u, enrollment_command ? 1u : 0u, mirror_command ? 1u : 0u, hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
           static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();
@@ -595,6 +596,13 @@ class ProtoCore {
     if(!doc["cmd"].is<const char*>() || doc["cmd"].as<JsonString>().size()!=strlen(cmd)) {
       reply_error(-1,0,"invalid command");return;
     }
+    if(!strncmp(cmd,"mirror_",7)) {
+      std::string response;
+      if(!mirror_command || !mirror_command(doc.as<JsonObjectConst>(),tick(),response) || response.empty() || response.size()>kAim1MaxPayload) {
+        reply_error(-1,0,"screen mirror unavailable");return;
+      }
+      emit(response.c_str());emit("\n");return;
+    }
     if(!strcmp(cmd,"get_crypto_benchmark")) {
       if(doc.as<JsonObjectConst>().size()!=1 || !crypto_benchmark) {
         reply_error(-1,0,"crypto benchmark unavailable");return;
@@ -607,8 +615,8 @@ class ProtoCore {
     }
     if(!strcmp(cmd,"history_begin") || !strcmp(cmd,"history_provider")) {
       const bool accepted=history_.handle(doc.as<JsonObjectConst>(),boot_id,tick());
-      emitf("{\"type\":\"history_reply\",\"schema\":1,\"cmd\":\"%s\",\"ok\":%s,\"bootId\":%u,\"epoch\":%u,\"revision\":%u,\"index\":%u}\n",
-        cmd,accepted?"true":"false",(unsigned)boot_id,(unsigned)(doc["epoch"]|0u),(unsigned)(doc["revision"]|0u),(unsigned)(doc["index"]|0u));
+      emitf("{\"type\":\"history_reply\",\"schema\":%u,\"cmd\":\"%s\",\"ok\":%s,\"bootId\":%u,\"epoch\":%u,\"revision\":%u,\"index\":%u}\n",
+        (unsigned)(doc["schema"]|0u),cmd,accepted?"true":"false",(unsigned)boot_id,(unsigned)(doc["epoch"]|0u),(unsigned)(doc["revision"]|0u),(unsigned)(doc["index"]|0u));
       return;
     }
     if(!strcmp(cmd,"interaction_enroll") || !strncmp(cmd,"interaction_enroll_",19)) {

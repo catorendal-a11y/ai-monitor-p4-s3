@@ -20,6 +20,9 @@
 #include "ui_menu.h"
 #include "ui_enrollment.h"
 #include "ui_history.h"
+#include "ui_permission.h"
+#include "ui_connection.h"
+#include "mirror/runtime.h"
 #include "ui/theme.h"
 #include "diagnostics/hardware_types.h"
 #include "diagnostics/ppa_benchmark.h"
@@ -51,6 +54,8 @@ static void uiTask(void*) {
   ui_menu_init();
   ui_enrollment_init();
   ui_history_init();
+  ui_connection_init();
+  ui_permission_init();
   ui_nova_show();
   diagnostics::capture_startup_memory(diagnostics::StartupStage::afterCompanion);
 
@@ -75,7 +80,10 @@ static void uiTask(void*) {
       ui_menu_update();
       ui_enrollment_update();
       ui_history_update();
+      ui_connection_update();
+      ui_permission_update();
     }
+    mirror::ui_tick();
     lv_timer_handler();
     vTaskDelay(pdMS_TO_TICKS(5));
   }
@@ -86,6 +94,10 @@ void setup() {
   // would silently truncate them. HWCDC only resizes while stopped.
   // Reserve space for the 4095-byte payload AND its AIM1 header/trailing newline.
   Serial.setRxBufferSize(8192);
+#if defined(AIM_USB_PERMISSION_RUNTIME)
+  Serial.setTxBufferSize(2048);
+  Serial.setTxTimeoutMs(0); // A permission write must never wait behind unrelated output.
+#endif
 #if defined(AIM_BOARD_WAVESHARE_S3)
   // The USB TO UART connector is used for both flashing and normal host data.
   Serial.begin(115200, SERIAL_8N1, 44, 43);

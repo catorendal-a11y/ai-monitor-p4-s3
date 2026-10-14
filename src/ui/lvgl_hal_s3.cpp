@@ -7,6 +7,7 @@
 #include "visual_dimmer.h"
 #include "../diagnostics/hardware_types.h"
 #include "../diagnostics/graphics_types.h"
+#include "../mirror/runtime.h"
 #include <Arduino.h>
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -38,6 +39,7 @@ void lvgl_flush_cb(lv_display_t* display, const lv_area_t* area, uint8_t* pixels
   // PARTIAL mode supplies contiguous rows. The RGB driver copies them into
   // its persistent PSRAM framebuffer before returning; no rotation needed.
   if (display_panel && area && pixels) {
+    mirror::flushed(area->x1,area->y1,area->x2,area->y2,reinterpret_cast<const uint16_t*>(pixels),lv_display_flush_is_last(display));
 #if AIM_GRAPHICS_TELEMETRY
     const int64_t began = esp_timer_get_time();
 #endif

@@ -2,6 +2,10 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
+Development candidate: **v1.19.1-rc1**, with observed session history, companion animation playback
+and [real USB device-screen capture](docs/DEVICE_MIRROR.md). Published downloads below remain
+v1.19.0. Physical permission control is a disabled preview until hardware/provider validation.
+
 ![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
 <p align="center">

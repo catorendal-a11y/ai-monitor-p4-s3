@@ -11,18 +11,21 @@ class UsbHistoryClient:
         age=self.clock()-summary['sampledAt']
         if not 0<=age<=120:raise ValueError('Stale history sample')
         providers=summary['providers']
-        begin=dict(cmd='history_begin',schema=1,bootId=self.panel.info['bootId'],epoch=self.epoch,revision=self.revision,
+        schema=2 if self.panel.info.get('historyProtocol')==2 else 1
+        begin=dict(cmd='history_begin',schema=schema,bootId=self.panel.info['bootId'],epoch=self.epoch,revision=self.revision,
                    enabled=summary['enabled'],error=summary['error'],date=summary['date'],sampleAgeSeconds=int(age),providers=[p['provider'] for p in providers])
         self._send(begin)
         for index,provider in enumerate(providers):
-            self._send(dict(cmd='history_provider',schema=1,epoch=self.epoch,revision=self.revision,index=index,
-                            **{key:provider[key] for key in ('today','daily','hourly','quota')}))
+            message=dict(cmd='history_provider',schema=schema,epoch=self.epoch,revision=self.revision,index=index,
+                            **{key:provider[key] for key in ('today','daily','hourly','quota')})
+            if schema==2:message['agents']=provider.get('agents',dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None))
+            self._send(message)
     def _send(self,message):
         raw=json.dumps(message,separators=(',',':'),allow_nan=False)
         if len(raw.encode('ascii'))>4095:raise ValueError('History packet too large')
         self.panel.send_line(raw)
         reply=self.panel.wait_for('history_reply',seconds=.5,command=message['cmd'])
-        expected=dict(type='history_reply',schema=1,cmd=message['cmd'],ok=True,bootId=self.panel.info['bootId'],
+        expected=dict(type='history_reply',schema=message['schema'],cmd=message['cmd'],ok=True,bootId=self.panel.info['bootId'],
                       epoch=self.epoch,revision=self.revision,index=message.get('index',0))
         if reply!=expected or type(reply.get('ok')) is not bool or any(type(reply[k]) is not int for k in ('schema','bootId','epoch','revision','index')):
             raise ValueError('Uncorrelated history receipt')
