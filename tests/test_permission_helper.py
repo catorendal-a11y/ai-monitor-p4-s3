@@ -6,6 +6,7 @@ from pathlib import Path
 import secrets
 import sys
 import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch,Mock
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
@@ -36,10 +37,13 @@ class PermissionHelperTests(unittest.TestCase):
             with self.assertRaises(ValueError):helper.decision_output(request,dict(response,**change),'a'*32)
     def test_unavailable_timeout_or_ambiguous_host_falls_back_without_output(self):
         for failure in (OSError('private error'),TimeoutError(),ValueError(),EOFError()):
-            with patch.object(helper.sys,'argv',['fixture']),patch.object(helper.os,'name','nt'),\
+            # Replace only the helper's platform view. Mutating os.name globally changes
+            # pathlib's path class on Linux and prevents this test reaching exchange().
+            with patch.object(helper.sys,'argv',['fixture']),patch.object(helper,'os',SimpleNamespace(name='nt')),\
                  patch.object(helper.sys,'stdin',Mock(buffer=io.BytesIO(json.dumps(self.fixture()).encode()))),\
-                 patch.object(helper,'exchange',side_effect=failure),patch.object(helper.sys,'stdout',io.StringIO()) as output:
+                 patch.object(helper,'exchange',side_effect=failure) as exchange,patch.object(helper.sys,'stdout',io.StringIO()) as output:
                 self.assertEqual(helper.main(),0);self.assertEqual(output.getvalue(),'')
+                exchange.assert_called_once()
     def test_strict_ipc_bytes_never_unpickles_or_accepts_duplicate_fields(self):
         for raw in (b'{"schema":1,"schema":2}',b'{"value":NaN}',b'x'*4097,b''):
             with self.assertRaises(ValueError):ipc.strict_json(raw)
