@@ -1,0 +1,13 @@
+{
+  "board": "",
+  "providers": [],
+  "port": "auto",
+  "interval_s": 240,
+  "zai_key": "",
+  "zai_provider": "zcode",
+  "reconnect_s": 5,
+  "token_poll_s": 2,
+  "log_font_size": 10,
+  "start_host_on_open": false,
+  "keep_host_on_close": true
+}

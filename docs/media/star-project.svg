@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="88" viewBox="0 0 1280 88" role="img" aria-labelledby="title description">
+  <title id="title">Support AI Monitor — give this project a star on GitHub</title>
+  <desc id="description">Enjoy the project? Visit the GitHub repository and click Star to help others discover it.</desc>
+  <rect x="2" y="2" width="1276" height="84" rx="4" fill="#e943a4"/>
+  <path d="M54 63C46 56 29 44 29 33c0-8 6-14 14-14 5 0 9 3 11 7 3-4 7-7 12-7 8 0 14 6 14 14 0 11-18 24-26 30Z" fill="none" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+  <path d="m109 29 5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2Z" fill="#fff"/>
+  <text x="151" y="53" fill="#fff" font-family="Segoe UI,Arial,sans-serif" font-size="29" font-weight="700" letter-spacing="1.5">SUPPORT THIS PROJECT — GIVE IT A STAR ON GITHUB</text>
+</svg>
