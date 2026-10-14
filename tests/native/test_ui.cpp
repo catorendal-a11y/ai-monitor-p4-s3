@@ -685,6 +685,12 @@ int main(int argc, char** argv) {
   CHECK(std::strcmp(lv_label_get_text(hdr.live), "LIVE") == 0);
   CHECK(std::strcmp(lv_label_get_text(footServices), "1 / 1 services online") == 0);
   CHECK(std::strcmp(lv_label_get_text(big[0].remaining), "LOCAL") == 0);
+  std::strcpy(sample.viewKeys[0], "external"); std::strcpy(sample.views[0].providerKey, "external");
+  std::strcpy(sample.views[0].providerLabel, "ABCDEFGHIJKLMNOP");
+  dashboard_update();
+  CHECK(std::strcmp(lv_label_get_text(big[0].vendor), "ABCDEFGHIJKLMNOP - ACTIVITY / SETUP") == 0);
+  CHECK(std::strcmp(bigCache[0].vendor, "ABCDEFGHIJKLMNOP - ACTIVITY / SETUP") == 0);
+  std::strcpy(sample.viewKeys[0], "gemini"); std::strcpy(sample.views[0].providerKey, "gemini");
   sample.tokenSourceMask = 1; dashboard_update();
   CHECK(std::strcmp(lv_label_get_text(hdr.live), "ISSUE") == 0);
   set_sample(2, 2);
