@@ -27,7 +27,8 @@ int main() {
     live.agents[0].state=agent::State::ERROR;++live.revision;center.observe(1003,true,live);
     live.agents[0].state=agent::State::COMPLETED;++live.revision;center.observe(1004,true,live);
     CHECK(center.at(0)->type==events::Type::COMPLETED && center.count()==5);
-    center.observe(1005,false,{});CHECK(center.at(0)->type==events::Type::DISCONNECTED && center.count()==6);
+    const live_agent::UsbLiveSnapshot disconnected{};
+    center.observe(1005,false,disconnected);CHECK(center.at(0)->type==events::Type::DISCONNECTED && center.count()==6);
     center.mark_read();CHECK(center.unread()==0);
     for(unsigned i=0;i<50;++i)center.quota("claude",true,2000+i);
     CHECK(center.count()==32 && center.unread()==32 && center.at(32)==nullptr);
