@@ -112,4 +112,37 @@ class MirrorTests(unittest.TestCase):
             self.assertIsNone(dialog.nonce)
             self.assertFalse((root/'tools/screen-capture/request.json').exists())
             dialog.reject();app.processEvents()
+
+    def test_old_viewer_does_not_consume_new_viewers_response(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'tools').mkdir()
+            old=mirror_service.request(root);current=mirror_service.request(root)
+            path=mirror_service.directory(root)/'response.json'
+            mirror_service.write(path,dict(nonce=current,at=time.time(),pixels=base64.b64encode(bytes(BYTES)).decode()))
+            self.assertIsNone(mirror_service.receive(root,old))
+            self.assertTrue(path.exists())
+            self.assertEqual(len(mirror_service.receive(root,current)[0]),BYTES)
+
+    def test_gui_refresh_failure_remains_visible_until_successful_retry(self):
+        import os
+        from unittest.mock import patch
+        os.environ['QT_QPA_PLATFORM']='offscreen'
+        from PySide6.QtWidgets import QApplication
+        from desktop_mirror import MirrorDialog
+        app=QApplication.instance() or QApplication([])
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'tools').mkdir();dialog=MirrorDialog(root)
+            dialog.timer.stop();dialog.stamp=time.time()-20
+            with patch.object(mirror_service,'request',return_value='a'*32), patch.object(mirror_service,'receive',side_effect=RuntimeError):
+                dialog.capture();dialog.poll()
+            message=dialog.status.text()
+            self.assertIn('Capture unavailable',message)
+            dialog.poll();self.assertEqual(dialog.status.text(),message)
+            with patch.object(mirror_service,'request',side_effect=OSError):dialog.capture()
+            message=dialog.status.text();dialog.poll();self.assertEqual(dialog.status.text(),message)
+            with patch.object(mirror_service,'request',return_value='b'*32), patch.object(mirror_service,'receive',return_value=(bytes(BYTES),time.time())):
+                dialog.capture();dialog.poll()
+            self.assertIn('Real device capture',dialog.status.text())
+            self.assertTrue(dialog.capture_button.isEnabled())
+            dialog.reject();app.processEvents()
 if __name__=='__main__':unittest.main()
