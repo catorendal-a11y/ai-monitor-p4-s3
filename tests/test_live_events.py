@@ -164,6 +164,35 @@ class LiveEventTests(unittest.TestCase):
             self.assertNotIn('permissionDecision',expression)
 
     @unittest.skipUnless(os.name=='nt','Windows observer executable wrapper')
+    def test_codex_command_executes_through_the_clients_powershell_shell(self):
+        from host_security import powershell_executable
+        (self.root/'tools').mkdir(exist_ok=True)
+        observed=self.root/'shell-observed.txt'
+        (self.root/'tools/aim_events.py').write_text('from pathlib import Path\n'
+            f'Path({str(observed)!r}).write_text("observed")\n')
+        command=setup.claude_command(self.root,'--codex-event')
+        result=subprocess.run([powershell_executable(),'-NoProfile','-Command',command],
+                              input='{}',capture_output=True,text=True,timeout=10)
+        self.assertEqual(result.returncode,0)
+        self.assertEqual(result.stderr,'')
+        self.assertEqual(result.stdout.strip(),'{}')
+        self.assertTrue(observed.exists())
+
+    @unittest.skipUnless(os.name=='nt','Windows packaged command migration')
+    def test_unprefixed_packaged_codex_command_is_migrated_without_duplicates(self):
+        (self.root/'AI-Monitor-Events.exe').touch()
+        file=self.root/'home/.codex/hooks.json'
+        with patch.object(sys,'frozen',True,create=True):
+            current=setup.claude_command(self.root,'--codex-event')
+            self.assertTrue(current.startswith('& '))
+            old={'type':'command','command':current.removeprefix('& '),'timeout':2}
+            write_record(file,{'hooks':{e:[{'hooks':[old]}] for e in setup.CODEX_EVENTS}})
+            setup.codex_session_link(self.root,home=self.root/'home')
+            doc=json.loads(file.read_text())
+            for entries in doc['hooks'].values():
+                self.assertEqual(entries,[{'hooks':[dict(old,command=current)]}])
+
+    @unittest.skipUnless(os.name=='nt','Windows observer executable wrapper')
     def test_actual_windows_codex_wrapper_suppresses_child_output_and_oversize_payload(self):
         from host_security import powershell_executable
         (self.root/'tools').mkdir(exist_ok=True)
