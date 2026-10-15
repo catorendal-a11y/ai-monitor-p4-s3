@@ -339,6 +339,25 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(connect.call_count, 2)
         first.close.assert_called_once()
         second.close.assert_called_once()
+
+    def test_post_handshake_failure_closes_port_before_reconnect_wait(self):
+        panel = Mock(info={'hardwareDiagnostics': True})
+        panel.send_line.side_effect = OSError('Synthetic disconnected USB')
+        closed_before_wait = []
+        def reconnect_wait(*args):
+            closed_before_wait.append(panel.close.called)
+            raise KeyboardInterrupt()
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(host, 'HERE', Path(folder)), \
+                patch.object(host, 'find_port', return_value='COM_TEST'), \
+                patch.object(host, 'connect_panel', return_value=panel), \
+                patch.object(host, 'wait_for_config', side_effect=reconnect_wait), \
+                patch.object(host, 'poll_cycle') as poll, patch.object(host, 'LOG'):
+            with self.assertRaises(KeyboardInterrupt):
+                host._run_loop(host.DEFAULT_CONFIG, 60, '', ['codex'])
+        self.assertEqual(closed_before_wait, [True])
+        panel.close.assert_called_once()
+        poll.assert_not_called()
         self.assertEqual(sleep.call_args.args[1], 5)
 
     def test_provider_error_is_sent_as_notice_and_receives_ack(self):
