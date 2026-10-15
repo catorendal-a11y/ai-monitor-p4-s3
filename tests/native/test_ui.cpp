@@ -1589,11 +1589,15 @@ int main(int argc, char** argv) {
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"NEEDS ATTENTION"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"1:02:03 / event 45s ago"));
     screenshot(screenshots,"live-agent-session-timer");
+    liveSample.agents[0].state=agent::State::ERROR;ui_agents_update();
+    CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(0xFF6B6B)));
     CHECK(lv_obj_is_hidden(agents_ui::rows[1].card));
     CHECK(lv_obj_has_state(agents_ui::next,LV_STATE_DISABLED));
     liveSample.count=8;liveSample.epoch=2;ui_agents_update();CHECK(agents_ui::page==0);
     testAppearance.theme=app_settings::Theme::ocean;ui_theme::apply(testAppearance.theme);
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(agents_ui::screen,LV_PART_MAIN),lv_color_hex(ui_theme::background)));
+    ui_agents_update();
+    CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(0xFF6B6B)));
     fakeTick+=30000;ui_agents_update();
     CHECK(!lv_obj_is_hidden(agents_ui::empty) && lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),""));
@@ -1618,7 +1622,7 @@ int main(int argc, char** argv) {
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].provider),"CODEX"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"NO RECENT EVENTS"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].provider),"Z CODE"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].state),"ACTIVITY ONLY"));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].state),"NO RECENT EVENTS"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].identity),"Token activity available"));
     CHECK(liveSample.count==0);screenshot(screenshots,"agents-provider-status");
     sample.hostPresent=false;ui_agents_update();CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
