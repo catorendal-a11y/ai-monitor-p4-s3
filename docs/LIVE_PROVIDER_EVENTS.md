@@ -83,7 +83,9 @@ quota messages, permission authority and source records stay separate.
 
 The installed official client's read-only `hooks/list` RPC reported all ten current user hooks
 trusted and enabled, without warnings. The observer's neutral no-op wrapper completed in 250 ms.
-The running desktop app-server predates the hook installation. An old loaded configuration is a
-possible explanation for missing events, not a confirmed root cause; a fresh inventory does not
-prove that a running conversation delivers events. No hook trust, permission settings, transcripts
+At that earlier checkpoint, the running desktop app-server predated the hook installation.
+The deeper October 15 audit found a newer running process and still no observer records, so that
+earlier hypothesis does not explain the current installation. A fresh inventory does not
+prove that a running conversation delivers events. See [the deeper integration audit](AGENT_INTEGRATION_AUDIT.md).
+No hook trust, permission settings, transcripts
 or model sessions were modified for this check. The monitor does not force-restart other agents.
