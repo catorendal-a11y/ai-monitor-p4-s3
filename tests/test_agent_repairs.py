@@ -86,6 +86,20 @@ class AgentRepairTests(unittest.TestCase):
         write_record(self.activity/'codex-session-link.json',{'enabled':True,'generation':17})
         self.assertEqual(setup.codex_session_state(self.root,home=self.root),'not linked')
 
+    def test_codex_upgrade_migrates_only_exact_legacy_observer_and_preserves_custom_hooks(self):
+        # Simulate an older source setup with a Python interpreter outside the release.
+        with patch.object(sys,'executable',str(self.root/'old-python/python.exe')):
+            old=setup.claude_command(self.root,'--codex-event')
+        custom={'type':'command','command':'fixture-custom','timeout':2}
+        old_hook={'type':'command','command':old,'timeout':2}
+        file=self.root/'.codex/hooks.json'
+        write_record(file,{'hooks':{event:[{'hooks':[old_hook,custom]}] for event in setup.CODEX_EVENTS}})
+        setup.codex_session_link(self.root,home=self.root)
+        document=json.loads(file.read_text())
+        current={'type':'command','command':setup.claude_command(self.root,'--codex-event'),'timeout':2}
+        for entries in document['hooks'].values():
+            self.assertEqual(entries,[{'hooks':[current,custom]}])
+
     def test_independent_sampler_does_not_need_numeric_reader(self):
         live.lifecycle_event('zcode',self.event('UserPromptSubmit'),self.activity,17)
         sampler=live.LiveSampler(self.activity,['zcode'])
