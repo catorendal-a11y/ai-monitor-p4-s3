@@ -75,6 +75,9 @@ def receive(root, nonce):
     if not path.exists(): return None
     if path.is_symlink() or path.parent.is_symlink(): raise ValueError('Invalid capture file')
     data = read_local_json(path, 1030000)
+    # A superseded viewer must not consume the current viewer's response.
+    if isinstance(data, dict) and data.get('nonce') != nonce:
+        return None
     path.unlink(missing_ok=True)
     if (not isinstance(data, dict) or data.get('nonce') != nonce or
         set(data) not in ({'nonce', 'at', 'pixels'}, {'nonce', 'at', 'error'})): raise ValueError('Capture response changed')

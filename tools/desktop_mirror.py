@@ -12,6 +12,7 @@ class MirrorDialog(QDialog):
     def __init__(self, root, parent=None):
         super().__init__(parent)
         self.root, self.nonce, self.started, self.stamp = root, None, 0, None
+        self.capture_failed = False
         self.setWindowTitle('Device screen — real USB capture')
         self.setMinimumSize(850, 600)
         layout = QVBoxLayout(self)
@@ -34,13 +35,16 @@ class MirrorDialog(QDialog):
         try:
             self.nonce = mirror_service.request(self.root)
             self.started = time.monotonic()
+            self.capture_failed = False
             self.capture_button.setEnabled(False)
             self.status.setText('Capturing through the running host. Existing image is STALE. Permission and connection-code screens are hidden.')
-        except (OSError, ValueError): self.status.setText('Capture mailbox unavailable.')
+        except (OSError, ValueError):
+            self.capture_failed = True
+            self.status.setText('Capture mailbox unavailable.')
 
     def poll(self):
         if not self.nonce:
-            if self.stamp and time.time() - self.stamp > 5:
+            if not self.capture_failed and self.stamp and time.time() - self.stamp > 5:
                 self.status.setText('STALE — captured ' + datetime.fromtimestamp(self.stamp).strftime('%H:%M:%S') + '. Press Capture / Refresh for a new image.')
             return
         try:
@@ -48,13 +52,16 @@ class MirrorDialog(QDialog):
             if result is None:
                 if time.monotonic() - self.started > 115: raise TimeoutError()
                 return
-            raw, self.stamp = result
+            raw, stamp = result
             if sys.byteorder != 'little': raise ValueError('Unsupported pixel byte order')
             # Native RGB565 avoids a Python loop over 384,000 pixels on the UI thread.
             picture = QImage(raw, 800, 480, 1600, QImage.Format.Format_RGB16).copy()
             self.image.setPixmap(QPixmap.fromImage(picture))
+            self.stamp = stamp
+            self.capture_failed = False
             self.status.setText('Real device capture at ' + datetime.fromtimestamp(self.stamp).strftime('%H:%M:%S') + ' — image is read-only.')
         except (OSError, ValueError, RuntimeError, TimeoutError):
+            self.capture_failed = True
             self.status.setText('Capture unavailable. Start the host, connect the display, leave permission/setup screens and retry. Existing image is STALE.')
         mirror_service.cancel(self.root, self.nonce)
         self.nonce = None; self.capture_button.setEnabled(True)
