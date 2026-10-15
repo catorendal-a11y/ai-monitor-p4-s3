@@ -31,7 +31,9 @@ def claude_command(root, option='--claude-statusline', *, interpreter=None):
                 # Stop/SubagentStop require neutral JSON. No context or decision fields.
                 expression=expression.replace('exit 0',"[Console]::Out.WriteLine('{}'); exit 0")
         encoded = base64.b64encode(expression.encode('utf-16le')).decode('ascii')
-        return '"' + powershell_executable() + '" -NoProfile -EncodedCommand ' + encoded
+        # Codex executes Windows command hooks through PowerShell. A quoted path
+        # is a string expression there until the call operator invokes it.
+        return ('& ' if option=='--codex-event' else '')+'"'+powershell_executable()+'" -NoProfile -EncodedCommand '+encoded
     import shlex
     suffix = (' >/dev/null 2>&1; printf \'{}\\n\'; exit 0' if option=='--codex-event' else
               ' >/dev/null 2>&1; exit 0' if observer else '')
@@ -148,10 +150,13 @@ def _legacy_codex_hook(hook,root):
             hook.get('type')!='command' or type(hook.get('timeout')) is not int or hook['timeout']!=2 or
             not isinstance(hook.get('command'),str)):return False
     try:
+        current=claude_command(Path(root),'--codex-event')
+        if current.startswith('& ') and hook['command']==current.removeprefix('& '):return True
         expression=base64.b64decode(hook['command'].rsplit(' ',1)[1],validate=True).decode('utf-16le')
         for candidate in re.findall(r"'([^']*python\.exe)'",expression,flags=re.IGNORECASE):
-            if Path(candidate).is_absolute() and hook['command']==claude_command(Path(root),'--codex-event',interpreter=candidate):
-                return True
+            if Path(candidate).is_absolute():
+                expected=claude_command(Path(root),'--codex-event',interpreter=candidate)
+                if hook['command'] in (expected,expected.removeprefix('& ')):return True
     except (ValueError,UnicodeError,IndexError):pass
     return False
 

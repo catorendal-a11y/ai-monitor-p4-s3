@@ -1,3 +1,13 @@
+# AI Monitor v1.19.1-rc4
+
+- Fix actual Codex Windows hook execution through the client's PowerShell shell.
+  The generated quoted executable now uses the call operator. The prior direct-argv
+  helper smoke test did not cover the outer shell and missed this parser failure.
+- Migrate exact generated rc3 and older source observer commands without adding
+  duplicate hooks or touching unrelated custom commands. Hook trust review remains
+  in the client's normal interface.
+- Add a real outer-PowerShell regression and packaged-command migration regression.
+
 # AI Monitor v1.19.1-rc3
 
 Local integration-fix candidate; genuine client delivery and physical approval remain separate checks.
