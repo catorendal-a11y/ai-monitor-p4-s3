@@ -123,6 +123,16 @@ class MirrorTests(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertEqual(len(mirror_service.receive(root,current)[0]),BYTES)
 
+    def test_invalid_response_nonce_is_rejected_without_waiting_for_timeout(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);(root/'tools').mkdir();nonce=mirror_service.request(root)
+            path=mirror_service.directory(root)/'response.json'
+            for invalid in (None, True, 'invalid', 'x'*32):
+                with self.subTest(nonce=invalid):
+                    mirror_service.write(path,dict(nonce=invalid,at=time.time(),error='unavailable'))
+                    with self.assertRaises(ValueError):mirror_service.receive(root,nonce)
+                    self.assertFalse(path.exists())
+
     def test_gui_refresh_failure_remains_visible_until_successful_retry(self):
         import os
         from unittest.mock import patch
