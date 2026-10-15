@@ -143,5 +143,16 @@ class AgentRepairTests(unittest.TestCase):
         health.update('connected','COM9999')
         self.assertIsNone(read_status(self.root,{os.getpid()}))
 
+    def test_console_link_is_explicit_and_requires_selected_provider(self):
+        import aim_control as control
+        with patch.object(control,'ROOT',self.root),patch.object(control,'local_config',return_value={'providers':['zcode']}), \
+             patch('provider_setup.zcode_session_link',return_value='fixture linked') as link,patch('builtins.print'):
+            self.assertEqual(control.main(['--link-events','zcode']),0)
+            link.assert_called_once_with(self.root,remove=False)
+        with patch.object(control,'ROOT',self.root),patch.object(control,'local_config',return_value={'providers':[]}), \
+             patch('provider_setup.zcode_session_link') as link,patch('builtins.print'):
+            self.assertEqual(control.main(['--link-events','zcode']),1)
+            link.assert_not_called()
+
 
 if __name__=='__main__':unittest.main()
