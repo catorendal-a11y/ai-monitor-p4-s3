@@ -362,6 +362,7 @@ static CardWidgets build_big_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) 
 
   c.name = make_label(c.card, 74, 20, 220, F_PROVIDER, C_NAME, LV_TEXT_ALIGN_LEFT, "-");
   c.vendor = make_label(c.card, 74, 49, 240, F_META, C_META, LV_TEXT_ALIGN_LEFT, "");
+  lv_label_set_long_mode(c.vendor, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
   lv_obj_set_style_text_letter_space(c.vendor, 1, 0);
   c.remaining = make_label(c.card, 240, 21, 106, F_META, C_META, LV_TEXT_ALIGN_RIGHT, "REMAINING");
   lv_obj_set_style_text_letter_space(c.remaining, 1, 0);

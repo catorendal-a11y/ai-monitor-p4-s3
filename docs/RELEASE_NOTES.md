@@ -1,3 +1,17 @@
+# AI Monitor v1.19.1-rc2
+
+Local bug-fix candidate; not a published release or a claim of complete hardware validation.
+
+- Require all Windows helpers/runtimes and both matching, layout-verified firmware
+  pairs before installer generation. Keep source, host and image versions aligned.
+- Release USB ownership before retrying a failure after the device handshake.
+- Prevent superseded screen viewers from consuming another capture's response,
+  reject malformed correlation IDs promptly and retain refresh errors until retry.
+- Preserve long dashboard status text in both label/cache and scroll overflow
+  without reducing font size or moving controls. Use portable history number formats.
+- Isolate PlatformIO's Python/toolchain state per project and document sequential,
+  failure-checked firmware collection and version-derived installer filenames.
+
 # AI Monitor v1.19.1-rc1
 
 Local candidate; not an announcement of a published or physically qualified release.

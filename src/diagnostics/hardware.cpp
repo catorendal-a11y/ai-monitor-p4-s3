@@ -15,7 +15,9 @@
 namespace diagnostics {
 namespace {
 uint32_t imageBytes = 0;
+#if defined(AIM_HAS_HOSTED_METADATA)
 char hostedVersion[24] = "unavailable";
+#endif
 StartupMemory startup;
 CompanionCache companion;
 portMUX_TYPE startupMux = portMUX_INITIALIZER_UNLOCKED;

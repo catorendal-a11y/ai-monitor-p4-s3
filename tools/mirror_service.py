@@ -76,7 +76,8 @@ def receive(root, nonce):
     if path.is_symlink() or path.parent.is_symlink(): raise ValueError('Invalid capture file')
     data = read_local_json(path, 1030000)
     # A superseded viewer must not consume the current viewer's response.
-    if isinstance(data, dict) and data.get('nonce') != nonce:
+    if (isinstance(data, dict) and isinstance(data.get('nonce'), str) and
+            re.fullmatch('[0-9a-f]{32}', data['nonce']) and data['nonce'] != nonce):
         return None
     path.unlink(missing_ok=True)
     if (not isinstance(data, dict) or data.get('nonce') != nonce or
