@@ -63,7 +63,10 @@ class SetupReportDialog(QDialog):
         else: self.detail.setPlainText('Choose and save your AI providers before checking setup.')
 
     def _selected(self,row,*unused):
-        if 0<=row<len(self.results): self.detail.setPlainText(self.results[row]['next_step'])
+        if 0<=row<len(self.results):
+            item=self.results[row]
+            self.detail.setPlainText('Event setup: '+item.get('events','not checked')+'\n'+
+                item.get('live_usb','Agent USB: not checked')+'\n'+item['next_step'])
 
     def provider(self):
         row=self.table.currentRow()

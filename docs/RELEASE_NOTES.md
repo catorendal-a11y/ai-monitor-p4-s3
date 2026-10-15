@@ -1,3 +1,18 @@
+# AI Monitor v1.19.1-rc3
+
+Local integration-fix candidate; genuine client delivery and physical approval remain separate checks.
+
+- Add explicitly linked ZCode lifecycle observations using its documented process hooks,
+  with selected-provider consent, bounded private-free records and safe removal.
+- Read live events independently of numeric databases. Show correlated agent USB
+  acknowledgment, sample expiry and transport errors in the PC app.
+- Check actual Codex hook definitions rather than treating an opt-in marker as setup proof.
+  Migrate only exact older wrappers belonging to this installation; preserve custom hooks
+  and the client's required trust review.
+- Freeze elapsed turn timers on interrupted tool failures. Give ZCode the correct
+  no-events fallback and show agent errors consistently in red.
+- Preserve globally disabled ZCode hooks, unrelated settings and provider selections.
+
 # AI Monitor v1.19.1-rc2
 
 Local bug-fix candidate; not a published release or a claim of complete hardware validation.

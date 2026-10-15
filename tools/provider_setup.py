@@ -1,6 +1,7 @@
 """Explicit local integration setup. Preserve unrelated client settings."""
 import base64
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -9,15 +10,15 @@ from host_security import powershell_executable, read_local_json
 from telemetry_bridge import write_record
 
 
-def claude_command(root, option='--claude-statusline'):
+def claude_command(root, option='--claude-statusline', *, interpreter=None):
     if option not in ('--claude-statusline','--claude-event','--codex-event'): raise ValueError('Unsupported event integration')
     observer=option in ('--claude-event','--codex-event')
-    if getattr(sys, 'frozen', False):
+    if getattr(sys, 'frozen', False) and interpreter is None:
         helper = root / ('AI-Monitor-Events.exe' if observer else 'AI-Monitor-Console.exe')
         if not helper.is_file(): raise ValueError('Console helper missing. Reinstall the complete release.')
         command = [str(helper), option]
     else:
-        command = [sys.executable, str(root / ('tools/aim_events.py' if observer else 'tools/aim_control.py')), option]
+        command = [str(interpreter or sys.executable), str(root / ('tools/aim_events.py' if observer else 'tools/aim_control.py')), option]
     if os.name == 'nt':
         expression = '$payload=[Console]::In.ReadToEnd(); $payload | & ' + ' '.join("'" + arg.replace("'", "''") + "'" for arg in command)
         if observer:
@@ -37,8 +38,122 @@ def claude_command(root, option='--claude-statusline'):
     return shlex.join(command)+suffix
 
 
+def event_process(root,provider):
+    """Direct argv for clients with a process executor; never a shell or a decision."""
+    if provider not in ('codex','claude','zcode'):raise ValueError('Unsupported observer')
+    root=Path(root)
+    if getattr(sys,'frozen',False):
+        helper=root/'AI-Monitor-Events.exe'
+        if not helper.is_file():raise ValueError('Observer helper missing. Reinstall the complete release.')
+        return [str(helper),'--'+provider+'-event']
+    return [sys.executable,str(root/'tools/aim_events.py'),'--'+provider+'-event']
+
+
+def _zcode_hook(root):
+    args=event_process(root,'zcode')
+    return dict(type='process',command=args[0],args=args[1:],enabled=True,timeoutMs=2000)
+
+
+def zcode_session_link(root,remove=False,home=None):
+    """Explicit user-level observer setup; preserve unrelated hooks and global disablement."""
+    from live_events import ZCODE_EVENTS,marker
+    root=Path(root)
+    settings=(Path.home() if home is None else Path(home))/'.zcode/cli/config.json'
+    document=read_local_json(settings,65536) if settings.exists() else {}
+    if not isinstance(document,dict):raise ValueError('Invalid ZCode settings; nothing changed.')
+    hooks=document.get('hooks',{})
+    if not isinstance(hooks,dict):raise ValueError('Invalid ZCode hooks; nothing changed.')
+    events=hooks.get('events',{})
+    if not isinstance(events,dict):raise ValueError('Invalid ZCode events; nothing changed.')
+    expected=_zcode_hook(root);changed=False
+    for event in sorted(ZCODE_EVENTS):
+        entries=events.get(event,[])
+        if not isinstance(entries,list) or any(not isinstance(e,dict) or not isinstance(e.get('hooks'),list) for e in entries):
+            raise ValueError('Invalid ZCode hook entries; nothing changed.')
+        if remove:
+            kept=[]
+            for entry in entries:
+                if entry.get('matcher','')!='' or expected not in entry['hooks']:kept.append(entry);continue
+                remaining=[h for h in entry['hooks'] if h!=expected]
+                if remaining:kept.append(dict(entry,hooks=remaining))
+                changed=True
+            if kept:events[event]=kept
+            else:events.pop(event,None)
+        elif not any(e.get('matcher','')=='' and expected in e['hooks'] for e in entries):
+            events[event]=entries+[{'hooks':[expected]}];changed=True
+    activity=root/'tools/activity';marker_path=activity/'zcode-session-link.json'
+    if remove:write_record(marker_path,dict(enabled=False,generation=time.time_ns()))
+    if changed:
+        # Only a new hook collection gets a global enable flag. Never activate existing custom hooks.
+        if not remove and 'hooks' not in document:hooks['enabled']=True
+        hooks['events']=events;document['hooks']=hooks
+        settings.parent.mkdir(parents=True,exist_ok=True)
+        if settings.exists():shutil.copy2(settings,settings.with_name('config.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+        write_record(settings,document)
+    if not remove and (changed or not marker(activity,'zcode')['enabled']):
+        write_record(marker_path,dict(enabled=True,generation=time.time_ns()))
+    return ('ZCode events removed; unrelated hooks preserved.' if remove else
+            'ZCode events linked. Confirm Hooks is enabled in ZCode settings and start a new session. '
+            'Only state and hashed identities are recorded; no context or tool decisions are returned.')
+
+
+def zcode_session_state(root,home=None):
+    from live_events import ZCODE_EVENTS,marker
+    settings=(Path.home() if home is None else Path(home))/'.zcode/cli/config.json'
+    try:
+        doc=read_local_json(settings,65536) if settings.exists() else {}
+        hooks=doc.get('hooks',{});events=hooks.get('events',{})
+        if not isinstance(events,dict):return 'invalid'
+        expected=_zcode_hook(root);found=0
+        for event in ZCODE_EVENTS:
+            entries=events.get(event,[])
+            if not isinstance(entries,list):return 'invalid'
+            found+=any(isinstance(e,dict) and e.get('matcher','')=='' and isinstance(e.get('hooks'),list)
+                       and expected in e['hooks'] for e in entries)
+        if found==len(ZCODE_EVENTS):
+            if hooks.get('enabled') is not True:return 'hooks disabled in ZCode settings'
+            return 'installed' if marker(Path(root)/'tools/activity','zcode')['enabled'] else 'link disabled / retry setup'
+        return 'partial link' if found else 'not linked'
+    except (ValueError,OSError,TypeError,AttributeError):return 'invalid'
+
+
+def codex_session_state(root,home=None):
+    from codex_support import codex_home
+    from live_events import marker
+    settings=(Path(home)/'.codex' if home is not None else codex_home())/'hooks.json'
+    try:
+        doc=read_local_json(settings,65536) if settings.exists() else {}
+        hooks=doc.get('hooks',{})
+        if not isinstance(hooks,dict):return 'invalid'
+        expected={'type':'command','command':claude_command(Path(root),'--codex-event'),'timeout':2}
+        found=0
+        for event in CODEX_EVENTS:
+            entries=hooks.get(event,[])
+            if not isinstance(entries,list):return 'invalid'
+            found+=any(isinstance(e,dict) and e.get('matcher','')=='' and isinstance(e.get('hooks'),list)
+                       and expected in e['hooks'] for e in entries)
+        if found==len(CODEX_EVENTS):
+            return 'installed / review trust in Codex' if marker(Path(root)/'tools/activity','codex')['enabled'] else 'link disabled / retry setup'
+        return 'partial or different observer / retry setup' if found else 'not linked'
+    except (ValueError,OSError,TypeError,AttributeError):return 'invalid'
+
+
 CODEX_EVENTS=('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse','PermissionRequest',
               'SubagentStart','SubagentStop','Stop','Interrupt','SessionEnd')
+
+
+def _legacy_codex_hook(hook,root):
+    """Recognize only a byte-exact generated wrapper for this installation's source helper."""
+    if (os.name!='nt' or not isinstance(hook,dict) or set(hook)!={'type','command','timeout'} or
+            hook.get('type')!='command' or type(hook.get('timeout')) is not int or hook['timeout']!=2 or
+            not isinstance(hook.get('command'),str)):return False
+    try:
+        expression=base64.b64decode(hook['command'].rsplit(' ',1)[1],validate=True).decode('utf-16le')
+        for candidate in re.findall(r"'([^']*python\.exe)'",expression,flags=re.IGNORECASE):
+            if Path(candidate).is_absolute() and hook['command']==claude_command(Path(root),'--codex-event',interpreter=candidate):
+                return True
+    except (ValueError,UnicodeError,IndexError):pass
+    return False
 
 
 def codex_session_link(root, remove=False, home=None):
@@ -57,12 +172,20 @@ def codex_session_link(root, remove=False, home=None):
         if (not isinstance(entries,list) or any(not isinstance(entry,dict) or
                 not isinstance(entry.get('hooks'),list) for entry in entries)):
             raise ValueError('Invalid Codex hook entries; nothing changed.')
+        if not remove:
+            migrated=[]
+            for entry in entries:
+                replacements=[expected if entry.get('matcher','')=='' and _legacy_codex_hook(h,root) else h for h in entry['hooks']]
+                if replacements!=entry['hooks']:changed=True
+                migrated.append(dict(entry,hooks=replacements))
+            entries=migrated
+            if entries:hooks[event]=entries
         if remove:
             kept=[]
             for entry in entries:
-                owned=entry.get('matcher','')=='' and expected in entry['hooks']
+                owned=entry.get('matcher','')=='' and any(h==expected or _legacy_codex_hook(h,root) for h in entry['hooks'])
                 if not owned: kept.append(entry); continue
-                remaining=[hook for hook in entry['hooks'] if hook!=expected]
+                remaining=[hook for hook in entry['hooks'] if hook!=expected and not _legacy_codex_hook(hook,root)]
                 if remaining: kept.append(dict(entry,hooks=remaining))
                 changed=True
             if kept: hooks[event]=kept
@@ -214,9 +337,9 @@ def setup_report(root, home=None):
         elif provider=='claude': next_step=_claude_extra(claude_link_state(root,home))
         elif provider in ('gemini','opencode'): next_step='Use the official client once, then check again. This integration does not report remaining account quota.'
         else: next_step=_bridge_extra(provider,readable)
-        event_state=claude_session_state(root,home) if provider=='claude' else 'unsupported'
-        if provider=='codex':
-            event_state='link enabled / waiting for client events' if marker(root/'tools/activity','codex')['enabled'] else 'not linked'
+        event_state=({'claude':claude_session_state,'codex':codex_session_state,
+                     'zcode':zcode_session_state}[provider](root,home) if provider in ('claude','codex','zcode') else 'unsupported')
+        from host_status import live_status_text
         results.append(dict(provider=provider,activity='readable' if readable else 'missing',
             quota=quota if provider in ('codex','zcode','claude') else 'unsupported',
             display=('source-echoed' if live and type(health.get('display_sources')) is int
@@ -225,6 +348,7 @@ def setup_report(root, home=None):
                      and 0<=time.time()-health['display_sources_at']<=35 else 'connected' if live else 'unconfirmed'),
             sessions='reporting' if any(r['provider']==provider for r in session_rows+observed) else
                      'linked / waiting for events' if event_state=='installed' else event_state,
+            events=event_state,live_usb=live_status_text(health),
             next_step=next_step))
     return results
 

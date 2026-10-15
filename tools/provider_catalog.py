@@ -20,12 +20,15 @@ PROVIDER_SETUP = {
               'Node.js and Git do not need to be installed separately. Internet and a browser are needed for first setup.\n'
               '5. Optional: Link Codex session events below. Review and trust the hooks using /hooks in a compatible '
               'Codex client, then restart the session. Events report waiting, editing and stopped turns; they never '
-              'approve tools. Missing hook events remain unknown. The new USB live view is still under development.',
+              'approve tools. Missing hook events remain unknown. Check Agent USB for confirmed display delivery.',
               'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/CODEX_SETUP.md'),
     'zcode': ('1. Install ZCode and sign in with your own account for local token activity.\n'
               '2. For quota percentages, create a Z.AI Coding Plan API key in your Z.AI account and paste it '
               'in the masked field below. Save settings.\n3. Without a key, local activity still works but quota '
-              'is unavailable. The display lists only the windows your plan reports.',
+              'is unavailable. The display lists only the windows your plan reports.\n'
+              '4. Optional: Link ZCode session events for working, reading, editing, waiting and turn completion. '
+              'Confirm Hooks is enabled in ZCode and start a new session. This observer never approves tools; '
+              'subagent lifecycle is not reported by this adapter.',
               'https://docs.z.ai/devpack/quick-start'),
     'claude': ('1. Install Claude Code, sign in and use the CLI on this PC. Local token records are read automatically.\n'
                '2. For available subscription quotas, click Link Claude quota below. Existing custom '

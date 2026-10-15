@@ -15,6 +15,21 @@ FLAGS = {'start_host_on_open': False, 'keep_host_on_close': True,
          'minimize_to_tray': True, 'close_to_tray': False, 'usage_history': False, 'usb_permissions': False}
 
 
+def live_status_text(health):
+    """An empty acknowledged packet confirms the transport, never a client agent."""
+    value=health.get('live') if isinstance(health,dict) else None
+    if not health or health.get('state')!='connected':return 'Agent USB: host not connected'
+    if not isinstance(value,dict):return 'Agent USB: waiting for confirmation'
+    if value.get('state')=='unsupported':return 'Agent USB: update display firmware'
+    stamp=value.get('updated_at')
+    if type(stamp) not in (int,float) or not 0<=time.time()-stamp<=35:return 'Agent USB: confirmation expired'
+    if value.get('state')=='error':return 'Agent USB: delivery failed; retrying'
+    if value.get('state')=='stale':return 'Agent USB: source sample expired'
+    if value.get('state')=='acknowledged':
+        return 'Agent USB confirmed / '+str(value.get('agent_count',0))+' observed agents'
+    return 'Agent USB: waiting for confirmation'
+
+
 def validate_options(config):
     for key, (low, high, default) in OPTIONS.items():
         value = config.get(key, default)
@@ -74,6 +89,13 @@ def read_status(root, pids):
         if 'display_sources' in data:
             mask,stamp=data['display_sources'],data.get('display_sources_at')
             if type(mask) is not int or not 0<=mask<=255 or type(stamp) not in (int,float) or not math.isfinite(stamp): return None
+        if 'live' in data:
+            live=data['live']
+            if not isinstance(live,dict) or set(live)!={'state','agent_count','updated_at'}:return None
+            if live['state'] not in ('unsupported','acknowledged','stale','error'):return None
+            if type(live['agent_count']) is not int or not 0<=live['agent_count']<=8:return None
+            stamp=live['updated_at']
+            if type(stamp) not in (int,float) or not math.isfinite(stamp) or not 0<=stamp<=time.time()+1:return None
         if 'history' in data:
             from usage_history import ERRORS
             history=data['history']

@@ -616,6 +616,7 @@ class Panel:
             status.update('connected', self.name)
 
     def report_tokens(self):
+        message = None
         mirror = getattr(self, "mirror_service", None)
         if mirror is not None: mirror.pump(self)
         runtime = getattr(self, 'permission_runtime', None)
@@ -641,20 +642,35 @@ class Panel:
                     if isinstance(health, HostStatus):
                         health.data['sessions'] = sessions
                         health.data['sessions_at'] = time.time()
-                if ('live_agents' in message and type(self.info.get('liveProtocol')) is int and
-                        self.info['liveProtocol']==1 and self.info.get('livePermissions') is False and
-                        time.monotonic()>=getattr(self,'live_retry_at',0)):
-                    from usb_live import UsbLiveClient
-                    try:
-                        if getattr(self,'live_client',None) is None:
-                            self.live_client=UsbLiveClient(self);self.live_client.open()
-                        sampled=message.get('live_sampled_at')
-                        fresh_sample=type(sampled) in (int,float) and 0<=time.monotonic()-sampled<=10
-                        self.live_client.send(message['live_agents'] if fresh_sample else [])
-                    except (ValueError,TimeoutError,RuntimeError):
-                        # Live telemetry failure must not take down quota monitoring. No blind replay.
-                        self.live_client=None;self.live_retry_at=time.monotonic()+30
-                    # Serial I/O failures propagate to the existing USB reconnect path.
+        sampler=getattr(self,'live_sampler',None)
+        # Dedicated production reader; keep compatibility with an older injected sampler.
+        live_message=sampler.poll() if sampler is not None else message
+        if not (isinstance(live_message,dict) and 'live_agents' in live_message):return
+        supported=(type(self.info.get('liveProtocol')) is int and self.info['liveProtocol']==1
+                   and self.info.get('livePermissions') is False)
+        if not supported:
+            self.live_health('unsupported',0);return
+        if time.monotonic()<getattr(self,'live_retry_at',0):return
+        from usb_live import UsbLiveClient
+        try:
+            if getattr(self,'live_client',None) is None:
+                self.live_client=UsbLiveClient(self);self.live_client.open()
+            sampled=live_message.get('live_sampled_at')
+            fresh_sample=type(sampled) in (int,float) and 0<=time.monotonic()-sampled<=10
+            agents=live_message['live_agents'] if fresh_sample else []
+            self.live_client.send(agents)
+            self.live_health('acknowledged' if fresh_sample else 'stale',len(agents))
+        except (ValueError,TimeoutError,RuntimeError):
+            # Optional telemetry failure is visible but never takes down quota monitoring.
+            self.live_client=None;self.live_retry_at=time.monotonic()+30
+            self.live_health('error',0)
+        # Serial I/O errors still propagate to the existing reconnect path.
+
+    def live_health(self,state,count):
+        health=getattr(self,'health',None)
+        if isinstance(health,HostStatus):
+            health.data['live']={'state':state,'agent_count':count,'updated_at':time.time()}
+            health.update()
 
     def _write(self, data):
         if self.ser.write(data) != len(data):
@@ -961,7 +977,9 @@ def _run_loop(cfg, interval, zai_key, views):
     from permission_policy import selected as permission_selected, release_ready
     permissions=PermissionRuntime(HERE.parent,release_ready)
     permissions.configure(permission_selected(cfg))
-    tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history)
+    tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history, include_live=False)
+    from live_events import LiveSampler
+    live_sampler=LiveSampler(HERE/'activity',views)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
         while True:
@@ -982,6 +1000,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 history_sampler.configure(cfg.get('usage_history',False),changed_views)
                 if changed_views != views:
                     tokens.configure(changed_views)
+                    live_sampler.configure(changed_views)
                 retries.interval = interval
                 tokens.poll_seconds = cfg.get('token_poll_s', 2)
                 health.data['providers'] = {key: value for key, value in health.data['providers'].items() if key in changed_views}
@@ -1013,6 +1032,8 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.fetcher = fetcher
                     panel.config_watcher = watcher
                     panel.token_reporter = tokens
+                    panel.live_sampler=live_sampler
+                    health.data.pop('live',None)
                     panel.history = history
                     panel.history_sampler=history_sampler
                     from mirror_service import MirrorService
@@ -1069,6 +1090,7 @@ def _run_loop(cfg, interval, zai_key, views):
     finally:
         health.update('stopped')
         tokens.close()
+        live_sampler.close()
         history.close()
         history_sampler.close()
         permissions.close()

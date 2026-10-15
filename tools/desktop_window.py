@@ -494,6 +494,8 @@ class MonitorWindow(QMainWindow):
         left.addWidget(self.host_state)
         self.token_state = InformationPanel('Waiting for selected token sources.', 3, 'Local token activity status')
         left.addWidget(self.token_state)
+        self.live_state=InformationPanel('Agent USB: waiting for confirmation',2,'Agent event USB delivery status')
+        left.addWidget(self.live_state)
         left.addStretch(2)
         self.close_hint = InformationPanel('', 4, 'Close and tray behavior')
         left.addWidget(self.close_hint)
@@ -709,10 +711,12 @@ class MonitorWindow(QMainWindow):
         self.claude_session_remove=self._button('Remove session events…',lambda:self.claude_sessions(True))
         self.codex_session_button=self._button('Link Codex session events…',lambda:self.codex_sessions(False))
         self.codex_session_remove=self._button('Remove session events…',lambda:self.codex_sessions(True))
+        self.zcode_session_button=self._button('Link ZCode session events…',lambda:self.zcode_sessions(False))
+        self.zcode_session_remove=self._button('Remove session events…',lambda:self.zcode_sessions(True))
         self.session_action_slot=QStackedWidget()
         self.session_remove_slot=QStackedWidget()
-        for slot,buttons in ((self.session_action_slot,(self.claude_session_button,self.codex_session_button)),
-                             (self.session_remove_slot,(self.claude_session_remove,self.codex_session_remove))):
+        for slot,buttons in ((self.session_action_slot,(self.claude_session_button,self.codex_session_button,self.zcode_session_button)),
+                             (self.session_remove_slot,(self.claude_session_remove,self.codex_session_remove,self.zcode_session_remove))):
             slot.addWidget(QWidget())
             for button in buttons: slot.addWidget(button)
             slot.setFixedHeight(44)
@@ -960,6 +964,8 @@ class MonitorWindow(QMainWindow):
         self.claude_session_remove.setEnabled(ready and 'claude' in self.config['providers'])
         self.codex_session_button.setEnabled(ready and 'codex' in self.config['providers'])
         self.codex_session_remove.setEnabled(ready and 'codex' in self.config['providers'])
+        self.zcode_session_button.setEnabled(ready and 'zcode' in self.config['providers'])
+        self.zcode_session_remove.setEnabled(ready and 'zcode' in self.config['providers'])
         self.permission_link.setEnabled(ready and 'claude' in self.config['providers'] and self.config.get('usb_permissions') is True)
         self.permission_unlink.setEnabled(ready and 'claude' in self.config['providers'])
         self.enter_key_button.setEnabled(not self.busy and self.providers['zcode'].isChecked())
@@ -993,7 +999,7 @@ class MonitorWindow(QMainWindow):
         self.provider_action_slot.setCurrentIndex(1 if key == 'codex' else 2 if key == 'claude' else 0)
         self.provider_remove_slot.setCurrentIndex(1 if key == 'claude' else 0)
         for slot in (self.session_action_slot,self.session_remove_slot):
-            slot.setCurrentIndex(1 if key=='claude' else 2 if key=='codex' else 0)
+            slot.setCurrentIndex(1 if key=='claude' else 2 if key=='codex' else 3 if key=='zcode' else 0)
         if key in PROVIDER_SETUP:
             self.provider_instructions.setText(PROVIDER_SETUP[key][0])
             self.provider_link.setEnabled(True)
@@ -1026,7 +1032,8 @@ class MonitorWindow(QMainWindow):
             def check(emit):
                 self.pending_setup_report=setup_report(self.root)
                 for item in self.pending_setup_report:
-                    emit(PROVIDERS[item['provider']][0]+': activity '+item['activity']+'; quota '+item['quota']+'; display '+item['display'])
+                    emit(PROVIDERS[item['provider']][0]+': activity '+item['activity']+'; quota '+item['quota']+
+                         '; display '+item['display']+'; events '+item['events']+'; '+item['live_usb'])
             self._run('Checking AI setup',check)
 
     def claude_sessions(self,remove):
@@ -1073,6 +1080,18 @@ class MonitorWindow(QMainWindow):
             try: emit(codex_session_link(self.root,remove=remove))
             except ValueError as error: raise control.SetupError(str(error)) from None
         self._run('Updating Codex session events',update)
+
+    def zcode_sessions(self,remove):
+        if not self._ready() or 'zcode' not in self.config['providers']:return
+        question=('Remove only this installation\'s ZCode observer hooks?' if remove else
+            'Link ZCode session events? A private settings backup is kept and other hooks are preserved. '
+            'Only state and hashed IDs are recorded; no context or permission decisions are returned. '
+            'Existing global hook disablement is preserved. Start a new ZCode session after linking.')
+        answer=QMessageBox.question(self,'ZCode session events',question,
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer!=QMessageBox.StandardButton.Yes:return
+        from provider_setup import zcode_session_link
+        self._run('Updating ZCode session events',lambda emit:emit(zcode_session_link(self.root,remove=remove)))
 
     def claude_quota(self, remove):
         if not self._ready() or 'claude' not in self.config['providers']: return
@@ -1441,6 +1460,7 @@ class MonitorWindow(QMainWindow):
             self.provider_health.setText('Provider status unconfirmed. Check the host log or retry the status read.')
             self.hardware_diagnostics.setText('Device telemetry unavailable. Reconnect the host to sample again.')
             self.token_state.setText('Local status unavailable; check the host log.')
+            self.live_state.setText('Agent USB: status unavailable')
             self._show_robot(False)
             self._update_setup_progress()
             self.refresh_tray(poll=False)
@@ -1452,6 +1472,8 @@ class MonitorWindow(QMainWindow):
         self.host_state.setText(data['summary'])
         health = data['health']
         self.cached_health=health
+        from host_status import live_status_text
+        self.live_state.setText(live_status_text(health))
         if not self.hidden_to_tray:
             from hardware_presentation import hardware_text
             self.hardware_diagnostics.setText(hardware_text(health))

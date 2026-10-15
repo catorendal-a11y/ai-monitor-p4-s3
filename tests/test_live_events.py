@@ -109,7 +109,7 @@ class LiveEventTests(unittest.TestCase):
              patch('token_activity.TokenReporter') as reporter:
             reporter.return_value.poll.return_value={'sources':0}
             report=setup.setup_report(self.root,home=self.root/'home')
-            self.assertEqual(report[0]['sessions'],'link enabled / waiting for client events')
+            self.assertEqual(report[0]['sessions'],'not linked')
             live.lifecycle_event('codex',self.event('UserPromptSubmit'),self.activity,17)
             self.assertEqual(setup.setup_report(self.root,home=self.root/'home')[0]['sessions'],'reporting')
 

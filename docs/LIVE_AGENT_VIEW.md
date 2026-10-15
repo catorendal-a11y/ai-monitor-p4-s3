@@ -7,7 +7,7 @@ are published; this is not the provider's total agent count. WAITING and FAILED 
 
 Selected providers without recent live sessions now have separately labelled provider-status rows,
 so Codex/ZCode do not disappear just because hooks are absent. These rows come from quota/token
-source availability and never create live agents. Codex/Claude show NO RECENT EVENTS; other providers
+source availability and never create live agents. Codex/Claude/ZCode show NO RECENT EVENTS; other providers
 show ACTIVITY ONLY. A readable token counter does not establish a working phase. Live sessions and
 provider statuses are counted separately; pagination can cover up to eight of each.
 

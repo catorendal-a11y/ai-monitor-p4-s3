@@ -40,7 +40,7 @@ def validate_agents(agents):
 
 
 class UsbLiveClient:
-    """Called only by the Panel's serial owner. Not enabled by normal host polling yet.
+    """Read-only live delivery, called only by the normal host's existing serial owner.
 
     No retries after ambiguous delivery. Reopen explicitly and republish a complete snapshot.
     No provider calls, model turns, USB discovery or additional serial connection.

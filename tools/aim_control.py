@@ -388,10 +388,25 @@ def main(argv=None):
     parser.add_argument('--ingest', choices=list(PROVIDERS), help='Read a cumulative numeric telemetry record from stdin')
     parser.add_argument('--claude-statusline', action='store_true', help='Receive documented Claude statusline quota fields')
     parser.add_argument('--claude-event', action='store_true', help='Observe a Claude lifecycle event silently; never return a decision')
+    events=parser.add_mutually_exclusive_group()
+    events.add_argument('--link-events',choices=('codex','claude','zcode'),help='Explicitly link selected-provider observational hooks')
+    events.add_argument('--unlink-events',choices=('codex','claude','zcode'),help='Remove only this installation\'s observational hooks')
     args = parser.parse_args(argv)
     if args.quota_worker:
         return host.quota_worker(args.quota_worker)
     (ROOT / "tools").mkdir(exist_ok=True)
+    if args.link_events or args.unlink_events:
+        provider=args.link_events or args.unlink_events
+        try:
+            if provider not in local_config(ROOT)['providers']:
+                print('Select '+PROVIDERS[provider][0]+' and save settings first.');return 1
+            from provider_setup import codex_session_link,claude_session_link,zcode_session_link
+            action={'codex':codex_session_link,'claude':claude_session_link,'zcode':zcode_session_link}[provider]
+            print(action(ROOT,remove=bool(args.unlink_events)))
+            return 0
+        except (ValueError,RuntimeError,OSError):
+            print('Event setup failed. Check provider settings and observer files; private data was not printed.')
+            return 1
     if args.claude_event:
         # Observational hooks must stay silent and never block/inject context.
         # The JSON may contain text; discard it and retain only hashed ID/state.

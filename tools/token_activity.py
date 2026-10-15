@@ -17,9 +17,10 @@ class TokenSampler:
     A stuck local source makes its signal expire, rather than creating more
     threads or delaying the heartbeat. Configuration changes discard old work.
     """
-    def __init__(self, history=None, **options):
+    def __init__(self, history=None, include_live=True, **options):
         self.options = options
         self.history = history
+        self.include_live=include_live
         self.condition = threading.Condition()
         self.reporter = TokenReporter(**options)
         self.generation = 0
@@ -84,10 +85,11 @@ class TokenSampler:
                         value['sessions'] = summary(self.options.get('activity_dir'), reporter.providers) if self.options.get('activity_dir') else {'cmd':'session_activity','providers':[]}
                     except (OSError,ValueError,TypeError,RecursionError): value['sessions']={'cmd':'session_activity','providers':[]}
                     from live_events import live_agents
-                    try:
-                        value['live_agents']=live_agents(self.options['activity_dir'],reporter.providers) if self.options.get('activity_dir') else []
-                    except (OSError,ValueError,TypeError,RecursionError): value['live_agents']=[]
-                    value['live_sampled_at']=time.monotonic()
+                    if self.include_live:
+                        try:
+                            value['live_agents']=live_agents(self.options['activity_dir'],reporter.providers) if self.options.get('activity_dir') else []
+                        except (OSError,ValueError,TypeError,RecursionError): value['live_agents']=[]
+                        value['live_sampled_at']=time.monotonic()
                     with self.condition: current = generation == self.generation and not self.closed
                     if current and self.history is not None:
                         try: self.history.record_tokens(reporter.deltas)

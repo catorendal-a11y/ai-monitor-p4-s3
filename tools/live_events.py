@@ -7,12 +7,15 @@ import os
 from pathlib import Path
 import re
 import time
+import threading
 from host_security import read_local_json
 from session_activity import link_marker, MAX_SESSIONS
 from telemetry_bridge import write_record
 from usb_live import STATES
 
-SOURCES = frozenset(('codex', 'claude'))
+SOURCES = frozenset(('codex', 'claude', 'zcode'))
+ZCODE_EVENTS = frozenset(('SessionStart','UserPromptSubmit','PreToolUse','PermissionRequest',
+                         'PostToolUse','PostToolUseFailure','Stop'))
 LEASE_SECONDS = 900
 TERMINAL_SECONDS = 30
 MAX_DURATION = 604800
@@ -20,9 +23,9 @@ MAX_DURATION = 604800
 
 def marker(directory, provider):
     if provider == 'claude': return link_marker(directory)
-    if provider != 'codex': return {'enabled': False, 'generation': 0}
+    if provider not in ('codex','zcode'): return {'enabled': False, 'generation': 0}
     try:
-        value = read_local_json(Path(directory)/'codex-session-link.json',1024)
+        value = read_local_json(Path(directory)/(provider+'-session-link.json'),1024)
         if (isinstance(value,dict) and type(value.get('enabled')) is bool and
                 type(value.get('generation')) is int and 0 < value['generation'] < (1 << 63)):
             return value
@@ -75,6 +78,7 @@ def _lifecycle_event(provider, payload, directory, generation, now=None):
     if not current['enabled'] or current['generation'] != generation: return
     session,event = payload.get('session_id'),payload.get('hook_event_name')
     if not isinstance(session,str) or not 1 <= len(session) <= 200 or not isinstance(event,str): return
+    if provider=='zcode' and event not in ZCODE_EVENTS:return
     if provider=='claude' and event in ('TaskCreated','TaskCompleted'):
         task=payload.get('task_id');timestamp=time.time() if now is None else now
         if (not isinstance(task,str) or not 1<=len(task)<=200 or type(timestamp) not in (int,float)
@@ -96,12 +100,14 @@ def _lifecycle_event(provider, payload, directory, generation, now=None):
         state = {'StopFailure':'ERROR','PostToolUseFailure':'ERROR',
                  'PermissionDenied':'NEEDS_ATTENTION','TeammateIdle':'IDLE'}.get(event,state)
         if event == 'PostToolUseFailure' and payload.get('is_interrupt') is True: state='IDLE'
+    if provider=='zcode' and event=='PostToolUseFailure':
+        state='IDLE' if payload.get('is_interrupt') is True else 'ERROR'
     if event == 'Notification' and provider == 'claude':
         state = 'WAITING' if payload.get('notification_type') in ('permission_prompt','elicitation_dialog','agent_needs_input') else None
     if event == 'PreToolUse':
         tool=payload.get('tool_name')
         if tool in (('apply_patch',) if provider=='codex' else ('Edit','MultiEdit')): state='EDITING'
-        if provider=='claude':
+        if provider in ('claude','zcode'):
             state={'Write':'WRITING','Read':'READING','Grep':'SEARCHING','Glob':'SEARCHING',
                    'WebSearch':'SEARCHING','WebFetch':'READING','Bash':'RUNNING','PowerShell':'RUNNING'}.get(tool,state)
     if state is None: return
@@ -129,7 +135,8 @@ def _lifecycle_event(provider, payload, directory, generation, now=None):
         start=previous['started_at']
         if 0<=timestamp-start<=MAX_DURATION:record['started_at']=start
     if 'started_at' in record:
-        if event in ('Stop','SubagentStop','StopFailure','Interrupt','SessionEnd','TeammateIdle'):
+        if (event in ('Stop','SubagentStop','StopFailure','Interrupt','SessionEnd','TeammateIdle') or
+                (event=='PostToolUseFailure' and payload.get('is_interrupt') is True)):
             record['finished_at']=timestamp
         elif previous and 'finished_at' in previous and event not in ('UserPromptSubmit','SubagentStart'):
             # No new start was observed: never resume an old completed timer on tool metadata.
@@ -189,3 +196,55 @@ def live_agents(directory, providers, now=None):
             except (OSError,ValueError,TypeError,RecursionError): continue
     rows.sort(key=lambda row:(row[1]['state'] not in ('WAITING','FAILED','ERROR','NEEDS_ATTENTION'),-row[0],row[1]['provider'],row[1]['id']))
     return [row[1] for row in rows[:8]]
+
+
+class LiveSampler:
+    """Independent bounded event reader; numeric source I/O never delays this worker."""
+    def __init__(self,directory,providers):
+        self.directory=directory
+        self.providers=list(providers)
+        self.condition=threading.Condition()
+        self.result=None
+        self.requested=self.busy=self.closed=False
+        self.generation=0
+        self.next_poll=0
+        self.worker=threading.Thread(target=self._read,daemon=True,name='aim-live-events')
+        self.worker.start()
+
+    def configure(self,providers):
+        with self.condition:
+            self.providers=list(providers)
+            self.generation+=1
+            self.result=None
+            self.next_poll=0
+
+    def poll(self):
+        with self.condition:
+            value,self.result=self.result,None
+            now=time.monotonic()
+            if not self.closed and not self.busy and not self.requested and now>=self.next_poll:
+                self.next_poll=now+2
+                self.requested=True
+                self.condition.notify_all()
+            return value
+
+    def _read(self):
+        while True:
+            with self.condition:
+                self.condition.wait_for(lambda:self.requested or self.closed)
+                if self.closed:return
+                self.requested=False;self.busy=True
+                providers,generation=list(self.providers),self.generation
+            try:rows=live_agents(self.directory,providers)
+            except (OSError,ValueError,TypeError,RecursionError):rows=[]
+            value={'live_agents':rows,'live_sampled_at':time.monotonic()}
+            with self.condition:
+                self.busy=False
+                if self.closed:return
+                if generation==self.generation:self.result=value
+                self.condition.notify_all()
+
+    def close(self):
+        with self.condition:
+            self.closed=True;self.result=None
+            self.condition.notify_all()

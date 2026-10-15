@@ -1,8 +1,15 @@
-# v2 completion status — v1.19.1-rc2
+# v2 completion status — v1.19.1-rc3
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc2.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc3.
+
+Rc3 adds ZCode's documented lifecycle observer, an independent event reader, visible
+agent USB acknowledgment/error status, actual hook-definition checks and exact legacy
+Codex wrapper migration. Synthetic regression evidence and new build/deployment results
+are separate from the historical rc1/rc2 physical checks below. Acknowledging a live
+packet does not establish genuine client delivery. Existing provider selections and
+physical-approval gates are preserved.
 
 The rc2 audit fixes post-handshake USB cleanup, screen-capture response ownership,
 persistent capture errors, malformed capture correlation and long dashboard status
@@ -12,7 +19,7 @@ results must be recorded separately rather than inherited from that candidate.
 | Area | Implemented | Validation / remaining gate |
 | --- | --- | --- |
 | USB permissions | UI-to-serial final commit, authenticated developer adapter, explicit PC/display opt-in, separate Claude setup/removal | Native real-crypto/LVGL tests pass. Production remains disabled pending physical enrollment/hold/deny/unplug/provider testing postponed by the user. |
-| AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude observational integrations | Installed host reports both selected providers ready on real P4. CLI hooks are active; natural turn lifecycle delivery still needs a real-client observation. ZCode detailed phases are unavailable without a documented source. |
+| AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude/ZCode observational integrations | Previously installed host reports both selected quota providers ready on real P4. Rc3 supplies ZCode hooks; genuine client delivery remains distinct from synthetic validation and USB acknowledgment. |
 | History | Opt-in bounded lifecycle journal, migration, observed sessions/active time/turns, Today/24h/7d | Native/SQLite/USB tests pass. Waiting/gaps excluded, parallel activity unioned, no transcripts or invented task results. Existing user's preference stays off. |
 | Companions | Bounded animation schema 2, mood timing/loops and built-in playback over LZ4/PSRAM cache | Native parsing/player/LVGL tests pass; normal P4 flashed. External pack installation remains a future storage/staging/recovery feature. |
 | Device mirror | Real device RGB565 capture, normal overlays, existing USB owner, explicit PC viewer | Physical P4 capture: 3.094 s directly, 4.922 s through installed host. PSRAM returned to the same free value. Protected screens excluded; no touch/approval. |

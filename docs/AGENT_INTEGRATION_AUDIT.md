@@ -2,6 +2,11 @@
 
 Date: 2026-10-15. Installed application and P4 firmware: v1.19.1-rc2.
 
+This records the **rc2 baseline**, before the rc3 repairs. Rc3 adds ZCode hooks,
+an independent live reader, setup-definition checks, legacy Codex wrapper migration
+and visible USB delivery health. See RELEASE_NOTES.md. Baseline observations below
+are retained as evidence and must not be presented as the current implementation.
+
 ## Finding
 
 The installation does **not** establish working live agent monitoring for all three

@@ -1,14 +1,21 @@
 # Local live provider events
 
-The USB live domain now has opt-in Codex and Claude Code lifecycle observers. This is source-level
+The USB live domain has opt-in Codex, Claude Code and ZCode lifecycle observers. This is source-level
 integration with synthetic validation, not a claim of physical USB operation or complete provider
 coverage. The [device agent view](LIVE_AGENT_VIEW.md) now exists with native validation; normal P4 USB operation has been physically verified. Real client delivery remains a separate gate. Quota/token sources remain independent.
 
 ## Setup in the PC program
 
 Save the selected provider, then choose **Link Codex session events** or **Link Claude session events**
-in AI setup. A private backup is kept and existing hooks are preserved. Removing the link removes only
+or **Link ZCode session events** in AI setup. A private backup is kept and existing hooks are preserved. Removing the link removes only
 this installation's exact hook commands and invalidates its observation generation.
+
+The console also supports explicit `--link-events codex|claude|zcode` and
+`--unlink-events codex|claude|zcode`; the named provider must already be selected.
+ZCode uses its documented user-level process hooks. Existing global disablement is
+preserved; confirm Hooks is enabled in ZCode and start a new session. Only its seven
+documented events are accepted; no per-subagent coverage is claimed. See the
+[official ZCode contract](https://zcode.z.ai/en/docs/hooks).
 
 Codex uses the effective CODEX_HOME/hooks.json file and documented lifecycle hooks. The hook definition
 must be reviewed/trusted in Codex's hook browser (CLI `/hooks`) before it runs; changed definitions
@@ -42,7 +49,9 @@ The helper itself emits no content. There are no provider API calls or new model
 Shell commands are never inspected to guess BUILDING or TESTING. THINKING is not inferred from
 token increases or an absence of tool events. Subagent start/stop records use separately hashed
 identities; detailed tool attribution is unavailable when a hook only identifies the parent session.
-UNKNOWN means the phase is not reported. Other providers have no live event observer yet.
+UNKNOWN means the phase is not reported. ZCode uses the shared prompt/tool/permission/stop
+states and tool-failure mapping; it does not report subagent start/stop through this adapter.
+Other providers have no live event observer yet.
 
 Only a SHA-256 actor identity, fixed state, observation timestamp, optional observed start/finish
 timestamps, schema and setup generation are stored. Raw prompts, commands, messages, tool results and transcript paths are discarded. Records
@@ -52,12 +61,15 @@ terminal/idle states expire after 30 seconds. The agent screen shows last-event 
 NOVA reacts only to source observations no older than 30 seconds. Sending a fresh USB packet never
 renews the source timestamp or proves that a quiet client is alive.
 
-The background worker reads only selected, enabled sources, scans bounded records and sends at most
+An independent event worker reads only selected, enabled sources, scans bounded records and sends at most
 eight agents. Waiting/failure observations have priority; this is not a total-agent count. Metadata
-does not enter token commands, history or status exports. Worker samples older than ten seconds are
+does not enter token commands or quota snapshots. Host health exports only the live transport's fixed
+status, timestamp and acknowledged count; no agent identities or content. Worker samples older than ten seconds are
 cleared. The host's serial owner negotiates live support, correlates replies and continues quota
 monitoring if live telemetry times out. Serial I/O errors still reach the existing reconnect handler.
 If USB disappears, the device's separate 30-second lease bounds retained display state.
+The PC's Agent USB status distinguishes acknowledged delivery, expired samples and errors.
+An acknowledged empty snapshot confirms transport availability, not a genuine client event.
 
 References: [official Codex hooks](https://learn.chatgpt.com/docs/hooks),
 [Claude Code hooks](https://code.claude.com/docs/en/hooks), [USB domain](USB_LIVE_TRANSPORT.md).
