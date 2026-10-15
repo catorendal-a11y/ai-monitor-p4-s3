@@ -1027,6 +1027,11 @@ def _run_loop(cfg, interval, zai_key, views):
                     LOG(f"connected to {port_name}, views={views}")
                 except Exception as exc:
                     LOG(f"open {port_name} failed: {exc}")
+                    # Handshake can succeed before optional runtime setup or a
+                    # diagnostics write fails. Release that owner before retry.
+                    if panel is not None:
+                        panel.close()
+                        panel = None
                     health.update('reconnecting', port_name)
                     wait_for_config(watcher, cfg.get('reconnect_s', 5), tokens if cfg.get('usage_history') else None)
                     continue

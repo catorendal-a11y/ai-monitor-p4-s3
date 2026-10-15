@@ -339,6 +339,7 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(connect.call_count, 2)
         first.close.assert_called_once()
         second.close.assert_called_once()
+        self.assertEqual(sleep.call_args.args[1], 5)
 
     def test_post_handshake_failure_closes_port_before_reconnect_wait(self):
         panel = Mock(info={'hardwareDiagnostics': True})
@@ -358,7 +359,6 @@ class LoopTests(unittest.TestCase):
         self.assertEqual(closed_before_wait, [True])
         panel.close.assert_called_once()
         poll.assert_not_called()
-        self.assertEqual(sleep.call_args.args[1], 5)
 
     def test_provider_error_is_sent_as_notice_and_receives_ack(self):
         serial = FakeSerial([b'{"type":"ack","frameId":101}\n'])
