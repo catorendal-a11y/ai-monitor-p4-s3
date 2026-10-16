@@ -76,6 +76,19 @@ class HistoryFixTests(unittest.TestCase):
                 time.sleep(.01)
             recorder.close()
         self.assertGreater(len(set(seen)),1)
+    def test_thirty_day_summary_at_full_journal_budget_respects_sql_deadline(self):
+        from usage_history import read_history
+        import sqlite3
+        now=time.time();begin=now-29*86400
+        with closing(sqlite3.connect(self.folder/'history.db')) as db,db:
+            db.executemany('INSERT INTO agent_events VALUES(?,?,?,?,?,?,?,?,?)',
+                ((str(i),'claude',self.agent,7,17,'Stop' if i%2 else 'UserPromptSubmit',
+                  'COMPLETED' if i%2 else 'WORKING',begin+i*(29*86400/50000),1)
+                 for i in range(50000)))
+        data=read_history(self.folder,['claude'],30,now)
+        self.assertIsNone(data['error'])
+        self.assertEqual(sum(row['completedTurns'] or 0 for row in data['daily_agents']),25000)
+
     def test_revoke_existing_marker_and_no_creation_for_missing_directory(self):
         revoke=getattr(history,'revoke',None)
         self.assertTrue(callable(revoke),'Missing explicit consent revocation API')
