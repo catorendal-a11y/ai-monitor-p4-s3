@@ -24,6 +24,12 @@ The opt-in event journal stores fixed Codex/Claude/ZCode lifecycle events and ha
 in the same local SQLite backend. Schema-1 numeric databases migrate transactionally to schema 2
 without changing token/quota records. Hooks retain no prompt, tool arguments, output or permission hint.
 The journal is capped at 50,000 events and 30 days; hook writes use a 20 ms lock timeout.
+Regular recorder housekeeping also removes old agent/task rows when hooks are idle.
+Normal host stop and disabling history revoke write consent. The existing recorder
+renews a 90-second lease every 30 seconds; after a crash, abandoned permission to
+collect expires within 90 seconds. A source event cannot extend that lease.
+A turn can start before midnight and finish on the next day; its outcome belongs
+to the day of its terminal event, independently of the 15-minute activity-gap limit.
 
 Today also shows observed sessions, active time, completed turns and failed turns when their real
 events are available. Session counts require SessionStart. Turn counts require a prompt-start event

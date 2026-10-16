@@ -1,5 +1,5 @@
-from private_files import backup as private_backup
 """Explicit interactive-hook setup. Separate from observational hooks and runtime helper."""
+from private_files import backup as private_backup
 from pathlib import Path
 import copy
 import shutil

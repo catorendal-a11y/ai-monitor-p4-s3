@@ -1,3 +1,19 @@
+# AI Monitor v1.19.1-rc7
+
+- Protect sensitive Windows settings and backups with a current-user/SYSTEM DACL
+  at file creation, before any content is written. POSIX files use mode 0600.
+- Revoke observational history consent on host stop or disabled saved settings.
+  Renew a 90-second consent lease on the existing recorder thread every 30 seconds;
+  abandoned markers expire after host crashes without spawning another worker.
+- Count turn outcomes across local midnight independently of the 900-second
+  activity-gap limit. Sweep dormant agent/task journals during regular maintenance.
+- Advance observed agent/token ages between packets, keeping status, animations
+  and hints consistent at expiry thresholds and clock rollover.
+- Reconcile uncertain companion activation with read-only correlated status.
+  Never replay a finish write or claim that a missing reply guarantees rollback.
+- Show quota-specific missing-history text and return EVENTS to its calling screen.
+- Preserve physical-permission release gates; production approval remains disabled.
+
 # AI Monitor v1.19.1-rc6
 
 - Import verified version-2 companion ZIPs through the desktop Companions tab.

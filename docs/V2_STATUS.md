@@ -2,7 +2,12 @@
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc6.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc7.
+
+Rc7 fixes the nine functional-audit defects: sensitive-file ACLs/backups, stop/crash
+history consent, midnight outcomes, dormant-journal retention, elapsed agent and
+token age, uncertain pack activation, quota fallback text and EVENTS back navigation.
+Existing physical approval, clean-profile installer and signing gates stay separate.
 
 Rc6 adds data-only companion import, a bounded persistent PC library and automatic
 USB restoration into two preallocated P4 RAM banks. Only a complete, decoded/hash-

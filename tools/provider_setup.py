@@ -1,5 +1,5 @@
-from private_files import backup as private_backup
 """Explicit local integration setup. Preserve unrelated client settings."""
+from private_files import backup as private_backup
 import base64
 import os
 import re

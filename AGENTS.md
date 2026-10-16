@@ -52,7 +52,8 @@
   data-only external P4 packs. Preserve bounded PC storage and both preallocated RAM banks, complete
   encoded/decoded validation, exact boot/nonce/offset receipts and UI-only bank activation. Never
   extract/execute archives, format display storage, reuse active-bank bytes or add a serial owner.
-  Read-only library checks cannot create directories. Failed transfers retain the previous pack.
+  Read-only library checks cannot create directories. Rejected/incomplete transfers retain the previous pack.
+  A missing activation acknowledgment is ambiguous; reconcile status without retrying activation writes.
 - `src/mirror/`, `tools/usb_mirror.py`, `mirror_service.py`, `desktop_mirror.py`: real read-only USB
   pixels through the existing serial owner. Bound coverage/RLE/nonce/leases and scrub/free buffers.
   Never expose protected screens, virtual touch or approval authority. Captures are not history.
@@ -63,7 +64,11 @@
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.
+- `tools/private_files.py`: create sensitive settings/backups with protected Windows current-user/SYSTEM
+  DACLs or POSIX 0600 before writing content. Preserve this protection across atomic replacement.
 - `tools/aim_control.py`: console setup, scoped host controls and verified firmware installation.
+  Successful host stop and history disable must revoke observational history consent; do not rely
+  on Windows terminate to run Python cleanup. Recorder leases expire after crashes.
 - `tools/aim_events.py`, `tools/live_events.py`: explicitly enabled Codex/Claude state observers;
   no model, host or serial control, transcripts or tool decisions. Codex's wrapper emits only neutral JSON.
 - `tools/usb_live.py`: read-only live metadata through the existing serial owner, separate from quota.
