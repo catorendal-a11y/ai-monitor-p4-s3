@@ -76,6 +76,18 @@ r.record_tokens({'claude':9});time.sleep(.1);r.close()
   with closing(connect(self.root)) as db:
    self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],1)
    self.assertEqual(db.execute('SELECT COUNT(*) FROM task_events').fetchone()[0],1)
+ def test_revocation_while_initial_epoch_is_pending_cannot_mint_fresh_authority(self):
+  import history_consent
+  original=history_consent.mint_epoch;entered=threading.Event();resume=threading.Event()
+  def delayed(directory,**kwargs):entered.set();resume.wait(2);return original(directory,**kwargs)
+  with patch('history_consent.mint_epoch',side_effect=delayed):
+   recorder=HistoryRecorder(self.root,True);self.addCleanup(recorder.close)
+   try:
+    self.assertTrue(entered.wait(2));history.revoke(self.root)
+    recorder.record_tokens({'claude':5});resume.set();time.sleep(.1);recorder.close()
+   finally:resume.set()
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM tokens').fetchone()[0],0)
+  self.assertFalse(json.loads((self.root/'agent-history-consent.json').read_text())['enabled'])
  def test_constructor_contains_unavailable_authority_and_keeps_host_caller_responsive(self):
   with patch('history_consent.mint_epoch',side_effect=OSError('synthetic unavailable store')):
    recorder=HistoryRecorder(self.root,True);self.addCleanup(recorder.close)
@@ -88,7 +100,7 @@ r.record_tokens({'claude':9});time.sleep(.1);r.close()
   entered=threading.Event();release=threading.Event()
   import history_consent
   original=history_consent.mint_epoch
-  def slow(directory):entered.set();release.wait(2);return original(directory)
+  def slow(directory,**kwargs):entered.set();release.wait(2);return original(directory,**kwargs)
   with patch('history_consent.mint_epoch',side_effect=slow):
    start=time.monotonic();recorder=HistoryRecorder(self.root,True)
    try:
