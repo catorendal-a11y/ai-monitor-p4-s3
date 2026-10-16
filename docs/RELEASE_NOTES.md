@@ -1,3 +1,21 @@
+# AI Monitor v1.19.1-rc8
+
+- Serialize saved history preferences, consent revocation and recorder/hook writes.
+  A persistent revocation floor prevents an old recorder from renewing authority;
+  minting and recovery run on the existing worker, away from the USB owner.
+- Protect invalid-settings recovery copies before writing sensitive content. If
+  revocation fails, leave the saved configuration unchanged.
+- Accept same-epoch lease renewal without dropping valid hook events.
+- Namespace Claude tasks by configuration root and effective task list, including
+  shared lists across sessions. Preserve old rows; mixed legacy/new identities make
+  the affected daily metric unknown because safe deduplication is unavailable.
+- Keep turn outcomes unknown after interruption/session end without Stop/StopFailure.
+- Wait for pending companion activation/clearing using correlated read-only status
+  before starting a replacement transfer.
+- Stage NVS settings until all present blobs have been read completely. Failed or
+  short reads retry without publishing defaults or overwriting saved settings.
+- Physical approval remains disabled pending genuine hardware/provider validation.
+
 # AI Monitor v1.19.1-rc7
 
 - Protect sensitive Windows settings and backups with a current-user/SYSTEM DACL

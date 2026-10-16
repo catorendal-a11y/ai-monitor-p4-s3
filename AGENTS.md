@@ -46,6 +46,10 @@
 - `tools/agent_history.py`: opt-in fixed lifecycle journal in the existing SQLite store. Preserve
   numeric migration, consent epochs, bounded hook writes and disable/shutdown revocation. Waiting
   and unobserved gaps are not active time; concurrent intervals are unioned. Turns are not tasks.
+- `tools/history_consent.py`: serialize saved policy, revocation and history commits.
+  Preserve the persistent revocation floor; stale recorders cannot renew authority.
+  Mint/recover on the existing worker, never block the serial owner. Mixed legacy/new
+  task identities remain unknown where safe deduplication is unavailable.
 - `src/companions/animation_types.h`, `animation.h`, `builtin_animation.h`: bounded versioned mood
   sequences and UI-owned playback. No allocation per frame, inferred phases or cache lifetime changes.
 - `src/companions/pack_store.h`, `runtime_esp.*`, `tools/companion_packages.py`, `companion_service.py`:
@@ -60,7 +64,9 @@
 - `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions;
   allocate the P4 LZ4 cache once at startup, verify encoded/decoded bytes, pin live LVGL sources,
   and retain raw work-pose fallback per companion. No allocation per render.
-- `src/app_settings.*`: validated NVS settings/save feedback.
+- `src/app_settings.*`: validated NVS settings/save feedback. Publish loaded settings
+  only after complete reads of all present blobs. Failed/short reads retry without
+  publishing defaults or overwriting the saved baseline.
 - `tools/aim_host.py`: polling, retries, config and USB companion.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.

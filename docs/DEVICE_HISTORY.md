@@ -28,6 +28,10 @@ Regular recorder housekeeping also removes old agent/task rows when hooks are id
 Normal host stop and disabling history revoke write consent. The existing recorder
 renews a 90-second lease every 30 seconds; after a crash, abandoned permission to
 collect expires within 90 seconds. A source event cannot extend that lease.
+Configuration saves, revocation and history transactions share a bounded process
+lock. A persistent revocation floor prevents an older recorder from renewing a
+revoked epoch, including rapid disable/enable changes. Workers check the current
+saved policy before minting or committing. Same-epoch renewal does not drop events.
 A turn can start before midnight and finish on the next day; its outcome belongs
 to the day of its terminal event, independently of the 15-minute activity-gap limit.
 
@@ -39,6 +43,8 @@ not guaranteed total work time. Missing events/unsupported providers stay `--`.
 These are turns, not completed tasks. TaskCreated/TaskCompleted hooks can precede a veto and do not
 prove task success. Claude Code task totals use a separate confirmed post-tool contract, described
 below. Unsupported providers/metrics remain unavailable.
+An interruption/session end closes activity without inventing completed/failed-turn
+counts when no Stop/StopFailure was observed.
 The live-agent screen's current session timers remain a separate source/domain.
 
 The PC History tab also displays a daily agent summary for the selected provider over seven or
@@ -76,6 +82,13 @@ Claude Code 2.1.296 client using an isolated own task and TaskGet readback. Othe
 fail closed. TaskGet alone does not establish when an old task completed; pre-veto hooks and
 failed task-update calls never increase completion totals. Counts are distinct tasks per local day,
 so duplicate delivery and repeated completion observations cannot inflate them.
+
+Task identities use the effective Claude configuration root and task-list ID
+(`CLAUDE_CODE_TASK_LIST_ID`, otherwise the session ID). Shared lists deduplicate
+across sessions while separate lists remain distinct. Rc8 uses versioned hashes.
+Existing rows remain; mixed legacy/new identities in the same daily task metric
+make that metric unknown because safe deduplication is impossible. Legacy-only
+and new-only metrics still count normally. No raw task-list identities are stored.
 
 The existing opt-in SQLite backend gets a bounded `task_events` table while retaining schema-2
 numeric compatibility. Only hashed task/session/tool-call identities, generation, consent epoch,

@@ -1,8 +1,15 @@
-# v2 completion status — v1.19.1-rc6
+# v2 completion status — v1.19.1-rc8
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc7.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc8.
+
+Rc8 fixes eight further logic defects: stale history consent renewal, recovery-copy
+ACLs, partial configuration saves after revocation failure, lease-renewal event loss,
+task-list identity collisions, invented zero outcomes after cancellation, replacement
+during pending companion adoption, and partial NVS reads. Old task rows remain;
+mixed legacy/new identity metrics stay unknown where deduplication is impossible.
+Release evidence remains version-specific.
 
 Rc7 fixes the nine functional-audit defects: sensitive-file ACLs/backups, stop/crash
 history consent, midnight outcomes, dormant-journal retention, elapsed agent and
