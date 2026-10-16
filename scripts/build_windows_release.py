@@ -101,6 +101,9 @@ def build_package(output, package, version, args):
         run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Console', '--paths', str(ROOT / 'tools'),
             '--exclude-module', 'esptool', '--exclude-module', 'PySide6',
             str(ROOT / 'tools/aim_control.py'))
+        run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Terminal', '--paths', str(ROOT / 'tools'),
+            '--exclude-module', 'esptool', '--exclude-module', 'PySide6', '--collect-all', 'textual',
+            '--copy-metadata', 'rich', str(ROOT / 'tools/aim_terminal.py'))
         run(*common, '--onefile', '--console', '--name', 'firmware-flasher', '--exclude-module', 'PySide6',
             '--collect-all', 'esptool', '--collect-all', 'esp_pylib',
             str(ROOT / 'scripts/esptool_entry.py'))
@@ -145,6 +148,7 @@ def build_package(output, package, version, args):
     # present: its diagnostics also launch the actual packaged flasher child.
     subprocess.run([str(package / 'AI-Monitor.exe'), '--gui-check'], cwd=package, check=True, timeout=30)
     subprocess.run([str(package / 'AI-Monitor-Permission.exe'), '--check'],cwd=package,check=True,timeout=10)
+    subprocess.run([str(package / 'AI-Monitor-Terminal.exe'), '--check'],cwd=package,check=True,timeout=30)
     licenses = package / 'licenses'
     licenses.mkdir()
     for distribution in metadata.distributions():

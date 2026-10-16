@@ -60,8 +60,10 @@ class TerminalDataTests(unittest.TestCase):
 
     def test_disabled_history_does_not_read_the_database(self):
         self.config['usage_history']=False
-        with patch.object(data,'compact_history') as history:
-            self.collect()
+        with patch.object(data,'compact_history') as history,patch.object(data,'local_config',return_value=self.config),\
+             patch.object(data,'owned_hosts',return_value=[]),patch.object(data,'read_status',return_value=None),\
+             patch.object(data,'live_agents',return_value=[]):
+            data.read_dashboard(self.root,now=1000)
         history.assert_not_called()
 
 
