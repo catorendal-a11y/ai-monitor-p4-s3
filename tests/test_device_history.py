@@ -134,9 +134,10 @@ class DeviceHistoryTests(unittest.TestCase):
                                    ('Stop','COMPLETED',70)]:
             record(self.root,'codex',identity,7,event,state,start+offset,True)
         codex,zcode=self.summary()['providers']
-        self.assertEqual(codex['agents'],dict(sessions=1,activeSeconds=40,completedTurns=1,failedTurns=0))
+        self.assertEqual(codex['agents'],dict(sessions=1,activeSeconds=40,completedTurns=1,failedTurns=0,
+            createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None))
         self.assertTrue(all(value is None for value in zcode['agents'].values()))
-        self.assertNotIn('task',str(codex['agents']).lower())
+        self.assertIsNone(codex['agents']['completedTasks'])
 
     def test_schema_one_device_reader_preserves_token_history_with_unknown_agent_metrics(self):
         self.rows([('codex',self.starts[6],42)])

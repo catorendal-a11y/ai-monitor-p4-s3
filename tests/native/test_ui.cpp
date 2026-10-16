@@ -1795,13 +1795,17 @@ int main(int argc, char** argv) {
     auto& first=historySample.providers[0];strcpy(first.key,"codex");first.dailyKnown=64;first.daily[6]=12345;
     first.hourlyKnown=1u<<23;first.hourly[23]=12345;first.quotaKnown=first.changeKnown=true;
     first.usedPercent=42;first.changePercent=10;first.windowMinutes=300;first.quotaAgeMinutes=1;
-    first.agentKnown=15;first.sessions=2;first.activeSeconds=180;first.completedTurns=1;first.failedTurns=0;
+    first.agentKnown=95;first.sessions=2;first.activeSeconds=180;first.completedTurns=1;first.failedTurns=0;
+    first.createdTasks=3;first.completedTasks=2;
     strcpy(historySample.providers[1].key,"zcode");sample.hostPresent=true;
     ui_menu_show();lv_obj_send_event(find_caption_button(menu_ui::screen,"HISTORY"),LV_EVENT_CLICKED,nullptr);
     CHECK(ui_history_is_active());CHECK(!strcmp(lv_label_get_text(history_ui::total),"12.3K"));
     CHECK(history_ui::count==2);check_inside(history_ui::screen,history_ui::provider);
     check_readable_text(history_ui::status);check_readable_text(history_ui::quota);
     check_readable_text(history_ui::metrics);CHECK(strstr(lv_label_get_text(history_ui::metrics),"Sessions 2"));
+    check_readable_text(history_ui::taskMetrics);
+    CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"done 2"));
+    CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"failed --"));
     CHECK(lv_obj_get_height(history_ui::bars[23])==100 && lv_obj_get_height(history_ui::bars[0])==3);
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[0],LV_PART_MAIN),lv_color_hex(ui_theme::muted)));
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[23],LV_PART_MAIN),lv_color_hex(ui_theme::accent)));
