@@ -611,8 +611,11 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
            !view || !view->valid ? "WAITING" :
            (!hostConnected ? "OFFLINE" : (view->informational ? "ACTIVITY / SETUP" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus))))));
   if (hostConnected && sessions.known && (sessions.waiting || sessions.running || sessions.error || sessions.completed)) {
-    snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
-             sessions.waiting ? "NEEDS YOU" : sessions.error ? "SESSION ERROR" : sessions.running ? "WORKING" : "TURN DONE");
+    // Keep quota health visible alongside an independent observed session.
+    const char* quotaLabel=!view || !view->valid?"WAITING":view->informational?"ACTIVITY":
+        view->notice?"ERROR":view->fetching?"UPDATING":!fresh?"STALE":quotaStatus;
+    snprintf(vendorBuf, sizeof(vendorBuf), "%s / %s", quotaLabel,
+             sessions.waiting ? "NEEDS YOU" : sessions.error ? "SESSION ERROR" : sessions.running ? "RUNNING" : "TURN DONE");
   }
   set_label_cached(c.vendor, cache.vendor, sizeof(cache.vendor), vendorBuf);
 

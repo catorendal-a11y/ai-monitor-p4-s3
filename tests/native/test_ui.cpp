@@ -632,6 +632,7 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   dashboard_show(); dashboard_update();
   CHECK(strstr(lv_label_get_text(big[0].vendor), "ERROR"));
   CHECK(strstr(lv_label_get_text(big[0].vendor), "RUNNING"));
+  screenshot(screenshots, "usage-session-quota-status");
   ui_nova_show();
   sample.views[0].notice = false; sample.views[0].quotaReceivedMs = fakeTick - 300001u; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "STALE / last good");
