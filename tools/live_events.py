@@ -144,6 +144,9 @@ def _lifecycle_event(provider, payload, directory, generation, now=None):
     write_record(path,record)
     from agent_history import record as record_history
     record_history(directory,provider,key,generation,event,state,timestamp,identity.startswith('session:'))
+    if provider=='claude' and event=='PostToolUse':
+        from agent_history import observe_task
+        observe_task(directory,payload,generation,timestamp)
     # Bounded scan, even if the local directory was filled with unrelated files.
     paths=[path for path in islice(folder.glob('*.json'),MAX_SESSIONS*2)
            if re.fullmatch(r'[0-9a-f]{64}\.json',path.name) and not path.is_symlink()]

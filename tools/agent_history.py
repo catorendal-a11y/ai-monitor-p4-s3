@@ -2,6 +2,7 @@
 from contextlib import closing
 from datetime import datetime,timedelta
 import math
+import hashlib
 from pathlib import Path
 import re
 import secrets
@@ -32,6 +33,78 @@ def create_schema(database):
         'id TEXT PRIMARY KEY,provider TEXT NOT NULL,agent TEXT NOT NULL,generation INTEGER NOT NULL,'
         'epoch INTEGER NOT NULL,event TEXT NOT NULL,state TEXT NOT NULL,at REAL NOT NULL,root INTEGER NOT NULL)')
     database.execute('CREATE INDEX IF NOT EXISTS agent_event_time ON agent_events(provider,at)')
+    database.execute('CREATE TABLE IF NOT EXISTS task_events('
+        'id TEXT PRIMARY KEY,provider TEXT NOT NULL,task TEXT NOT NULL,generation INTEGER NOT NULL,'
+        'epoch INTEGER NOT NULL,event TEXT NOT NULL,at REAL NOT NULL)')
+    database.execute('CREATE INDEX IF NOT EXISTS task_event_time ON task_events(provider,at)')
+
+
+def observe_task(directory,payload,generation,at):
+    """Claude 2.1.296 verified post-tool contract. Requests/TaskGet never prove completion time."""
+    if (not isinstance(payload,dict) or payload.get('hook_event_name')!='PostToolUse'
+            or type(generation) is not int or not 0<generation<(1<<63)
+            or type(at) not in (int,float) or not math.isfinite(at) or not 0<=at<=253402300799):return
+    session,use=payload.get('session_id'),payload.get('tool_use_id')
+    if any(not isinstance(value,str) or not 1<=len(value)<=200 for value in (session,use)):return
+    response,inputs=payload.get('tool_response'),payload.get('tool_input')
+    if not isinstance(response,dict) or not isinstance(inputs,dict) or 'error' in response or response.get('is_error') is True:return
+    event=task=None
+    if payload.get('tool_name')=='TaskCreate':
+        value=response.get('task')
+        if not isinstance(value,dict) or ('success' in response and response['success'] is not True):return
+        task=value.get('id');event='created'
+    elif payload.get('tool_name')=='TaskUpdate':
+        task=inputs.get('taskId');change=response.get('statusChange')
+        if response.get('success') is not True or response.get('taskId')!=task or not isinstance(change,dict):return
+        target,previous=change.get('to'),change.get('from')
+        if not isinstance(target,str) or inputs.get('status')!=target or not isinstance(previous,str):return
+        if target=='completed' and previous in ('pending','in_progress'):event='completed'
+        elif target=='in_progress' and previous in ('pending','completed'):event='started'
+    if event is None or not isinstance(task,str) or not 1<=len(task)<=200:return
+    key=hashlib.sha256((str(len(session))+':'+session+task).encode()).hexdigest()
+    try:
+        folder=Path(directory);path=folder/'history.db'
+        consent=read_local_json(folder/'agent-history-consent.json',256)
+        if (not isinstance(consent,dict) or set(consent)!={'enabled','epoch'} or consent['enabled'] is not True
+                or type(consent['epoch']) is not int or not 0<consent['epoch']<(1<<63)
+                or not path.is_file() or path.is_symlink()):return
+        with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=rw',uri=True,timeout=.02)) as database,database:
+            database.execute('PRAGMA trusted_schema=OFF')
+            if (database.execute('PRAGMA application_id').fetchone()[0]!=APPLICATION_ID or
+                    database.execute('PRAGMA user_version').fetchone()[0]!=2):return
+            deadline=time.monotonic()+.05
+            database.set_progress_handler(lambda:time.monotonic()>deadline,100)
+            if read_local_json(folder/'agent-history-consent.json',256)!=consent:return
+            identity=hashlib.sha256((key+':'+str(generation)+':'+str(consent['epoch'])+':'+use+':'+event).encode()).hexdigest()
+            database.execute('INSERT OR IGNORE INTO task_events VALUES(?,?,?,?,?,?,?)',
+                (identity,'claude',key,generation,consent['epoch'],event,float(at)))
+            database.execute('DELETE FROM task_events WHERE at<?',(at-30*86400,))
+            database.execute('DELETE FROM task_events WHERE id IN '
+                '(SELECT id FROM task_events ORDER BY at DESC,rowid DESC LIMIT -1 OFFSET ?)',(MAX_EVENTS,))
+    except (OSError,ValueError,TypeError,sqlite3.Error):pass
+
+
+def task_summary(database,provider,start,end,end_exclusive=False):
+    if (not isinstance(provider,str) or provider not in PROVIDERS or
+            any(type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=253402300799
+                for value in (start,end)) or end<start):raise ValueError('Invalid task history interval')
+    empty=dict(createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None)
+    if not database.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_events'").fetchone():return empty
+    rows=database.execute('SELECT task,generation,epoch,event,at FROM task_events '
+        'WHERE provider=? AND at>=? AND at<=? ORDER BY at,rowid LIMIT ?',
+        (provider,start,end,MAX_EVENTS+1)).fetchall()
+    if len(rows)>MAX_EVENTS:raise ValueError('Task history limit reached')
+    counts={event:set() for event in ('created','started','completed')}
+    for task,generation,epoch,event,at in rows:
+        if (not isinstance(task,str) or not re.fullmatch('[0-9a-f]{64}',task)
+                or type(generation) is not int or not 0<generation<(1<<63)
+                or type(epoch) is not int or not 0<epoch<(1<<63) or event not in counts
+                or type(at) not in (int,float) or not math.isfinite(at) or not 0<=at<=253402300799):
+            raise ValueError('Invalid task history')
+        if not end_exclusive or at<end:counts[event].add(task)
+    for field,event in [('createdTasks','created'),('startedTasks','started'),('completedTasks','completed')]:
+        if counts[event]:empty[field]=len(counts[event])
+    return empty
 
 
 def record(directory,provider,agent,generation,event,state,at,root):
