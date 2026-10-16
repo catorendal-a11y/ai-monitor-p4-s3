@@ -183,7 +183,6 @@ class InsightsUiTests(unittest.TestCase):
             for name in ('segoeui.ttf','segoeuib.ttf','consola.ttf'):
                 QFontDatabase.addApplicationFont(str(Path(os.environ['SystemRoot'])/'Fonts'/name))
         self.window.resize(1040,760)
-        self.window.tabs.setCurrentWidget(self.window.history_view.parentWidget().parentWidget())
         view=self.window.history_view
         scroll=view.parentWidget()
         while scroll is not None and not isinstance(scroll,QScrollArea):scroll=scroll.parentWidget()
