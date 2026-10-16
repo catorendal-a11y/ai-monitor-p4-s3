@@ -10,7 +10,7 @@ class LifecycleTests(unittest.TestCase):
         import installation_lifecycle as life
         with tempfile.TemporaryDirectory() as td, patch('aim_control.stop_host') as stop, patch('aim_control.owned_hosts',return_value=[]), patch.object(life,'remove_startup_task') as task, patch.object(life,'remove_integrations') as hooks:
             life.prepare(Path(td))
-            self.assertEqual(stop.call_args.args,(Path(td),))
+            self.assertEqual(stop.call_args.args,(Path(td).resolve(),))
             task.assert_not_called(); hooks.assert_not_called()
 
     def test_failed_stop_never_removes_integrations(self):
@@ -24,7 +24,7 @@ class LifecycleTests(unittest.TestCase):
         import provider_setup as providers
         import json
         with tempfile.TemporaryDirectory() as td, patch('aim_control.stop_host'), patch('aim_control.owned_hosts',return_value=[]), patch.object(life,'remove_startup_task'):
-            root=Path(td)/'app'; root.mkdir(); home=Path(td)/'home'; home.mkdir()
+            root=(Path(td)/'app').resolve(); root.mkdir(); home=Path(td)/'home'; home.mkdir()
             (root/'tools').mkdir(); config=root/'tools/aim_host.json'; config.write_text('{"fixture":"private","usage_history":false}')
             for link in (providers.codex_session_link,providers.claude_session_link,providers.zcode_session_link): link(root,home=home)
             providers.claude_bridge(root,home=home)
@@ -54,3 +54,4 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn('PrepareToInstall',script); self.assertIn('--prepare-upgrade',script)
 
 if __name__=='__main__': unittest.main()
+

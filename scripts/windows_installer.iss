@@ -44,9 +44,45 @@ Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 [Files]
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "tools\aim_host.json,tools\aim_host.status.json,tools\aim_host.log,tools\activity\*"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+Source: "{#PackageDir}\AI-Monitor-Console.exe"; Flags: dontcopy
+
 [Icons]
 Name: "{userprograms}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: "{app}"
 Name: "{userdesktop}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\AI-Monitor.exe"; Description: "Open AI Monitor setup"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function RunLifecycle(const Option: String): Boolean;
+var
+  Helper: String;
+  ResultCode: Integer;
+begin
+  Helper := ExpandConstant('{app}\AI-Monitor-Console.exe');
+  Result := Exec(Helper, Option, ExpandConstant('{app}'), SW_HIDE,
+    ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+  if FileExists(ExpandConstant('{app}\AI-Monitor-Console.exe')) then begin
+    ExtractTemporaryFile('AI-Monitor-Console.exe');
+    if not Exec(ExpandConstant('{tmp}\AI-Monitor-Console.exe'),
+      '--prepare-upgrade --installation-root ' + AddQuotes(ExpandConstant('{app}')),
+      ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+      ResultCode := -1;
+    if ResultCode <> 0 then
+      Result := 'AI Monitor could not confirm that its background host stopped. Close this installation and retry. Existing settings are preserved.';
+  end;
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  Result := RunLifecycle('--prepare-uninstall');
+  if not Result then
+    MsgBox('AI Monitor could not confirm safe cleanup of its background host and owned integrations. Uninstall was stopped before removing application files. Retry after checking local provider settings and the startup task. Private settings and history are preserved.', mbError, MB_OK);
+end;
