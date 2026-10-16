@@ -12,7 +12,7 @@ int main(){
  CHECK(store.initialize(a,b,4096,scratch,16,hash,decode));
  aim::ProtoCore core;core.boot_id=17;
  core.companion_command=[&](JsonObjectConst object,uint32_t now,std::string& reply){return companions::pack_command(store,17,object,now,reply);};
- feed(core,"{\"cmd\":\"hello\"}\n");
+ feed(core,"{\"cmd\":\"get_info\"}\n");
  CHECK(core.out().find("\"companionProtocol\":1")!=std::string::npos);core.clear_out();
  feed(core,"{\"cmd\":\"pack_status\",\"bootId\":17,\"nonce\":\"11111111111111111111111111111111\"}\n");
  CHECK(core.out().find("\"state\":\"builtin\"")!=std::string::npos);core.clear_out();

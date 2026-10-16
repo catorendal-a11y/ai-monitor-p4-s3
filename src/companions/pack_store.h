@@ -24,7 +24,7 @@ class PackStore {
     scratchBytes_=scratchBytes;hash_=hash;decode_=decode;initialized_=true;return true;
   }
   bool begin(const char* nonce,size_t total,const char* digest,uint32_t now) {
-    if(!initialized_ || ready_ || !hex(nonce,32) || !hex(digest,64) || total<5 || total>capacity_)return false;
+    if(!initialized_ || ready_ || builtin_ || !hex(nonce,32) || !hex(digest,64) || total<5 || total>capacity_)return false;
     staging_=active_==0?1:0;total_=total;offset_=0;received_=now;receiving_=true;
     memcpy(nonce_,nonce,33);memcpy(banks_[staging_].digest,digest,65);return true;
   }
@@ -59,8 +59,13 @@ class PackStore {
     if(offset!=total_)return false;
     ready_=true;received_=now;return true;
   }
-  bool activate() {if(!ready_)return false;active_=staging_;ready_=false;++revision_;return true;}
-  void disable() {active_=-1;receiving_=ready_=false;nonce_[0]=0;++revision_;}
+  bool activate() {
+    if(builtin_){disable();return true;}
+    if(!ready_)return false;
+    active_=staging_;ready_=false;++revision_;return true;
+  }
+  void disable() {active_=-1;receiving_=ready_=builtin_=false;offset_=total_=0;nonce_[0]=0;++revision_;}
+  void request_builtin(){receiving_=ready_=false;builtin_=true;}
   void cancel(){receiving_=ready_=false;nonce_[0]=0;}
   void expire(uint32_t now){if((receiving_ || ready_) && uint32_t(now-received_)>30000u)cancel();}
   const AnimationManifest* active()const{return active_>=0?&banks_[active_].manifest:nullptr;}
@@ -68,8 +73,8 @@ class PackStore {
     return active_>=0 && index<banks_[active_].manifest.frameCount?banks_[active_].bytes+banks_[active_].offsets[index]:nullptr;
   }
   const char* active_id()const{return active_>=0?banks_[active_].digest:"";}
-  const char* phase()const{return ready_?"ready":receiving_?"receiving":active_>=0?"active":"builtin";}
-  bool pending()const{return ready_;}
+  const char* phase()const{return builtin_?"clearing":ready_?"ready":receiving_?"receiving":active_>=0?"active":"builtin";}
+  bool pending()const{return ready_ || builtin_;}
   size_t offset()const{return offset_;}
   uint32_t revision()const{return revision_;}
  private:
@@ -81,7 +86,7 @@ class PackStore {
   struct Bank {uint8_t* bytes=nullptr;AnimationManifest manifest;size_t offsets[16]{};char digest[65]{};} banks_[2];
   uint8_t* scratch_=nullptr;size_t capacity_=0,scratchBytes_=0,total_=0,offset_=0;
   FrameCache::Hash hash_=nullptr;FrameCache::Decode decode_=nullptr;
-  int active_=-1,staging_=0;bool initialized_=false,receiving_=false,ready_=false;
+  int active_=-1,staging_=0;bool initialized_=false,receiving_=false,ready_=false,builtin_=false;
   uint32_t received_=0,revision_=0;char nonce_[33]{};
 };
 }
