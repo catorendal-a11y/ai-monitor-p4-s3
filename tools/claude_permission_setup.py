@@ -1,5 +1,6 @@
 """Explicit interactive-hook setup. Separate from observational hooks and runtime helper."""
 from private_files import backup as private_backup
+from claude_paths import config_root
 from pathlib import Path
 import copy
 import shutil
@@ -18,8 +19,7 @@ def hook(root, require_file=True):
 
 
 def settings_path(home=None):
-    home = Path.home() if home is None else Path(home)
-    directory = home / '.claude'
+    directory = config_root(home)
     file = directory / 'settings.json'
     if directory.is_symlink() or file.is_symlink():
         raise ValueError('Claude settings must be a regular local file.')

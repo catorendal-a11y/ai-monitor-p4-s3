@@ -63,6 +63,19 @@ static void night_bytes(const NightSettings& value, uint8_t (&bytes)[6]) {
   bytes[3] = value.end & 255; bytes[4] = value.end >> 8; bytes[5] = value.percent;
 }
 
+// Preferences returns a caller-supplied fallback on scalar read errors. Two
+// different fallback sentinels must agree before a present typed value is trusted.
+static bool read_scalar(Preferences& prefs, const char* key, PreferenceType expected, uint16_t& value) {
+  const auto type = prefs.getType(key);
+  if (type == PT_INVALID) return !prefs.isKey(key);
+  if (type != expected) return true;  // Retain the legacy malformed-type default.
+  const uint16_t first = expected == PT_U8 ? prefs.getUChar(key, 0) : prefs.getUShort(key, 0);
+  const uint16_t second = expected == PT_U8 ? prefs.getUChar(key, UINT8_MAX) : prefs.getUShort(key, UINT16_MAX);
+  if (first != second) return false;
+  value = first;
+  return true;
+}
+
 static bool ensure_loaded(bool retry = false) {
   if (s_loaded) return true;
   const uint32_t now = millis();
@@ -81,12 +94,20 @@ static bool ensure_loaded(bool retry = false) {
 
   // Stage the complete load. A short read may have filled only a prefix of its
   // destination; neither runtime values nor confirmed save baselines may see it.
-  const uint8_t brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
-  const uint8_t dim = normalize_dim_minutes(prefs.getUChar(KEY_DIM_MIN, 5));
-  const uint8_t warning = normalize_warning_percent(prefs.getUChar("warn_pct", 25));
+  uint16_t storedBrightness = DISPLAY_DEFAULT_BRIGHTNESS, storedDim = 5, storedWarning = 25;
+  uint16_t nightOn = 0, nightStart = 1320, nightEnd = 420, nightPercent = 20;
+  if (!read_scalar(prefs, "brightness", PT_U8, storedBrightness) ||
+      !read_scalar(prefs, KEY_DIM_MIN, PT_U8, storedDim) ||
+      !read_scalar(prefs, "warn_pct", PT_U8, storedWarning) ||
+      !read_scalar(prefs, "night_on", PT_U8, nightOn) ||
+      !read_scalar(prefs, "night_start", PT_U16, nightStart) ||
+      !read_scalar(prefs, "night_end", PT_U16, nightEnd) ||
+      !read_scalar(prefs, "night_pct", PT_U8, nightPercent)) return failed();
+  const uint8_t brightness = static_cast<uint8_t>(storedBrightness);
+  const uint8_t dim = normalize_dim_minutes(static_cast<uint8_t>(storedDim));
+  const uint8_t warning = normalize_warning_percent(static_cast<uint8_t>(storedWarning));
   Appearance appearance;
-  NightSettings night = normalize_night({prefs.getBool("night_on", false), prefs.getUShort("night_start", 1320),
-                                        prefs.getUShort("night_end", 420), prefs.getUChar("night_pct", 20)});
+  NightSettings night = normalize_night({nightOn == 1, nightStart, nightEnd, static_cast<uint8_t>(nightPercent)});
   WarningRule rules[24]{};
   NovaWindow novaWindows[8]{};
   auto read_blob = [&](const char* key, void* destination, size_t expected, bool& present) {

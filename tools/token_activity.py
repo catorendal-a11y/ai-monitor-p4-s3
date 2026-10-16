@@ -133,7 +133,8 @@ class TokenReporter:
         home = Path.home() if default_home else Path(home)
         self.paths = {"codex": home / ".codex/state_5.sqlite", "zcode": home / ".zcode/cli/db/db.sqlite"}
         if default_home: self.paths['codex'] = codex_home() / 'state_5.sqlite'
-        self.paths.update(claude=home / '.claude/projects', gemini=home / '.gemini/tmp')
+        from claude_paths import config_root
+        self.paths.update(claude=config_root(None if default_home else home) / 'projects', gemini=home / '.gemini/tmp')
         from opencode_activity import database_path
         self.paths['opencode'] = database_path(home)
         self.providers = ['codex', 'zcode'] if providers is None else list(providers)

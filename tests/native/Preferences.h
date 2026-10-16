@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+enum PreferenceType { PT_U8, PT_U16, PT_BLOB, PT_INVALID };
+
 namespace fake_nvs {
 inline std::map<std::string, std::vector<uint8_t>> values;
 inline bool fail_open = false, fail_write = false;
@@ -20,6 +22,10 @@ class Preferences {
   bool begin(const char*, bool = false) { return !fake_nvs::fail_open; }
   void end() {}
   bool isKey(const char* key) { return !fake_nvs::values[key].empty(); }
+  PreferenceType getType(const char* key) {
+    const auto size=fake_nvs::values[key].size();
+    return size==1?PT_U8:size==2?PT_U16:size?PT_BLOB:PT_INVALID;
+  }
   size_t getBytesLength(const char* key) { return fake_nvs::fail_lengths.count(key)?0:fake_nvs::values[key].size(); }
   size_t getBytes(const char* key, void* destination, size_t capacity) {
     const auto& bytes = fake_nvs::values[key];

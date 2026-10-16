@@ -1,5 +1,6 @@
 """Explicit local integration setup. Preserve unrelated client settings."""
 from private_files import backup as private_backup
+from claude_paths import config_root
 import base64
 import os
 import re
@@ -216,7 +217,7 @@ def codex_session_link(root, remove=False, home=None):
 
 
 def claude_bridge(root, remove=False, home=None):
-    settings = (Path.home() if home is None else Path(home)) / '.claude/settings.json'
+    settings = config_root(home) / 'settings.json'
     document = read_local_json(settings, 65536) if settings.exists() else {}
     if not isinstance(document, dict): raise ValueError('Claude settings are invalid; nothing changed.')
     expected = {'type': 'command', 'command': claude_command(root)}
@@ -240,7 +241,7 @@ def claude_bridge(root, remove=False, home=None):
 
 def claude_link_state(root, home=None):
     """Read-only status of this installation's quota link; never prints settings content."""
-    settings = (Path.home() if home is None else Path(home)) / '.claude/settings.json'
+    settings = config_root(home) / 'settings.json'
     try:
         document = read_local_json(settings, 65536) if settings.exists() else {}
     except (ValueError, OSError):
@@ -271,7 +272,7 @@ CLAUDE_EVENTS = ('SessionStart','UserPromptSubmit','PreToolUse','PostToolUse',
 
 def claude_session_link(root, remove=False, home=None):
     """Append/remove only this installation's observational command hooks."""
-    settings=(Path.home() if home is None else Path(home))/'.claude/settings.json'
+    settings=config_root(home)/'settings.json'
     document=read_local_json(settings,65536) if settings.exists() else {}
     if not isinstance(document,dict): raise ValueError('Invalid Claude settings; nothing changed.')
     hooks=document.get('hooks',{})
@@ -360,7 +361,7 @@ def setup_report(root, home=None):
 
 
 def claude_session_state(root,home=None):
-    settings=(Path.home() if home is None else Path(home))/'.claude/settings.json'
+    settings=config_root(home)/'settings.json'
     try:
         document=read_local_json(settings,65536) if settings.exists() else {}
         if not isinstance(document,dict) or not isinstance(document.get('hooks',{}),dict): return 'invalid'

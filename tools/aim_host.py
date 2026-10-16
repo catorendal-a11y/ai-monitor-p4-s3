@@ -874,6 +874,8 @@ class ConfigWatcher:
     def __init__(self):
         self.signature = self.fingerprint()
         self.pending = None
+        self.failed_signature = None
+        self.retry_at = 0
 
     @staticmethod
     def fingerprint():
@@ -887,14 +889,23 @@ class ConfigWatcher:
         signature = self.fingerprint()
         if signature == self.signature:
             return
-        self.signature = signature
+        now = time.monotonic()
+        if signature == self.failed_signature and now < self.retry_at:
+            return
+        self.failed_signature = signature
+        self.retry_at = now + 2
         if signature is None:
             LOG("Configuration file unavailable; keeping previous settings")
             return
         try:
-            self.pending = load_config()
+            config = load_config()
         except (ValueError, OSError):
             LOG("Configuration reload rejected; keeping previous settings")
+            return
+        self.pending = config
+        self.signature = signature
+        self.failed_signature = None
+        self.retry_at = 0
 
     def take(self):
         value, self.pending = self.pending, None

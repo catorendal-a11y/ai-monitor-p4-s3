@@ -79,7 +79,8 @@ def observe_task(directory,payload,generation,at):
         if target=='completed' and previous in ('pending','in_progress'):event='completed'
         elif target=='in_progress' and previous in ('pending','completed'):event='started'
     if event is None or not isinstance(task,str) or not 1<=len(task)<=200:return
-    config=os.path.normcase(str(Path(os.environ.get('CLAUDE_CONFIG_DIR') or Path.home()/'.claude').expanduser().resolve()))
+    from claude_paths import config_root
+    config=os.path.normcase(str(config_root().resolve()))
     scope=os.environ.get('CLAUDE_CODE_TASK_LIST_ID') or session
     if len(config)>4096 or len(scope)>4096:return
     key='v2:'+hashlib.sha256((str(len(config))+':'+config+str(len(scope))+':'+scope+task).encode()).hexdigest()
