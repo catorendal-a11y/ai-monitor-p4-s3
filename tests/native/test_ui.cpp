@@ -1568,6 +1568,25 @@ int main(int argc, char** argv) {
       live.agents[0].observedAgeSeconds=31;
       CHECK(!session_status(quota,fakeTick,255u,counts,live).known);
       CHECK(quota.tokenUsageKnown==false && quota.frameCount==0);
+      // Reported event age and time spent on the device share one freshness budget.
+      live.agents[0].state=agent::State::WORKING;live.agents[0].observedAgeSeconds=29;
+      for(uint32_t received:{1000u,0xfffffff0u}) {
+        live.receivedAt=received;counts.fresh=false;
+        CHECK(session_status(quota,received+1000u,255u,counts,live).running==1);
+        CHECK(!session_status(quota,received+1001u,255u,counts,live).known);
+        CHECK(!session_status(quota,received+28000u,255u,counts,live).running);
+      }
+      aim::Snapshot token{};token.hostPresent=token.tokenUsageKnown=token.tokenUsageSeen=true;
+      token.tokenIdleSeconds=89;token.tokenActivityMs=1000;
+      CHECK(companion.evaluate(token,1999,false,warning,{},{} )==NovaMood::working);
+      CHECK(companion.evaluate(token,2000,false,warning,{},{} )!=NovaMood::working);
+      token.views[0].valid=token.views[0].hasUsage=true;token.views[0].rowCount=1;
+      token.views[0].rows[0].valid=true;token.views[0].rows[0].usedPercent=5;
+      CHECK(companion.evaluate(token,2000,false,warning,{},{} )==NovaMood::updated);
+      CHECK(companion.evaluate(token,7000,false,warning,{},{} )==NovaMood::ready);
+      token.tokenIdleSeconds=299;token.tokenActivityMs=0xfffffff0u;
+      token.views[0].quotaReceivedMs=token.tokenActivityMs;
+      CHECK(companion.evaluate(token,token.tokenActivityMs+1000u,false,warning,{},{} )==NovaMood::resting);
     }
     ui_menu_show(); auto* entry=find_caption_button(lv_screen_active(),"AGENTS");CHECK(entry);
     const auto savedQuota=sample;sample.hostPresent=false;
@@ -1603,6 +1622,9 @@ int main(int argc, char** argv) {
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"NEEDS ATTENTION"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"1:02:03 / event 45s ago"));
     screenshot(screenshots,"live-agent-session-timer");
+    fakeTick+=5000;ui_agents_update();
+    CHECK(strstr(lv_label_get_text(agents_ui::rows[0].identity),"event 50s ago"));
+    fakeTick-=5000;
     liveSample.agents[0].state=agent::State::ERROR;ui_agents_update();
     CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(0xFF6B6B)));
     CHECK(lv_obj_is_hidden(agents_ui::rows[1].card));
@@ -1666,7 +1688,15 @@ int main(int argc, char** argv) {
     CHECK(lv_obj_is_hidden(event_center_ui::rows[0].card));
     lv_area_t after{};lv_obj_get_coords(read,&after);CHECK(before.x1==after.x1 && before.y1==after.y1 && before.x2==after.x2 && before.y2==after.y2);
     auto* back=find_caption_button(event_center_ui::screen,"BACK");CHECK(back);lv_obj_send_event(back,LV_EVENT_CLICKED,nullptr);
-    CHECK(lv_screen_active()==agents_ui::screen);
+    CHECK(ui_nova_is_active());
+    for(auto* caller:{nova_ui::screen,agents_ui::screen,::screen}) {
+      lv_screen_load(caller);ui_menu_show();
+      lv_obj_send_event(find_caption_button(menu_ui::screen,"EVENTS"),LV_EVENT_CLICKED,nullptr);
+      CHECK(ui_event_center_is_active());ui_event_center_show();
+      lv_obj_send_event(find_caption_button(event_center_ui::screen,"BACK"),LV_EVENT_CLICKED,nullptr);
+      CHECK(lv_screen_active()==caller);
+    }
+    ui_nova_show();
   }
   {
     interaction::PermissionController controller;
@@ -1803,6 +1833,10 @@ int main(int argc, char** argv) {
     CHECK(history_ui::count==2);check_inside(history_ui::screen,history_ui::provider);
     check_readable_text(history_ui::status);check_readable_text(history_ui::quota);
     check_readable_text(history_ui::metrics);CHECK(strstr(lv_label_get_text(history_ui::metrics),"Sessions 2"));
+    first.quotaKnown=false;++historySample.revision;ui_history_update();
+    CHECK(!strcmp(lv_label_get_text(history_ui::quota),"Quota history: not available"));
+    CHECK(strstr(lv_label_get_text(history_ui::metrics),"Sessions 2"));
+    first.quotaKnown=true;++historySample.revision;ui_history_update();
     check_readable_text(history_ui::taskMetrics);
     CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"done 2"));
     CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"failed --"));
@@ -1817,7 +1851,7 @@ int main(int argc, char** argv) {
     screenshot(screenshots,"history-today-7d");
     lv_dropdown_set_selected(history_ui::provider,1);lv_obj_send_event(history_ui::provider,LV_EVENT_VALUE_CHANGED,nullptr);
     CHECK(!strcmp(lv_label_get_text(history_ui::total),"--"));
-    CHECK(strstr(lv_label_get_text(history_ui::quota),"not recorded"));
+    CHECK(!strcmp(lv_label_get_text(history_ui::quota),"Quota history: not available"));
     CHECK(strstr(lv_label_get_text(history_ui::metrics),"no observed"));
     lv_dropdown_open(history_ui::provider);historySample.providers[0]=historySample.providers[1];historySample.count=1;++historySample.revision;
     ui_history_update();CHECK(history_ui::count==2 && !strcmp(history_ui::keys[0],"codex"));
