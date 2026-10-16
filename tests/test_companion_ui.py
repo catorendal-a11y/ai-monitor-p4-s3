@@ -13,6 +13,27 @@ from test_companion_packages import archive
 
 
 class CompanionUiTests(unittest.TestCase):
+    def test_activation_requires_saved_board_and_usb_port(self):
+        from types import SimpleNamespace
+        from PySide6.QtWidgets import QLabel
+        from companion_ui import CompanionView
+        app=QApplication.instance() or QApplication([])
+        health=dict(state='connected',updated_at=time.time(),board='guition-p4',port='COM9999',
+                    companion=dict(state='active',id='a'*64))
+        owner=SimpleNamespace(config=dict(board='guition-p4',port='COM9999'),cached_health=health)
+        view=SimpleNamespace(owner=owner,selected_id='a'*64,device_status=QLabel())
+        for field,value in [('board','esp32s3-waveshare-43'),('port','COM8888')]:
+            with self.subTest(field=field):
+                previous=health[field];health[field]=value
+                CompanionView.refresh_device(view)
+                self.assertNotIn('activated',view.device_status.text())
+                health[field]=previous
+        CompanionView.refresh_device(view)
+        self.assertIn('activated',view.device_status.text())
+        owner.config['port']='auto'
+        CompanionView.refresh_device(view)
+        self.assertIn('activated',view.device_status.text())
+
     def test_import_use_and_builtin_selection_with_visible_rejection(self):
         from companion_ui import CompanionView
         import companion_packages as packages
