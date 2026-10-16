@@ -38,6 +38,14 @@ class ConsentLogicTests(unittest.TestCase):
   self.wait_marker(lambda m:m['enabled'])
   recorder.record_tokens({'claude':3});recorder.close()
   with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT SUM(tokens) FROM tokens').fetchone()[0],3)
+ def test_explicit_true_can_reenable_revoked_already_enabled_recorder(self):
+  recorder=HistoryRecorder(self.root,True);self.addCleanup(recorder.close)
+  original=self.wait_marker(lambda m:m['epoch']==recorder.epoch and m['enabled'])
+  history.revoke(self.root)
+  recorder.configure(True)
+  renewed=self.wait_marker(lambda m:m['enabled'] and m['epoch']>original['epoch'])
+  recorder.record_tokens({'claude':4});recorder.close()
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT SUM(tokens) FROM tokens').fetchone()[0],4)
  def test_cross_process_revocation_cannot_be_undone_by_stale_recorder(self):
   code="""import sys,time,json
 from pathlib import Path
