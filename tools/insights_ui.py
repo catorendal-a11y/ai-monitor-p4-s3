@@ -263,7 +263,7 @@ class HistoryView(QWidget):
         if data is None:
             self.summary.setText('History could not be read. Existing data was preserved.'); return
         self.data=data
-        daily=data.get('daily_agents',[])
+        daily=sorted(data.get('daily_agents',[]),key=lambda row:row['date'],reverse=True)
         self.daily_table.setRowCount(len(daily))
         for index,row in enumerate(daily):
             values=[row['date'],row['sessions'],row['activeSeconds'],row['completedTurns'],row['failedTurns']]
