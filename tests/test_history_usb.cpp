@@ -71,6 +71,25 @@ int main() {
     CHECK(core.snapshot().providers[0].agentKnown==11 && core.snapshot().providers[0].activeSeconds==180);
     CHECK(core.snapshot().providers[1].agentKnown==0);
   }
+  for(unsigned fault=0;fault<5;++fault) {
+    auto opening=start(100+fault);opening["schema"]=3;
+    CHECK(core.handle(opening.as<JsonObjectConst>(),17,600));
+    auto first=row(0,100+fault);first["schema"]=3;
+    auto stats=first["agents"].to<JsonObject>();
+    for(const char* key:{"sessions","activeSeconds","completedTurns","failedTurns","createdTasks","startedTasks","completedTasks","failedTasks"})stats[key]=nullptr;
+    stats["completedTasks"]=2;
+    if(fault==1)stats["completedTasks"]=true;
+    if(fault==2)stats["completedTasks"]=50001;
+    if(fault==3)stats["task_title"]="must never be accepted";
+    if(fault==4)stats.remove("failedTasks");
+    if(fault){CHECK(!core.handle(first.as<JsonObjectConst>(),17,601));continue;}
+    CHECK(core.handle(first.as<JsonObjectConst>(),17,601));
+    auto second=first;second["index"]=1;second["agents"]["completedTasks"]=nullptr;
+    CHECK(core.handle(second.as<JsonObjectConst>(),17,602));
+    CHECK(core.snapshot().providers[0].completedTasks==2);
+    CHECK(core.snapshot().providers[0].agentKnown==64);
+    CHECK(core.snapshot().providers[1].agentKnown==0);
+  }
   if(failures)return 1;
   std::cout<<"Atomic bounded history, unknown gaps, strict fields, replay and rollback tests passed\n";
 }

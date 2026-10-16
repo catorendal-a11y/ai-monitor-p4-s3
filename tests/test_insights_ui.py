@@ -114,6 +114,23 @@ class InsightsUiTests(unittest.TestCase):
             view._finished((9,'codex',None)); self.app.processEvents()
             refresh.assert_called_once()
 
+    def test_confirmed_tasks_are_separate_from_turns_and_export_without_token_samples(self):
+        import csv
+        view=self.window.history_view
+        row=dict(provider='claude',date='2026-10-16',sessions=None,activeSeconds=None,
+                 completedTurns=None,failedTurns=None,completedTasks=2,failedTasks=None)
+        view._finished((view.generation,'claude',dict(tokens=[],quota=[],forecasts=[],error=None,daily_agents=[row])))
+        self.assertEqual(view.daily_table.item(0,3).text(),'--')
+        self.assertEqual(view.daily_table.item(0,5).text(),'2')
+        self.assertEqual(view.daily_table.item(0,6).text(),'--')
+        self.assertTrue(view.export_button.isEnabled())
+        path=self.root/'tasks.csv'
+        with patch('insights_ui.QFileDialog.getSaveFileName',return_value=(str(path),'CSV')):view.export()
+        with path.open(newline='',encoding='utf-8') as stream:rows=list(csv.DictReader(stream))
+        self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['metric'],'client_tasks_completed')
+        self.assertEqual(rows[0]['value'],'2')
+
     def test_live_test_resets_cells_expires_and_deconfirms_wrong_or_stale_display(self):
         dialog=SetupReportDialog(self.report(),self.window)
         self.window.live_sampler=Mock(); self.window.live_sampler.poll.return_value=None

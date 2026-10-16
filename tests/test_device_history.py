@@ -97,6 +97,23 @@ class DeviceHistoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):client.send(summary)
         self.assertEqual(len(panel.messages),before)
 
+    def test_task_history_uses_schema_three_but_old_devices_receive_only_known_agent_fields(self):
+        import json
+        class Panel:
+            def __init__(self,protocol):self.info=dict(bootId=17,historyProtocol=protocol);self.messages=[]
+            def send_line(self,raw):self.messages.append(json.loads(raw))
+            def wait_for(self,kind,seconds,command):
+                m=self.messages[-1]
+                return dict(type='history_reply',schema=m['schema'],cmd=command,ok=True,
+                    bootId=17,epoch=m['epoch'],revision=m['revision'],index=m.get('index',0))
+        summary=self.summary();summary['providers'][0]['agents']['completedTasks']=2
+        for protocol in (1,2,3):
+            panel=Panel(protocol);UsbHistoryClient(panel,lambda:self.now).send(summary)
+            self.assertEqual(panel.messages[0]['schema'],protocol)
+            agents=panel.messages[1].get('agents',{})
+            if protocol==3:self.assertEqual(agents['completedTasks'],2)
+            else:self.assertNotIn('completedTasks',agents)
+
     def test_invalid_selection_dates_clocks_and_future_buckets_are_rejected(self):
         for providers in (['codex','codex'],['unknown']):
             with self.assertRaises(ValueError):compact_history(self.root,providers,True,self.now,self.boundaries)
