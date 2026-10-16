@@ -177,6 +177,27 @@ class CompanionUsbTests(unittest.TestCase):
         self.assertEqual(panel.messages,[])
 
 class CompanionServiceTests(unittest.TestCase):
+    def test_reconnect_reuses_one_reader_even_if_local_storage_is_blocked(self):
+        import threading
+        import time
+        import companion_service
+        import companion_packages as p
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'pack.zip';source.write_bytes(archive())
+            pack=p.install(root,source);p.select(root,pack.id)
+            entered,release=threading.Event(),threading.Event();original=companion_service.load
+            def blocked(*args):entered.set();release.wait(2);return original(*args)
+            with patch.object(companion_service,'load',side_effect=blocked):
+                service=companion_service.CompanionService(root)
+                try:
+                    self.assertTrue(entered.wait(1));reader=service.worker;started=time.monotonic()
+                    for _ in range(20):service.detach();service.reconnect()
+                    self.assertLess(time.monotonic()-started,.1)
+                    self.assertIs(service.worker,reader)
+                    panel=CompanionUsbTests.Panel();service.pump(panel)
+                    self.assertEqual(panel.messages,[])
+                finally:release.set();service.close()
+
     def test_selected_library_loads_off_serial_owner_and_reinstalls_after_new_host(self):
         import time
         from companion_service import CompanionService
