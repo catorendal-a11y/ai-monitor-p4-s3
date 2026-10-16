@@ -131,6 +131,35 @@ class InsightsUiTests(unittest.TestCase):
         self.assertEqual(rows[0]['metric'],'client_tasks_completed')
         self.assertEqual(rows[0]['value'],'2')
 
+    def test_local_token_export_and_unknown_tooltips_match_calendar(self):
+        import csv
+        view=self.window.history_view
+        row=dict(provider='codex',date='2026-10-16',sessions=None,activeSeconds=None,
+                 completedTurns=None,failedTurns=None,completedTasks=None,failedTasks=None,
+                 unknownReasons={'completedTurns':'no_terminal_evidence','completedTasks':'unsupported_tasks'})
+        data=dict(tokens=[dict(provider='codex',day=20742,date='2026-10-16',total=5)],
+                  quota=[],forecasts=[],error=None,daily_agents=[row])
+        view._finished((view.generation,'codex',data))
+        self.assertIn('terminal',view.daily_table.item(0,3).toolTip().lower())
+        self.assertIn('not report',view.daily_table.item(0,5).toolTip().lower())
+        self.assertIn('local',view.chart.accessibleName().lower())
+        path=self.root/'local.csv'
+        with patch('insights_ui.QFileDialog.getSaveFileName',return_value=(str(path),'CSV')):view.export()
+        with path.open(newline='',encoding='utf-8') as stream:rows=list(csv.DictReader(stream))
+        self.assertEqual(rows[0]['local_date'],'2026-10-16')
+        self.assertEqual(rows[0]['observed_utc'],'')
+
+    def test_clear_history_requires_explicit_confirmation(self):
+        from PySide6.QtWidgets import QMessageBox
+        view=self.window.history_view
+        self.window.clear_history=Mock()
+        with patch('PySide6.QtWidgets.QMessageBox.question',return_value=QMessageBox.StandardButton.No):
+            view.clear_button.click()
+        self.window.clear_history.assert_not_called()
+        with patch('PySide6.QtWidgets.QMessageBox.question',return_value=QMessageBox.StandardButton.Yes):
+            view.clear_button.click()
+        self.window.clear_history.assert_called_once()
+
     def test_live_test_resets_cells_expires_and_deconfirms_wrong_or_stale_display(self):
         dialog=SetupReportDialog(self.report(),self.window)
         self.window.live_sampler=Mock(); self.window.live_sampler.poll.return_value=None
@@ -200,3 +229,4 @@ class InsightsUiTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
