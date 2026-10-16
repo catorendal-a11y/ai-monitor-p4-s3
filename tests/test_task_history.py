@@ -78,3 +78,16 @@ class TaskHistoryTests(unittest.TestCase):
         with closing(connect(self.root)) as db:
             self.assertIsNone(history.task_summary(db,'claude',0,50,end_exclusive=True)['completedTasks'])
             self.assertEqual(history.task_summary(db,'claude',50,100)['completedTasks'],1)
+
+    def test_daily_and_device_summaries_include_only_supported_confirmed_tasks(self):
+        from usage_history import read_history
+        from device_history import compact_history
+        now=datetime(2026,10,16,12).timestamp()
+        self.record(self.payload(),now-10)
+        daily=read_history(self.root,['claude'],now=now)['daily_agents'][-1]
+        self.assertEqual(daily.get('completedTasks'),1)
+        self.assertIsNone(daily['failedTasks'])
+        for provider in ('codex','zcode'):
+            self.assertIsNone(read_history(self.root,[provider],now=now)['daily_agents'][-1]['completedTasks'])
+        stats=compact_history(self.root,['claude'],True,now)['providers'][0]['agents']
+        self.assertEqual(stats['completedTasks'],1)
