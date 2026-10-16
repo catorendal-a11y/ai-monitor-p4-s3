@@ -38,7 +38,11 @@ class PackReconciliationTests(unittest.TestCase):
                 class View:pass
                 class Label:
                     def setText(self,text):self.text=text
-                view=View();view.owner=View();view.owner.cached_health={'state':'connected','updated_at':time.time(),'companion':service.snapshot()};view.selected_id=mypack.id;view.device_status=Label()
+                view=View();view.owner=View()
+                view.owner.config={'board':'guition-p4','port':'COM9999'}
+                view.owner.cached_health={'state':'connected','updated_at':time.time(),
+                    'board':'guition-p4','port':'COM9999','companion':service.snapshot()}
+                view.selected_id=mypack.id;view.device_status=Label()
                 CompanionView.refresh_device(view)
                 self.assertNotIn('previous companion retained',view.device_status.text)
                 service.next_status=0;service.pump(panel)
