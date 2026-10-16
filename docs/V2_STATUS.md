@@ -1,8 +1,16 @@
-# v2 completion status — v1.19.1-rc4
+# v2 completion status — v1.19.1-rc5
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc4.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc5.
+
+Rc5 fixes ZCode lifecycle events being silently omitted from opt-in history. The
+desktop History tab now displays and exports daily observed sessions, active
+seconds and completed/failed turns for seven/30 local days, with the latest day
+first. Unknown values remain unknown and midnight outcomes belong to one day.
+The suite passed 529 Python tests and all native checks. Coverage of the three
+changed Python modules is 93% combined. This does not turn lifecycle hooks into
+confirmed task outcomes, enable physical approvals or install external packs.
 
 Rc4 fixes a failure found with the actual Windows Codex client: command hooks
 need PowerShell's call operator before the quoted observer executable. The exact
@@ -30,7 +38,7 @@ results must be recorded separately rather than inherited from that candidate.
 | --- | --- | --- |
 | USB permissions | UI-to-serial final commit, authenticated developer adapter, explicit PC/display opt-in, separate Claude setup/removal | Native real-crypto/LVGL tests pass. Production remains disabled pending genuine physical enrollment/hold/deny/unplug/provider testing. |
 | AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude/ZCode observational integrations | Installed rc4 host reports Codex/ZCode quota ready on P4. Real local client turns and live USB delivery passed for all three observers; Claude Code with GLM remains activity-only for Claude quota. Local Codex command hooks do not cover cloud-orchestrated Work. |
-| History | Opt-in bounded lifecycle journal, migration, observed sessions/active time/turns, Today/24h/7d | Native/SQLite/USB tests pass. Waiting/gaps excluded, parallel activity unioned, no transcripts or invented task results. Existing user's preference stays off. |
+| History | Opt-in bounded lifecycle journal, migration, observed sessions/active time/turns, Today/24h/7d and desktop daily summary/CSV | Native/SQLite/USB and desktop tests pass. Waiting/gaps excluded, parallel activity unioned, no transcripts or invented task results. Collection requires opt-in; saved numeric history can be read without restarting collection. |
 | Companions | Bounded animation schema 2, mood timing/loops and built-in playback over LZ4/PSRAM cache | Native parsing/player/LVGL tests pass; normal P4 flashed. External pack installation remains a future storage/staging/recovery feature. |
 | Device mirror | Real device RGB565 capture, normal overlays, existing USB owner, explicit PC viewer | Physical P4 capture: 3.094 s directly, 4.922 s through installed host. PSRAM returned to the same free value. Protected screens excluded; no touch/approval. |
 | Packaging | Both board images, five rebuilt Windows executables, checksummed portable ZIP and per-user installer | Actual installer upgrade/startup passed on the existing PC, settings unchanged. A read-only CI workflow can verify clean-profile installation/upgrade/uninstall without release publication. |
