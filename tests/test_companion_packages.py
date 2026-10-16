@@ -83,6 +83,12 @@ class CompanionPackageTests(unittest.TestCase):
             with zipfile.ZipFile(stream,'a') as z:z.writestr('one.raw',b'bad')
         with self.assertRaises(ValueError):self.p.parse_archive(stream.getvalue())
 
+    def test_frame_ids_follow_the_same_reserved_name_rules_as_firmware(self):
+        def reserved(m,files):
+            m['frames'][0]['id']='con'
+            for clip in m['animations']:clip['frames'][0]['id']='con'
+        with self.assertRaises(ValueError):self.p.parse_archive(archive(reserved))
+
 
 if __name__=='__main__':unittest.main()
 
