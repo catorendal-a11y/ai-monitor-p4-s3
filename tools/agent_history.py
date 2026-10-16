@@ -53,6 +53,8 @@ def create_schema(database):
         'id TEXT PRIMARY KEY,provider TEXT NOT NULL,agent TEXT NOT NULL,generation INTEGER NOT NULL,'
         'epoch INTEGER NOT NULL,event TEXT NOT NULL,state TEXT NOT NULL,at REAL NOT NULL,root INTEGER NOT NULL)')
     database.execute('CREATE INDEX IF NOT EXISTS agent_event_time ON agent_events(provider,at)')
+    database.execute('CREATE INDEX IF NOT EXISTS agent_turn_identity ON agent_events(provider,agent,generation,epoch,at) '
+        "WHERE root=1 AND event IN ('UserPromptSubmit','Stop','StopFailure','Interrupt','SessionEnd')")
     database.execute('CREATE TABLE IF NOT EXISTS task_events('
         'id TEXT PRIMARY KEY,provider TEXT NOT NULL,task TEXT NOT NULL,generation INTEGER NOT NULL,'
         'epoch INTEGER NOT NULL,event TEXT NOT NULL,at REAL NOT NULL)')
@@ -160,11 +162,10 @@ def summarize(database,provider,start,end,end_exclusive=False):
     empty=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None)
     if database.execute('PRAGMA user_version').fetchone()[0]!=2:return empty
     rows=database.execute('SELECT agent,generation,epoch,event,state,at,root FROM agent_events '
-        'WHERE provider=? AND at<=? AND (at>=? OR (root=1 AND event IN '
-        "('UserPromptSubmit','Stop','StopFailure','Interrupt','SessionEnd'))) ORDER BY at,rowid LIMIT ?",
-        (provider,end,start-900,MAX_EVENTS+1)).fetchall()
+        'WHERE provider=? AND at>=? AND at<=? ORDER BY at,rowid LIMIT ?',
+        (provider,start-900,end,MAX_EVENTS+1)).fetchall()
     if len(rows)>MAX_EVENTS:raise ValueError('Agent history limit reached')
-    previous={};sessions=set();turns={};finished=set();intervals=[];completed=failed=0;observed=False
+    previous={};sessions=set();turns={};finished=set();seeded=set();intervals=[];completed=failed=0;observed=False
     for agent,generation,epoch,event,state,at,root in rows:
         if (not isinstance(agent,str) or not re.fullmatch('[0-9a-f]{64}',agent)
                 or type(generation) is not int or not 0<generation<(1<<63)
@@ -183,6 +184,22 @@ def summarize(database,provider,start,end,end_exclusive=False):
             if left<right:intervals.append((left,right))
         previous[key]=(at,state)
         if event=='SessionStart' and root and in_period:sessions.add((agent,generation))
+        if root and event in ('UserPromptSubmit','Stop','StopFailure','Interrupt','SessionEnd') and key not in seeded:
+            seeded.add(key)
+            # Activity needs only a 900s lookback. A first terminal event may
+            # close a much older prompt; fetch one indexed prior lifecycle event
+            # for this exact identity instead of rescanning 30 days for every day.
+            if event!='UserPromptSubmit':
+                prior=database.execute('SELECT event,state,at FROM agent_events WHERE provider=? '
+                    'AND agent=? AND generation=? AND epoch=? AND at<? AND root=1 AND event IN '
+                    "('UserPromptSubmit','Stop','StopFailure','Interrupt','SessionEnd') "
+                    'ORDER BY at DESC,rowid DESC LIMIT 1',(provider,agent,generation,epoch,start-900)).fetchone()
+                if prior:
+                    prior_event,prior_state,prior_at=prior
+                    if (prior_event not in EVENTS or prior_state not in STATES
+                            or type(prior_at) not in (int,float) or not math.isfinite(prior_at)
+                            or not 0<=prior_at<=253402300799):raise ValueError('Invalid agent history')
+                    if prior_event=='UserPromptSubmit':turns[key]=prior_at
         if event=='UserPromptSubmit' and root:turns[key]=at
         if event in ('Stop','StopFailure','Interrupt','SessionEnd') and key in turns:
             identity=(key,turns.pop(key))

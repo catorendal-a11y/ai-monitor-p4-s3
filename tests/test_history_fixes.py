@@ -69,7 +69,9 @@ class HistoryFixTests(unittest.TestCase):
             recorder=HistoryRecorder(self.folder,True);self.addCleanup(recorder.close)
             deadline=time.monotonic()+2;seen=[]
             while time.monotonic()<deadline:
-                marker=json.loads((self.folder/'agent-history-consent.json').read_text())
+                try:marker=json.loads((self.folder/'agent-history-consent.json').read_text())
+                except OSError:
+                    time.sleep(.01);continue
                 if marker['epoch']==recorder.epoch:
                     seen.append(marker.get('expires_at'))
                     if len(set(seen))>1:break
