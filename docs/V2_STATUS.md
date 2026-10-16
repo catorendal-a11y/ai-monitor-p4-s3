@@ -1,8 +1,18 @@
-# v2 completion status — v1.19.1-rc3
+# v2 completion status — v1.19.1-rc4
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc3.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc4.
+
+Rc4 fixes a failure found with the actual Windows Codex client: command hooks
+need PowerShell's call operator before the quoted observer executable. The exact
+older wrapper can be migrated without changing custom hooks or bypassing the
+client's normal hook trust review. Actual local Codex and ZCode turns returned
+OK and delivered WORKING/COMPLETED through the installed host's live USB channel.
+A separately configured Claude Code client using Z.AI GLM also passed a real
+reply and a Read-tool fixture round trip, including READING/COMPLETED events.
+This establishes the tested client paths, not every tool, model or client surface.
+GLM access does not provide native Anthropic Claude models or plan quotas.
 
 Rc3 adds ZCode's documented lifecycle observer, an independent event reader, visible
 agent USB acknowledgment/error status, actual hook-definition checks and exact legacy
@@ -18,17 +28,21 @@ results must be recorded separately rather than inherited from that candidate.
 
 | Area | Implemented | Validation / remaining gate |
 | --- | --- | --- |
-| USB permissions | UI-to-serial final commit, authenticated developer adapter, explicit PC/display opt-in, separate Claude setup/removal | Native real-crypto/LVGL tests pass. Production remains disabled pending physical enrollment/hold/deny/unplug/provider testing postponed by the user. |
-| AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude/ZCode observational integrations | Previously installed host reports both selected quota providers ready on real P4. Rc3 supplies ZCode hooks; genuine client delivery remains distinct from synthetic validation and USB acknowledgment. |
+| USB permissions | UI-to-serial final commit, authenticated developer adapter, explicit PC/display opt-in, separate Claude setup/removal | Native real-crypto/LVGL tests pass. Production remains disabled pending genuine physical enrollment/hold/deny/unplug/provider testing. |
+| AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude/ZCode observational integrations | Installed rc4 host reports Codex/ZCode quota ready on P4. Real local client turns and live USB delivery passed for all three observers; Claude Code with GLM remains activity-only for Claude quota. Local Codex command hooks do not cover cloud-orchestrated Work. |
 | History | Opt-in bounded lifecycle journal, migration, observed sessions/active time/turns, Today/24h/7d | Native/SQLite/USB tests pass. Waiting/gaps excluded, parallel activity unioned, no transcripts or invented task results. Existing user's preference stays off. |
 | Companions | Bounded animation schema 2, mood timing/loops and built-in playback over LZ4/PSRAM cache | Native parsing/player/LVGL tests pass; normal P4 flashed. External pack installation remains a future storage/staging/recovery feature. |
 | Device mirror | Real device RGB565 capture, normal overlays, existing USB owner, explicit PC viewer | Physical P4 capture: 3.094 s directly, 4.922 s through installed host. PSRAM returned to the same free value. Protected screens excluded; no touch/approval. |
 | Packaging | Both board images, five rebuilt Windows executables, checksummed portable ZIP and per-user installer | Actual installer upgrade/startup passed on the existing PC, settings unchanged. A read-only CI workflow can verify clean-profile installation/upgrade/uninstall without release publication. |
 
-493 Python tests and four native LVGL targets pass. P4 normal/developer and S3 firmware builds pass.
-18 frozen modules were compared against tested source. The P4 application-only update was backed up,
-written and digest-verified; NVS, bootloader and partition table were preserved. S3 has no physical
-hardware validation. A long-duration soak is not established by these shorter checks.
+The rc4 suite passed 521 Python tests and the complete native protocol/settings/history/USB/LVGL/mirror
+checks. Both release firmware targets and all five Windows executables were rebuilt from source.
+The rc4 P4 application-only update was backed up, written and independently digest-verified;
+NVS, bootloader and partition table were preserved. Package contents, firmware manifests,
+installer/ZIP SHA256 and ZIP CRC passed verification. The installed host reconnected to COM6 with
+acknowledged live USB after its stale login task was updated to the installed executable and
+invoked successfully. This tests the scheduled action, not a complete Windows reboot. S3 has no
+physical hardware validation. A long-duration soak is not established by these shorter checks.
 
 Windows binaries remain unsigned. No usable code-signing certificate was found on this PC; compiler
 checksums and Microsoft file review are not a publisher signature. Do not disable SmartScreen,
