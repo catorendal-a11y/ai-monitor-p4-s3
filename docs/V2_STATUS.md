@@ -1,8 +1,15 @@
-# v2 completion status — v1.19.1-rc9
+# v2 completion status — v1.19.1-rc10
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc9.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc10.
+
+Rc10 audits desktop and firmware UI action/state flows. It preserves quota errors
+alongside session signals, expires old agent presentation, aligns daily history on
+local calendar boundaries, explains unknown metrics, adds explicit history clearing
+and bounded diagnostics, and scopes upgrade/uninstall cleanup to this installation.
+Companion activation requires the saved board and port. Builds and source tests do
+not establish physical approval, signing, clean-profile or long-endurance gates.
 
 Rc9 fixes the three follow-up audit defects: alternate Claude profile paths,
 transient configuration-read recovery and scalar NVS read/save confirmation.

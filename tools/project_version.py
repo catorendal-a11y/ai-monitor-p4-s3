@@ -13,7 +13,7 @@ import re
 
 # Runtime identity of the Windows host tools. Must equal FW_VERSION in
 # src/config.h; the sync test and the release build enforce this.
-HOST_VERSION = 'v1.19.1-rc9'
+HOST_VERSION = 'v1.19.1-rc10'
 
 _VERSION_DEFINE = re.compile(r'#define\s+FW_VERSION\s+"(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.]+)?)"')
 

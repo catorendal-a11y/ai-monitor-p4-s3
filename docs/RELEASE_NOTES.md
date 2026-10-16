@@ -1,3 +1,19 @@
+# AI Monitor v1.19.1-rc10
+
+- Preserve quota errors and window identity alongside session activity. Token-only
+  signals say Recent activity; expired agent states are marked Last.
+- Align token charts, daily tables, CSV and display history on local calendar days,
+  including 23/25-hour DST boundaries. Preserve raw UTC observations.
+- Explain unknown metrics locally without inventing outcomes or changing USB schema3.
+- Add confirmed local-history clearing with writer revocation, transactional deletion
+  and restoration of a previously running host. Database files stay in place.
+- Export bounded diagnostic metadata with independent provider check/success ages.
+  Reject health and companion activation from another saved board or port.
+- Stop the exact host before upgrades. Uninstall removes only confirmed owned hooks
+  and startup tasks, preserving private data and custom integration metadata.
+- Physical approvals remain disabled. Signing, clean-profile installation and long
+  endurance remain separate validation gates.
+
 # AI Monitor v1.19.1-rc9
 
 - Share the effective Claude configuration root across observer/quota setup,
