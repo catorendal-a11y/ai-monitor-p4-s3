@@ -629,9 +629,17 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   sample.views[0].notice = true; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "ERROR / last good");
   screenshot(screenshots, "nova-session-quota-error");
+  dashboard_show(); dashboard_update();
+  CHECK(strstr(lv_label_get_text(big[0].vendor), "ERROR"));
+  CHECK(strstr(lv_label_get_text(big[0].vendor), "RUNNING"));
+  ui_nova_show();
   sample.views[0].notice = false; sample.views[0].quotaReceivedMs = fakeTick - 300001u; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "STALE / last good");
   screenshot(screenshots, "nova-session-quota-stale");
+  dashboard_show(); dashboard_update();
+  CHECK(strstr(lv_label_get_text(big[0].vendor), "STALE"));
+  CHECK(strstr(lv_label_get_text(big[0].vendor), "RUNNING"));
+  ui_nova_show();
   sample.views[0].quotaReceivedMs = fakeTick; sample.views[0].fetching = true; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "UPDATING / last good");
   sample.views[0].fetching = false; sample.views[0].informational = true;
