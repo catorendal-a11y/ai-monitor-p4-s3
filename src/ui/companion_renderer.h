@@ -19,6 +19,26 @@ class CompanionRenderer {
   bool cache_active() const { return cached_; }
   uint32_t decoded_frames() const { return decoded_; }
   uint32_t decode_failures() const { return failures_; }
+  void reset() {
+    binding_.detach();requested_=nullptr;externalRequested_=false;cached_=false;
+    drawn_=nullptr;target_=nullptr;
+  }
+  bool render_external(lv_obj_t* image,const companions::Frame& frame,companions::Codec codec,
+                       const uint8_t* encoded,int x,int y) {
+    if(!cache_ || !image || !encoded)return false;
+    if(!externalRequested_ || !same_frame(externalFrame_,frame) || externalCodec_!=codec) {
+      externalRequested_=true;externalFrame_=frame;externalCodec_=codec;requested_=nullptr;cached_=false;
+      int slot=-1;
+      for(unsigned i=0;i<2;++i) {
+        const auto* candidate=cache_->slot(i);
+        if(candidate && same_frame(candidate->frame,frame))slot=i;
+      }
+      if(slot<0){slot=cache_->load(frame,codec,encoded,frame.encodedBytes,hash_,decode_);if(slot>=0)++decoded_;}
+      if(slot>=0 && binding_.activate(image,*cache_,slot,x,y)){cached_=true;active_=slot;}
+      else{++failures_;binding_.detach();}
+    }
+    return cached_ && binding_.activate(image,*cache_,active_,x,y);
+  }
   bool render(lv_obj_t* image,const CompanionFrameView& view,int x,int y) {
     if (!image || !view.descriptor)return false;
     if (image != target_ || view.descriptor != drawn_ || lv_image_get_src(image) != view.descriptor) {
@@ -38,6 +58,7 @@ class CompanionRenderer {
       for (unsigned i=0;i<6;++i)if (pose==poses[i])index=i;
       const auto* wanted=&companions::builtin_frames[index+(orbit?6:0)];
       if (wanted!=requested_) {
+        externalRequested_=false;
         requested_=wanted;cached_=false;
         int slot=-1;
         for (unsigned i=0;i<2;++i) {
@@ -65,6 +86,14 @@ class CompanionRenderer {
         orbit ? nova_assets::orbit_origin_y : nova_assets::nova_origin_y},x,y);
   }
  private:
+  static bool same_frame(const companions::Frame& a,const companions::Frame& b) {
+    return a.width==b.width && a.height==b.height && a.originX==b.originX && a.originY==b.originY &&
+      a.encodedBytes==b.encodedBytes && a.decodedBytes==b.decodedBytes &&
+      !memcmp(a.encodedSha256,b.encodedSha256,65) && !memcmp(a.decodedSha256,b.decodedSha256,65);
+  }
+  companions::Frame externalFrame_;
+  companions::Codec externalCodec_=companions::Codec::raw;
+  bool externalRequested_=false;
   const lv_image_dsc_t* drawn_ = nullptr;
   lv_obj_t* target_ = nullptr;
   companions::FrameCache* cache_=nullptr;
