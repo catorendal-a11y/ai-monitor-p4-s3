@@ -716,7 +716,8 @@ void ui_settings_update() {
   if (!lv_obj_is_hidden(quotaOverlay) && millis() - quotaUpdatedAt >= 500u) {
     quotaUpdatedAt = millis(); refresh_quota_choices();
   }
-  const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay);
+  const bool choosing = !lv_obj_is_hidden(appearanceOverlay) || !lv_obj_is_hidden(quotaOverlay) ||
+                        !lv_obj_is_hidden(alertsOverlay) || !lv_obj_is_hidden(nightOverlay);
   if (choosing && lv_obj_get_index(saveFeedback) != static_cast<int32_t>(lv_obj_get_child_count(lv_layer_top())) - 1) lv_obj_move_foreground(saveFeedback);
   const int x = choosing ? 48 : 590, y = choosing ? 446 : 406;
   if (lv_obj_get_x(saveFeedback) != x || lv_obj_get_y(saveFeedback) != y) lv_obj_set_pos(saveFeedback, x, y);
