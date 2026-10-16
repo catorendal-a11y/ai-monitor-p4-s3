@@ -65,9 +65,12 @@
   allocate the P4 LZ4 cache once at startup, verify encoded/decoded bytes, pin live LVGL sources,
   and retain raw work-pose fallback per companion. No allocation per render.
 - `src/app_settings.*`: validated NVS settings/save feedback. Publish loaded settings
-  only after complete reads of all present blobs. Failed/short reads retry without
+  only after verified reads of present scalar values and complete blob reads. Failed/short reads retry without
   publishing defaults or overwriting the saved baseline.
-- `tools/aim_host.py`: polling, retries, config and USB companion.
+- `tools/claude_paths.py`: shared effective Claude root for setup/removal/status,
+  numeric readers and task identity. Explicit fixture homes ignore user env.
+- `tools/aim_host.py`: polling, retries, config and USB companion. Failed reloads
+  retain the accepted signature/config and retry with backoff; new saves bypass it.
 - `tools/process_runtime.py`, `tools/windows_job.py`: scoped background worker startup and verified cleanup; never target unrelated processes by name.
 - `tools/token_activity.py`: read-only numeric token activity.
 - `tools/private_files.py`: create sensitive settings/backups with protected Windows current-user/SYSTEM

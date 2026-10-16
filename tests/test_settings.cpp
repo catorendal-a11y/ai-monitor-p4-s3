@@ -208,6 +208,16 @@ int main() {
     CHECK(save_status()==SaveStatus::saved && fake_nvs::writes==before+1);
     CHECK(fake_nvs::values["brightness"][0]==DISPLAY_DEFAULT_BRIGHTNESS);
   }
+  // Sentinels are real valid stored values, not reserved error values.
+  for (uint8_t level : {uint8_t{0},uint8_t{255}}) {
+    fake_nvs::values.clear();s_loaded=s_loadFailed=false;
+    Preferences stored;stored.putUChar("brightness",level);stored.putUShort("night_start",0);
+    CHECK(ensure_loaded() && brightness()==level && night().start==0);
+    const auto before=fake_nvs::writes;set_brightness(level);CHECK(fake_nvs::writes==before);
+  }
+  fake_nvs::values.clear();s_loaded=s_loadFailed=false;
+  fake_nvs::values["brightness"]={1,2}; // Invalid legacy scalar type still defaults.
+  CHECK(ensure_loaded() && brightness()==DISPLAY_DEFAULT_BRIGHTNESS);
   if (failures) return EXIT_FAILURE;
   std::cout << "NVS persistence, failure/retry, window identity and migration checks passed\n";
 }

@@ -1,3 +1,16 @@
+# AI Monitor v1.19.1-rc9
+
+- Share the effective Claude configuration root across observer/quota setup,
+  removal/status checks, permission setup, local token reading and task identity.
+  Respect CLAUDE_CONFIG_DIR; explicit fixture homes stay isolated from user env.
+- Retry failed configuration reads after a bounded two-second delay without
+  requiring another save. A changed file bypasses the previous failure delay;
+  the last valid configuration remains active until validation succeeds.
+- Verify present scalar NVS reads before publishing settings/saved baselines.
+  Preferences fallback results cannot falsely certify a save. Preserve missing
+  or malformed legacy defaults and recover through the existing retry path.
+- Preserve the physical-permission release gate and existing USB ownership.
+
 # AI Monitor v1.19.1-rc8
 
 - Serialize saved history preferences, consent revocation and recorder/hook writes.

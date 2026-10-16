@@ -83,6 +83,8 @@ fail closed. TaskGet alone does not establish when an old task completed; pre-ve
 failed task-update calls never increase completion totals. Counts are distinct tasks per local day,
 so duplicate delivery and repeated completion observations cannot inflate them.
 
+Claude setup, link removal/status and local activity readers also honor
+`CLAUDE_CONFIG_DIR`. An explicitly supplied test home remains isolated.
 Task identities use the effective Claude configuration root and task-list ID
 (`CLAUDE_CODE_TASK_LIST_ID`, otherwise the session ID). Shared lists deduplicate
 across sessions while separate lists remain distinct. Rc8 uses versioned hashes.
