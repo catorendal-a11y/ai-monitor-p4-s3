@@ -14,6 +14,27 @@ from textual.widgets import TabbedContent,Static
 
 
 class TerminalDataTests(unittest.TestCase):
+    def test_reference_tables_keep_activity_only_and_old_states_truthful(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import provider_table,nova_panel,agent_table
+        stream=StringIO();console=Console(file=stream,width=100,color_system=None)
+        console.print(provider_table([dict(name='Claude Code',remaining=None,health='activity_only',quota_note='No recorded quota')]))
+        text=stream.getvalue();self.assertIn('Activity only',text);self.assertIn('Quota unavailable',text)
+        self.assertNotIn('% left',text)
+        stream.seek(0);stream.truncate()
+        rows=[dict(provider='Codex',id='test',state='Last: WORKING',age=45,elapsed=None)]
+        console.print(nova_panel(rows));console.print(agent_table(rows))
+        self.assertIn('No fresh events',stream.getvalue());self.assertIn('Last: WORKING',stream.getvalue())
+
+    def test_extra_provider_rows_remain_scrollable_in_reference_layout(self):
+        # Renderable data keeps every selection; the fixed overview panel scrolls its content.
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import provider_table
+        rows=[dict(name='Provider '+str(i),remaining=i*10,health='ready',quota_note='Recorded 1m ago / 5h window') for i in range(8)]
+        stream=StringIO();Console(file=stream,width=70).print(provider_table(rows))
+        self.assertIn('Provider 7',stream.getvalue())
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
@@ -96,7 +117,7 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
             quota=main.query_one('#quota',Static)
             agents=main.query_one('#overview-agents',Static)
             self.assertNotIsInstance(quota.render(),str)
-            self.assertIn('Provider',str(agents.render()))
+            self.assertIn('Provider',app.export_screenshot())
             self.assertGreater(main.query_one('#connection').region.y,agents.region.y)
     async def test_operation_forms_cancel_without_backend_calls(self):
         from unittest.mock import Mock

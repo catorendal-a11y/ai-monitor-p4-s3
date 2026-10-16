@@ -16,11 +16,11 @@ its verified board images and flasher. Missing components are errors, not downlo
 
 | Page | Functions |
 | --- | --- |
-| Overview | Provider health, recorded quota, agents, Start host and Stop host |
+| Overview | Reference-style provider table, recorded quota, device/NOVA panels and observed-agent table |
 | Agents | State/age/elapsed time, AI setup report, event hooks, Claude quota bridge, official Codex setup/sign-in |
 | History | Daily metrics, 7/30 day report with quota windows and forecasts, CSV, confirmed clearing, diagnostic export |
 | Device | Port scan, selected-board check, firmware preparation/write, real device pixels as terminal cells, companion library/import/selection/removal, physical PC enrollment |
-| Settings | Board/port/providers, quota interval, masked optional key, key removal, history and shared preferences, redacted log, invalid-settings recovery |
+| Settings | Start/Stop host, board/port/providers, quota interval, masked optional key, key removal, history and shared preferences, redacted log, invalid-settings recovery |
 
 Keys: **1–5** change page, **Tab** moves focus, **Enter** activates controls,
 arrows and **PageUp/PageDown** scroll, **R** reloads metadata, **?** toggles help,

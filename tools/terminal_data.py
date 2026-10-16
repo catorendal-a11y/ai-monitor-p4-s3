@@ -42,6 +42,8 @@ def read_dashboard(root,now=None):
     result['device']=dict(board=safe_text(health.get('board',config.get('board','Unknown')),50),
         port=safe_text(health.get('port',config.get('port','Unknown')),30),
         firmware=safe_text(hardware.get('firmwareVersion','Unknown'),40),
+        connected=health.get('state')=='connected',
+        sync_age=max(0,int(now-health['updated_at'])) if 'updated_at' in health else None,
         age=max(0,int(now-health['hardware_at'])) if 'hardware_at' in health else None)
     history=compact_history(root/'tools/activity',providers,True,now=now) if enabled else {'providers':[],'error':False}
     if history.get('error'):result['error']='History unavailable. Values remain unknown.'

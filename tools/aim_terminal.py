@@ -6,13 +6,13 @@ import sys
 import json
 from textual.app import App,ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal,VerticalScroll
-from textual.widgets import Button,Footer,Static,TabbedContent,TabPane
+from textual.containers import Horizontal,Vertical,VerticalScroll
+from textual.widgets import Button,Static,TabbedContent,TabPane
 from host_security import safe_text
-from project_version import HOST_VERSION
 from terminal_data import default_root,read_dashboard
 from terminal_actions import TerminalActions
 from terminal_forms import ActionForm,ResultScreen,settings_form,settings_values
+from terminal_presentation import provider_table,agent_table,device_panel,nova_panel
 
 
 def number(value):
@@ -21,18 +21,6 @@ def number(value):
 
 def duration(value):
     return 'Unknown' if value is None else f'{value//3600}:{value//60%60:02}:{value%60:02}'
-
-
-def quota_text(rows):
-    lines=['RECORDED PROVIDER QUOTA','']
-    for row in rows:
-        remaining=row['remaining']
-        bar='-'*20 if remaining is None else '#'*round(remaining/5)+'-'*(20-round(remaining/5))
-        percent='Unknown' if remaining is None else f'{remaining:g}% left'
-        lines.extend([f"{row['name']} / {row['health'].replace('_',' ')}",
-                      f'[{bar}]  {percent}',row['quota_note'],''])
-    if not rows:lines.append('Select providers in the desktop app.')
-    return '\n'.join(lines)
 
 
 def agents_text(rows):
@@ -47,24 +35,32 @@ def agents_text(rows):
 class TerminalApp(App):
     TITLE='AI Monitor — Terminal'
     CSS='''
-    Screen { background: #0c1215; color: #eff5f3; }
-    #brand { height: 3; padding: 1 2 0 2; color: #35d07f; text-style: bold; }
-    #connection { height: auto; padding: 0 2; color: #a3b2bc; }
+    Screen { background: #101519; color: #eff5f3; }
+    #brand { height: 3; padding: 1 2 0 2; color: #95ffc2; text-style: bold; }
+    #connection { height: 1; width: 1fr; color: #95ffc2; }
+    #statusbar { height: 2; border-top: solid #87929a; padding: 0 2; }
+    #shortcuts { height: 1; width: auto; color: #a5adb7; }
     TabbedContent { height: 1fr; }
-    Tabs { background: #11191d; }
-    Tab.-active { color: #35d07f; text-style: bold; }
+    Tabs { background: #101519; height: 3; border-bottom: solid #87929a; }
+    Tab { padding: 0 2; height: 2; color: #a5adb7; }
+    Tab.-active { background: #95ffc2; color: #101519; text-style: bold; }
+    Underline { display: none; }
     TabPane { padding: 1 2; }
     VerticalScroll { height: 1fr; }
-    .panel { border: round #263239; padding: 1 2; height: auto; margin-bottom: 1; }
-    #overview-top { height: auto; }
-    #quota { width: 2fr; }
-    #overview-device { width: 1fr; margin-left: 1; }
+    .panel { border: solid #87929a; padding: 0 1; height: auto; margin-bottom: 1; }
+    #overview-top { height: 18; margin-bottom: 1; }
+    #quota-wrap { width: 2fr; height: 1fr; margin-right: 1; margin-bottom: 0; }
+    #quota { height: auto; }
+    #overview-side { width: 1fr; height: 1fr; }
+    #overview-device { height: 9; }
+    #nova-panel { height: 8; margin-bottom: 0; }
+    #overview-agents { min-height: 8; }
     #notice { height: auto; max-height: 3; color: #ffcf66; padding: 0 2; }
     #help { display: none; height: auto; padding: 1 2; border: round #35d07f; }
     .actions { layout: horizontal; height: auto; margin-bottom: 1; }
     .actions Button { margin-right: 1; min-width: 12; }
-    Footer { background: #11191d; }
     '''
+    ENABLE_COMMAND_PALETTE=False
     BINDINGS=[Binding(str(i),f"page('{page}')",page.title(),show=False,priority=True)
               for i,page in enumerate(('overview','agents','history','device','settings'),1)]+[
         Binding('r','reload','Reload',priority=True),Binding('?','help','Help',priority=True),
@@ -85,15 +81,16 @@ class TerminalApp(App):
                 for caption,identifier in items[index:index+2]:yield Button(caption,id=identifier)
 
     def compose(self)->ComposeResult:
-        yield Static(f'AI MONITOR  |  NOVA / Terminal  {HOST_VERSION}',id='brand',markup=False)
-        yield Static('Reading local status...',id='connection',markup=False)
+        yield Static('AI MONITOR  |  NOVA / USB companion',id='brand',markup=False)
         with TabbedContent(id='pages'):
             with TabPane('1 Overview',id='overview'):
                 with VerticalScroll():
-                    yield from self.actions(('Start host','start'),('Stop host','stop'))
                     with Horizontal(id='overview-top'):
-                        yield Static('Loading...',id='quota',classes='panel',markup=False)
-                        yield Static('DEVICE',id='overview-device',classes='panel',markup=False)
+                        with VerticalScroll(id='quota-wrap',classes='panel'):
+                            yield Static('Loading...',id='quota',markup=False)
+                        with Vertical(id='overview-side'):
+                            yield Static('DEVICE',id='overview-device',classes='panel',markup=False)
+                            yield Static('NOVA',id='nova-panel',classes='panel',markup=False)
                     yield Static('OBSERVED AGENTS',id='overview-agents',classes='panel',markup=False)
             with TabPane('2 Agents',id='agents'):
                 with VerticalScroll():
@@ -109,6 +106,7 @@ class TerminalApp(App):
                     yield Static('',id='device-content',classes='panel',markup=False)
             with TabPane('5 Settings',id='settings'):
                 with VerticalScroll():
+                    yield from self.actions(('Start host','start'),('Stop host','stop'))
                     yield from self.actions(('Edit settings','settings'),('Recent host log','log'),('Recover invalid settings','recover'))
                     yield Static('',id='settings-content',classes='panel',markup=False)
         yield Static('',id='notice',markup=False)
@@ -117,7 +115,9 @@ class TerminalApp(App):
                      'Quota comes from optional local history; its recording age is always shown.\n'
                      'Tab / Enter activate controls. Escape cancels forms. Settings and host controls use the shared backend.',
                      id='help',markup=False)
-        yield Footer()
+        with Horizontal(id='statusbar'):
+            yield Static('Reading local status...',id='connection',markup=False)
+            yield Static('Tab Navigate  Enter Open  R Reload  ? Help  Q Quit',id='shortcuts',markup=False)
 
     def on_mount(self):
         self.apply_width(self.size.width)
@@ -130,9 +130,14 @@ class TerminalApp(App):
     def apply_width(self,width):
         main=self.screen_stack[0]
         main.query_one('#overview-top').styles.layout='vertical' if width<90 else 'horizontal'
-        main.query_one('#overview-device').styles.width='1fr' if width>=90 else '100%'
-        main.query_one('#overview-device').styles.margin=(0,0,1,1 if width>=90 else 0)
-        main.query_one('#quota').styles.width='2fr' if width>=90 else '100%'
+        main.query_one('#overview-top').styles.height=18 if width>=90 else 'auto'
+        main.query_one('#overview-side').styles.width='1fr' if width>=90 else '100%'
+        main.query_one('#overview-side').styles.height='1fr' if width>=90 else 'auto'
+        main.query_one('#quota-wrap').styles.width='2fr' if width>=90 else '100%'
+        main.query_one('#quota-wrap').styles.height='1fr' if width>=90 else 'auto'
+        main.query_one('#quota-wrap').styles.margin=(0,1 if width>=90 else 0,0 if width>=90 else 1,0)
+        main.query_one('#shortcuts').display=width>=100
+        if self.latest:main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120))
 
     def check_action(self,action,parameters):
         # Global shortcuts must never steal digits, q, r or ? from form inputs.
@@ -182,13 +187,14 @@ class TerminalApp(App):
             self.screen_stack[0].query_one('Button#stop').disabled=not value.get('running',False)
         count=len(value['agents'])
         update('#connection',value['connection']+f"  |  {count} observed session"+('' if count==1 else 's')+'  |  History '+('enabled' if value['history_enabled'] else 'disabled'))
-        update('#quota',quota_text(value['providers']))
-        agents=agents_text(value['agents']);update('#agents-content',agents);update('#overview-agents',agents)
+        update('#quota',provider_table(value['providers'],compact=self.size.width<120))
+        agents=agents_text(value['agents']);update('#agents-content',agents);update('#overview-agents',agent_table(value['agents']))
         device=value['device']
         stamp='Unknown observation age' if device.get('age') is None else f"Observed {device['age']}s ago"
         description='DEVICE\n\n'+f"{device.get('board','Unknown')}\n{device.get('port','Unknown')}\nFirmware {device.get('firmware','Unknown')}\n{stamp}"
         update('#device-content',description+'\n\nStatus comes from the existing host.\nNo second USB connection is opened.')
-        update('#overview-device',description+'\n\n  .-----.'+'\n  | ^ ^ |\n  |  _  |\n  `-----\'\n    NOVA')
+        update('#overview-device',device_panel(device,value['connection']))
+        update('#nova-panel',nova_panel(value['agents']))
         lines=['LOCAL HISTORY / TODAY','']
         if not value['history_enabled']:lines.append('History is disabled. Enable it in the desktop app to collect future observations.')
         for row in value['history']:
