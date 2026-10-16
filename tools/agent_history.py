@@ -35,7 +35,7 @@ def create_schema(database):
 
 def record(directory,provider,agent,generation,event,state,at,root):
     """Best effort on the hook process, with a 20ms SQLite lock deadline. Never fails a hook."""
-    if (provider not in ('claude','codex') or not isinstance(agent,str) or not re.fullmatch('[0-9a-f]{64}',agent)
+    if (provider not in ('claude','codex','zcode') or not isinstance(agent,str) or not re.fullmatch('[0-9a-f]{64}',agent)
             or type(generation) is not int or not 0<generation<(1<<63)
             or not isinstance(event,str) or event not in EVENTS or not isinstance(state,str) or state not in STATES
             or type(at) not in (int,float) or not math.isfinite(at) or not 0<=at<=253402300799 or type(root) is not bool):return
