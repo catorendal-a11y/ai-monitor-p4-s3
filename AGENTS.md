@@ -48,6 +48,11 @@
   and unobserved gaps are not active time; concurrent intervals are unioned. Turns are not tasks.
 - `src/companions/animation_types.h`, `animation.h`, `builtin_animation.h`: bounded versioned mood
   sequences and UI-owned playback. No allocation per frame, inferred phases or cache lifetime changes.
+- `src/companions/pack_store.h`, `runtime_esp.*`, `tools/companion_packages.py`, `companion_service.py`:
+  data-only external P4 packs. Preserve bounded PC storage and both preallocated RAM banks, complete
+  encoded/decoded validation, exact boot/nonce/offset receipts and UI-only bank activation. Never
+  extract/execute archives, format display storage, reuse active-bank bytes or add a serial owner.
+  Read-only library checks cannot create directories. Failed transfers retain the previous pack.
 - `src/mirror/`, `tools/usb_mirror.py`, `mirror_service.py`, `desktop_mirror.py`: real read-only USB
   pixels through the existing serial owner. Bound coverage/RLE/nonce/leases and scrub/free buffers.
   Never expose protected screens, virtual touch or approval authority. Captures are not history.

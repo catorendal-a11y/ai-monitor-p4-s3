@@ -75,7 +75,7 @@ class CompanionView(QWidget):
 
     def choose_file(self):
         if self.worker is not None:return
-        path,_=QFileDialog.getOpenFileName(self,'Import companion pack','','Companion packs (*.zip *.aimcompanion)')
+        path,_=QFileDialog.getOpenFileName(self,'Import companion pack',str(self.owner.root/'companion-packs'),'Companion packs (*.zip *.aimcompanion)')
         if path:self.import_path(path)
 
     def import_path(self,path):

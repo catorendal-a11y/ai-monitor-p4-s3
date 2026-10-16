@@ -1,3 +1,19 @@
+# AI Monitor v1.19.1-rc6
+
+- Import verified version-2 companion ZIPs through the desktop Companions tab.
+  A bounded PC library retains original archives/notices and restores the
+  selection through the existing USB owner after restart. P4 verifies staging
+  completely before UI activation; interrupted replacement preserves the old pack.
+  No filesystem formatting, wireless transport or second serial owner is used.
+- Add verified successful Claude TaskCreate/TaskUpdate post-tool outcomes to
+  opt-in history. Store hashed identities and fixed states only. Pre-veto hooks,
+  TaskGet snapshots and completed turns never become task completion counts.
+- Deliver task counters with history schema 3 while preserving schema 1/2
+  compatibility. Show client-reported tasks separately on PC and display.
+- Export reproducible NOVA/ORBIT packs using committed original pixel arrays
+  and animation timings, exact hashes, LZ4 blocks and the unchanged MIT notice.
+- Physical approval remains disabled until its genuine device/provider gates pass.
+
 # AI Monitor v1.19.1-rc5
 
 - Retain ZCode's documented lifecycle events in opt-in history. The live observer

@@ -147,8 +147,9 @@ Checkpoint: compact Today/24h/7d token and reliable quota summaries are implemen
 and installed on P4. Atomic synthetic USB history delivery passed without changing activity counters.
 The new candidate adds a bounded lifecycle journal and observed session/active-time/turn summaries.
 It migrates the existing numeric backend, excludes waiting/gaps and unions overlapping agent activity.
-Task success is not inferred from pre-veto hooks; unsupported metrics remain unavailable.
-History is opt-in, stays off in the user's saved preferences, and never transfers the SQLite database.
+Task success is not inferred from pre-veto hooks. Rc6 adds successful Claude post-tool task
+transitions; unsupported metrics remain unavailable. History is opt-in and never transfers
+the SQLite database. Current local preferences are kept outside public source.
 See [device history](../docs/DEVICE_HISTORY.md) and [validation](../docs/V2_VALIDATION.md).
 
 Reuse the existing PC SQLite history backend. Aggregate compact today/24-hour/7-day summaries;
@@ -160,8 +161,10 @@ Add small graphs and a daily AI summary; unsupported values remain unavailable.
 
 Checkpoint: bounded schema 2 and allocation-free playback are implemented in the candidate.
 Built-in NOVA/ORBIT now use multi-pose mood sequences through the existing renderer/cache.
-See [animation format](../docs/COMPANION_ANIMATIONS.md). External installation/activation remains
-disabled pending its independent storage/staging/recovery gates; microSD is not required.
+See [animation format](../docs/COMPANION_ANIMATIONS.md). Rc6 implements bounded PC import/storage
+and verified dual-bank P4 RAM staging/activation with automatic host restoration. Interrupted
+replacement retains the old pack. Native validation and actual device evidence remain separate;
+microSD is not required and no device filesystem is formatted.
 
 Separate mood from animation before public runtime packs. Support bounded multi-frame states,
 frame duration, loops/nonloops, idle/blink/work/testing/attention/success/error sequences and runtime

@@ -31,7 +31,8 @@ and its matching Stop/StopFailure. Waiting is excluded; intervals longer than 15
 Concurrent agent activity is unioned, rather than counted twice. Time means observed intervals,
 not guaranteed total work time. Missing events/unsupported providers stay `--`.
 These are turns, not completed tasks. TaskCreated/TaskCompleted hooks can precede a veto and do not
-prove task success. Task totals remain unavailable until an integration supplies confirmed results.
+prove task success. Claude Code task totals use a separate confirmed post-tool contract, described
+below. Unsupported providers/metrics remain unavailable.
 The live-agent screen's current session timers remain a separate source/domain.
 
 The PC History tab also displays a daily agent summary for the selected provider over seven or
@@ -46,8 +47,9 @@ lifecycle dates use the explicit `local_date` column; numeric quota timestamps r
 Unknown metrics are omitted rather than exported as zero. A zero failed-turn count means real
 completed/failed turn evidence was observed without failures; it is not a count of task success.
 
-History protocol 2 adds a strictly bounded `agents` summary to each provider packet. Schema 1 is
-still accepted; the host sends schema 1 to old historyProtocol-1 devices. No event log/database is
+History protocol 2 adds a strictly bounded `agents` summary to each provider packet. Schema 3 adds
+nullable created/started/completed/failed task counters. Schemas 1 and 2 are still accepted and
+the host sends only the fields supported by the connected device. No event log/database is
 transferred to the display. Collection stops when local history is disabled or the recorder shuts down.
 
 One coalesced background reader queries the existing database with its hard SQLite deadline.
@@ -58,3 +60,30 @@ snapshot and cannot change quota, token activity, live agents or permission auth
 
 Synthetic tests cover local-day boundaries, gaps, overflow, invalid schema, future timestamps,
 source selection changes, receipt correlation, atomic transfer/replay/expiry and actual LVGL layout.
+
+## Client-reported task outcomes
+
+Claude Code's successful `PostToolUse` result for TaskCreate confirms creation. TaskUpdate counts
+a start/completion only when `success` is exactly true, input/response task IDs agree, and the
+structured statusChange confirms a real transition. The contract was checked with the installed
+Claude Code 2.1.296 client using an isolated own task and TaskGet readback. Other response shapes
+fail closed. TaskGet alone does not establish when an old task completed; pre-veto hooks and
+failed task-update calls never increase completion totals. Counts are distinct tasks per local day,
+so duplicate delivery and repeated completion observations cannot inflate them.
+
+The existing opt-in SQLite backend gets a bounded `task_events` table while retaining schema-2
+numeric compatibility. Only hashed task/session/tool-call identities, generation, consent epoch,
+fixed event and timestamp are retained. Task subjects, descriptions, arbitrary arguments and tool
+output are not stored or sent to the display. The table has a 50,000-event/30-day cap and uses the
+same short hook-write deadline and consent-revocation checks as lifecycle history.
+
+The PC table/CSV and P4 history distinguish client-reported tasks from turns. A client marking
+work complete is not proof that builds/tests passed. Failed-task counts stay unknown because
+the verified Claude TaskUpdate contract does not report task failure. Codex/ZCode task outcomes
+also stay unknown until a supported confirmed interface is available; their session/turn history
+continues to work.
+
+Custom model IDs such as GLM may need `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` in the Claude client's
+environment to expose its task tools. This does not grant file/shell permissions or enable physical
+approvals. See the official [task tools reference](https://code.claude.com/docs/en/tools-reference#task-tool-availability)
+and [hook decision contract](https://code.claude.com/docs/en/hooks#taskcompleted).

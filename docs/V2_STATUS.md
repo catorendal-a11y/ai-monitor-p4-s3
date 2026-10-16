@@ -1,8 +1,19 @@
-# v2 completion status — v1.19.1-rc5
+# v2 completion status — v1.19.1-rc6
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc5.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc6.
+
+Rc6 adds data-only companion import, a bounded persistent PC library and automatic
+USB restoration into two preallocated P4 RAM banks. Only a complete, decoded/hash-
+verified pack can be adopted by the UI owner. Interruptions retain the old pack.
+Built-ins remain available; S3 does not advertise external pack support.
+
+Claude client task counts now come from verified successful TaskCreate/TaskUpdate
+post-tool results, separately from turns and pre-veto hooks. Unknown provider or
+failure metrics remain unknown. The PC daily table/CSV and schema-3 P4 history
+carry only counts. Old history schemas remain supported. The exact packaged
+client/device tests and endurance result are recorded separately from source tests.
 
 Rc5 fixes ZCode lifecycle events being silently omitted from opt-in history. The
 desktop History tab now displays and exports daily observed sessions, active
@@ -38,8 +49,8 @@ results must be recorded separately rather than inherited from that candidate.
 | --- | --- | --- |
 | USB permissions | UI-to-serial final commit, authenticated developer adapter, explicit PC/display opt-in, separate Claude setup/removal | Native real-crypto/LVGL tests pass. Production remains disabled pending genuine physical enrollment/hold/deny/unplug/provider testing. |
 | AI monitoring | Codex/ZCode quota and recorded token activity; documented Codex/Claude/ZCode observational integrations | Installed rc4 host reports Codex/ZCode quota ready on P4. Real local client turns and live USB delivery passed for all three observers; Claude Code with GLM remains activity-only for Claude quota. Local Codex command hooks do not cover cloud-orchestrated Work. |
-| History | Opt-in bounded lifecycle journal, migration, observed sessions/active time/turns, Today/24h/7d and desktop daily summary/CSV | Native/SQLite/USB and desktop tests pass. Waiting/gaps excluded, parallel activity unioned, no transcripts or invented task results. Collection requires opt-in; saved numeric history can be read without restarting collection. |
-| Companions | Bounded animation schema 2, mood timing/loops and built-in playback over LZ4/PSRAM cache | Native parsing/player/LVGL tests pass; normal P4 flashed. External pack installation remains a future storage/staging/recovery feature. |
+| History | Opt-in bounded lifecycle/task journal, migration, observed sessions/active time/turns, confirmed Claude client task transitions, Today/24h/7d and desktop daily summary/CSV | Native/SQLite/USB and desktop tests pass. Waiting/gaps excluded, parallel activity unioned, no task text or invented results. Task completion is a client report, not proof that tests passed. Unsupported task metrics remain unknown. |
+| Companions | Bounded animation schema 2, PC import/library, staged existing-owner USB transfer, UI activation and LZ4 cache | Native parsing/player/transfer/LVGL tests and both board builds pass. P4 owns preallocated active/staging banks; PC storage restores the selection after restart. No display filesystem formatting or microSD dependency. Physical validation is distinct from native evidence. |
 | Device mirror | Real device RGB565 capture, normal overlays, existing USB owner, explicit PC viewer | Physical P4 capture: 3.094 s directly, 4.922 s through installed host. PSRAM returned to the same free value. Protected screens excluded; no touch/approval. |
 | Packaging | Both board images, five rebuilt Windows executables, checksummed portable ZIP and per-user installer | Actual installer upgrade/startup passed on the existing PC, settings unchanged. A read-only CI workflow can verify clean-profile installation/upgrade/uninstall without release publication. |
 
@@ -56,8 +67,8 @@ Windows binaries remain unsigned. No usable code-signing certificate was found o
 checksums and Microsoft file review are not a publisher signature. Do not disable SmartScreen,
 install a fake trusted root or describe unsigned artifacts as signed.
 
-Later v2 items remain deliberately separate: confirmed build/test/task outcomes, Git status, audio,
-public companion-pack installation and configurable layouts. Bluetooth remains permanently excluded.
+Later v2 items remain deliberately separate: confirmed build/test results, additional providers'
+task outcomes, Git status, audio and configurable layouts. Bluetooth remains permanently excluded.
 
 Evidence and contracts: [validation log](V2_VALIDATION.md), [permissions](USB_PERMISSION_HELPER.md),
 [history](DEVICE_HISTORY.md), [animations](COMPANION_ANIMATIONS.md), [mirror](DEVICE_MIRROR.md).

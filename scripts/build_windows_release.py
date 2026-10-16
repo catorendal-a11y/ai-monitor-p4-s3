@@ -173,6 +173,8 @@ def build_package(output, package, version, args):
     sources.mkdir()
     run('-m', 'pip', 'download', '--no-deps', '--no-binary=:all:', '--dest', str(sources), 'esptool==5.4.0')
     collect_qt_sources(sources, args.qt_source_dir)
+    from build_companion_packages import build as build_companion
+    for robot in ('nova','orbit'):build_companion(robot,package/'companion-packs')
     hashes = []
     for path in sorted(package.rglob('*')):
         if path.is_file():
