@@ -82,6 +82,7 @@
   no model, host or serial control, transcripts or tool decisions. Codex's wrapper emits only neutral JSON.
 - `tools/usb_live.py`: read-only live metadata through the existing serial owner, separate from quota.
 - `tools/aim_desktop.py`, `tools/desktop_window.py`, `tools/desktop_support.py`: graphical NOVA control panel and validated actions. Qt mutations stay on the main thread; blocking actions use one worker.
+- `tools/aim_terminal.py`, `terminal_forms.py`, `terminal_data.py`, `terminal_actions.py`: terminal UI using shared desktop operations. Preserve one action worker, epoch-bound reads, masked draft secrets, cancel-without-effects, typed firmware/history confirmations and existing serial ownership. Never infer agents from providers or enable production approvals.
 - Desktop tests use an offscreen Qt window with synthetic configuration, without provider requests or hardware writes.
 - `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
 - `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.

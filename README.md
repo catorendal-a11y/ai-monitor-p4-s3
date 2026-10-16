@@ -8,6 +8,11 @@ v1.19.0. Physical permission control is a disabled preview until hardware/provid
 
 ![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
 
+An interactive [terminal application](docs/TERMINAL.md) is available from source:
+run `AI-Monitor-Terminal.bat` after installing `tools/requirements.txt`. It provides
+setup, host controls, integrations, history, firmware and companion operations
+through the shared backend, with keyboard navigation and cancelable forms.
+
 <p align="center">
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/latest"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>

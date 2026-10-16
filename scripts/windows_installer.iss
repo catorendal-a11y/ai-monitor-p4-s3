@@ -48,7 +48,6 @@ Source: "{#PackageDir}\AI-Monitor-Console.exe"; Flags: dontcopy
 
 [Icons]
 Name: "{userprograms}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: "{app}"
-Name: "{userprograms}\AI Monitor Terminal"; Filename: "{app}\AI-Monitor-Terminal.exe"; WorkingDir: "{app}"; Check: FileExists(ExpandConstant('{app}\AI-Monitor-Terminal.exe'))
 Name: "{userdesktop}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]

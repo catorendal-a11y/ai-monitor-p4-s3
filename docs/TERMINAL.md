@@ -1,45 +1,59 @@
-# AI Monitor Terminal
+# AI Monitor terminal application
 
-A real Windows terminal companion with Overview, Agents, History, Device and
-Settings pages. It reuses existing local metadata without provider requests,
-model turns, history writes, extra serial ownership or host lifecycle changes.
-
-Run `AI-Monitor-Terminal.exe` in Windows Terminal or double-click it. Keep the
-normal AI Monitor host running. The standalone program automatically finds the
-existing per-user installation. Use `--root "C:\path\to\AI Monitor"` to select
-another installation explicitly. The terminal does not configure or start a host.
-
-From source, install `tools/requirements.txt`, then run `AI-Monitor-Terminal.bat`
-or `.venv\Scripts\python.exe tools/aim_terminal.py --root "C:\path\to\AI Monitor"`.
-The source launcher uses its own configured project when present, then the existing
-per-user installation. No configuration or credentials are copied into a release.
-
-Keys: **1–5** change page, **Tab** moves focus, arrows and **PageUp/PageDown**
-scroll, **R** reloads local metadata, **?** toggles help, **Esc** closes help and
-**Q** exits. Mouse selection works on the tabs. Narrow windows stack the overview
-panels vertically; content remains scrollable.
-
-Quota percentages come from the optional local numeric history and are always
-labeled **Recorded**, with their age and window. They are not fresh API receipts.
-When history is off or a quota was not recorded today, the value is unknown.
-Provider health is separate from a recorded percentage. Agents contains only
-observer metadata: a short opaque ID, reported state, elapsed time and event age.
-States older than 30 seconds say **Last**. Selecting a provider creates no agent.
-Elapsed run time includes waiting and is not active time. Unknown history gaps
-stay unknown. Device identity is the last observation held by the existing host;
-its observation age is displayed. Credentials and conversations are never shown.
-
-Settings is a read-only summary. Use the existing desktop app to change settings,
-credentials, consent, integrations or host lifecycle. Closing this terminal leaves
-the host and firmware untouched. No firmware update is required for this companion.
-
-Build a standalone executable and ZIP using:
+An interactive Textual application using the same validated operations as the
+desktop app. It runs inside an existing terminal; no separate executable is required.
 
 ```powershell
-.\.venv\Scripts\python.exe scripts/build_terminal.py --output outputs/terminal-v1.19.1-rc11
+.\.venv\Scripts\python.exe -m pip install -r tools/requirements.txt
+.\AI-Monitor-Terminal.bat
 ```
 
-Use a new output directory for a subsequent build. The bundle includes source,
-license notices and hashes. `AI-Monitor-Terminal.exe --check` runs a synthetic
-headless smoke test without accessing the user's configuration or device.
-The normal Windows release builder also includes this terminal in future builds.
+Or run `.venv\Scripts\python.exe tools/aim_terminal.py` directly. The terminal
+uses the existing per-user installation when present, otherwise this source project.
+Use `--root "C:\path\to\AI Monitor"` for an explicit project or package. A complete
+source checkout/package with host tools is required; firmware operations also need
+its verified board images and flasher. Missing components are errors, not downloads.
+
+| Page | Functions |
+| --- | --- |
+| Overview | Provider health, recorded quota, agents, Start host and Stop host |
+| Agents | State/age/elapsed time, AI setup report, event hooks, Claude quota bridge, official Codex setup/sign-in |
+| History | Daily metrics, 7/30 day report with quota windows and forecasts, CSV, confirmed clearing, diagnostic export |
+| Device | Port scan, selected-board check, firmware preparation/write, real device pixels as terminal cells, companion library/import/selection/removal, physical PC enrollment |
+| Settings | Board/port/providers, quota interval, masked optional key, key removal, history and shared preferences, redacted log, invalid-settings recovery |
+
+Keys: **1–5** change page, **Tab** moves focus, **Enter** activates controls,
+arrows and **PageUp/PageDown** scroll, **R** reloads metadata, **?** toggles help,
+**Esc** cancels/closes forms and **Q** exits. Shortcuts do not steal text typed in
+forms. Narrow windows stack panels vertically. Terminal fonts/window management
+belong to the terminal emulator; tray/minimize settings apply to the desktop app.
+
+Canceling a form runs no action. Saves reuse desktop validation and protected
+storage, preserving keys unless explicitly replaced/cleared. One action worker
+runs at a time; read results predating a mutation are discarded. Quit waits for
+an active operation. Saved auto-start and keep-host-on-close policies are honored.
+Navigating does not save settings. Export files are published exclusively: existing
+or concurrently created files are never overwritten.
+
+Firmware preparation shows the exact board/port/operation before typed **FLASH**
+confirmation. The shared writer revalidates selection/files, stops the owned host
+and verifies device identity. Writes are never retried automatically. Clearing
+requires **CLEAR** and reuses consent revocation, transactional deletion and prior
+host restoration. Provider links/removal and invalid-settings recovery also have
+explicit confirmations.
+
+Monitoring uses metadata and numeric history without provider requests or model
+turns. Quota is labeled **Recorded** with age/window; missing or disabled history
+means unknown percentages. Selecting a provider creates no agent row. Observer
+states older than 30 seconds say **Last**. Elapsed run time includes waiting and
+is not active time. Unknown metrics/gaps remain unknown. Device facts show age.
+Credentials and conversations are never displayed or exported.
+
+Pixels and companion transfers use the existing host owner. Protected screens and
+virtual touch stay excluded. Enrollment retains physical comparison, timeout and
+hold requirements. Production AI approval remains disabled. Terminal tests do not
+establish physical touch/approval or S3 hardware validation.
+
+`python tools/aim_terminal.py --check` runs a headless synthetic smoke check without
+private settings/hardware. `tests/test_terminal*.py` cover keyboard, resizing,
+cancellation, privacy and the shared action guards.

@@ -14,15 +14,15 @@ from live_events import live_agents
 def default_root():
     """Reuse the installed application when the terminal is a standalone companion."""
     own=Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parents[1]
-    if (own/'tools/aim_host.json').is_file():return own
     installed=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'Programs/AI Monitor'
+    if getattr(sys,'frozen',False) and (own/'tools/aim_host.json').is_file():return own
     return installed if (installed/'tools/aim_host.json').is_file() else own
 
 
 def read_dashboard(root,now=None):
     root=Path(root);now=time.time() if now is None else now
     result=dict(connection='Host stopped',error='',providers=[],agents=[],history=[],device={},
-                settings={},history_enabled=False)
+                settings={},history_enabled=False,running=False)
     try:
         config=local_config(root);validate_options(config)
     except (OSError,ValueError,TypeError):
@@ -31,7 +31,9 @@ def read_dashboard(root,now=None):
     providers=config['providers'];enabled=config.get('usage_history',False)
     result['history_enabled']=enabled
     result['settings']={key:config.get(key) for key in ('board','port','interval_s','token_poll_s','usage_history')}
+    result['settings'].update(keep_host_on_close=config.get('keep_host_on_close',True),start_host_on_open=config.get('start_host_on_open',False))
     processes=owned_hosts(root)
+    result['running']=bool(processes)
     health=read_status(root,{p.pid for p in processes}) or {}
     if health:
         result['connection']=safe_text(health.get('state','unknown').replace('_',' ').title()+' / '+health.get('port',''),80)
