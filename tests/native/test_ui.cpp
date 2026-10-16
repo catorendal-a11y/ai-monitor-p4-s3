@@ -1643,6 +1643,11 @@ int main(int argc, char** argv) {
     liveSample.agents[0].observedAgeSeconds=45;ui_agents_update();
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"Last: NEEDS ATTENTION"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"1:02:03 / event 45s ago"));
+    lv_obj_update_layout(agents_ui::screen);
+    lv_point_t phaseSize{};
+    lv_text_get_size(&phaseSize,lv_label_get_text(agents_ui::rows[0].state),&lv_font_montserrat_24,
+                    0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+    CHECK(phaseSize.x<=lv_obj_get_width(agents_ui::rows[0].state));
     screenshot(screenshots,"live-agent-session-timer");
     fakeTick+=5000;ui_agents_update();
     CHECK(strstr(lv_label_get_text(agents_ui::rows[0].identity),"event 50s ago"));

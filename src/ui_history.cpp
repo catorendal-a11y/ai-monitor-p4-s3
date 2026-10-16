@@ -62,7 +62,7 @@ void ui_history_init() {
     lv_obj_set_style_bg_color(bars[i],lv_color_hex(ui_theme::muted),0);
   }
   button(24,432,224,"BACK",back);period=button(280,432,240,"SHOW 7 DAYS",change_period);
-  label(552,442,224,"Numbers only / local",&lv_font_montserrat_18,ui_theme::muted);
+  label(552,442,224,"-- = unobserved",&lv_font_montserrat_18,ui_theme::muted);
 }
 void ui_history_show(){using namespace history_ui;if(!screen || lv_screen_active()==screen)return;returnScreen=lv_screen_active();lv_screen_load(screen);ui_history_update();}
 bool ui_history_is_active(){return history_ui::screen && lv_screen_active()==history_ui::screen;}

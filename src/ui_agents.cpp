@@ -115,10 +115,12 @@ void update() {
     else snprintf(identifier,sizeof(identifier),"Start unknown / event %llus ago",observedAge);
     text(row.identity,identifier);
     const unsigned state=static_cast<unsigned>(entry.state);
-    char phase[32];snprintf(phase,sizeof(phase),"%s",state<agent::state_count?live_agent::activity_names[state]:"UNKNOWN");
+    const bool observedStale=live_agent::observed_age_ms(snapshot,entry,millis())>=live_agent::activity_lease_ms;
+    char phase[40];snprintf(phase,sizeof(phase),"%s%s",observedStale?"Last: ":"",
+        state<agent::state_count?live_agent::activity_names[state]:"UNKNOWN");
     for(auto* c=phase;*c;++c)if(*c=='_')*c=' ';
     text(row.state,phase);
-    const uint32_t color=(entry.state==live_agent::ActivityState::FAILED || entry.state==agent::State::ERROR)?0xFF6B6B:
+    const uint32_t color=observedStale?ui_theme::muted:(entry.state==live_agent::ActivityState::FAILED || entry.state==agent::State::ERROR)?0xFF6B6B:
         (entry.state==live_agent::ActivityState::WAITING || entry.state==agent::State::NEEDS_ATTENTION)?0xFFCF66:
         state<2 || state>=agent::state_count?ui_theme::muted:ui_theme::accent;
     if(!lv_color_eq(lv_obj_get_style_text_color(row.state,LV_PART_MAIN),lv_color_hex(color)))
