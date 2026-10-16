@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -10,15 +11,20 @@ namespace fake_nvs {
 inline std::map<std::string, std::vector<uint8_t>> values;
 inline bool fail_open = false, fail_write = false;
 inline unsigned writes = 0;
+inline std::map<std::string,size_t> read_limits;
+inline std::set<std::string> fail_lengths;
 }
 class Preferences {
  public:
   bool begin(const char*, bool = false) { return !fake_nvs::fail_open; }
   void end() {}
-  size_t getBytesLength(const char* key) { return fake_nvs::values[key].size(); }
+  bool isKey(const char* key) { return !fake_nvs::values[key].empty(); }
+  size_t getBytesLength(const char* key) { return fake_nvs::fail_lengths.count(key)?0:fake_nvs::values[key].size(); }
   size_t getBytes(const char* key, void* destination, size_t capacity) {
     const auto& bytes = fake_nvs::values[key];
-    const size_t size = std::min(capacity, bytes.size());
+    size_t size = std::min(capacity, bytes.size());
+    const auto limit=fake_nvs::read_limits.find(key);
+    if(limit!=fake_nvs::read_limits.end())size=std::min(size,limit->second);
     if (size) std::memcpy(destination, bytes.data(), size);
     return size;
   }

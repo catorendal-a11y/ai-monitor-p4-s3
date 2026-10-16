@@ -142,6 +142,53 @@ int main() {
   note_brightness_override();  // A temporary user change while NVS is unavailable.
   fake_nvs::fail_open = false; settingsTick += 1001;
   CHECK(!take_initial_brightness(recovered) && s_loaded);
+  // A failed read of a present blob cannot publish any part of a settings load.
+  fake_nvs::fail_open=fake_nvs::fail_write=false;s_loaded=true;
+  set_brightness(92);set_dim_minutes(10);set_warning_percent(35);
+  set_appearance({Companion::orbit,Theme::ocean});set_night({true,1260,390,10});
+  set_warning_for("codex","Session",300,15);
+  set_nova_window("codex",manual_window(10080,"Week"));
+  set_nova_window("zcode",manual_window(300,"Session"));
+  const auto durable=fake_nvs::values;
+  auto loaded_state=[] {
+    std::vector<uint8_t> bytes;
+    auto append=[&](const auto& value) {
+      const auto* first=reinterpret_cast<const uint8_t*>(&value);
+      bytes.insert(bytes.end(),first,first+sizeof(value));
+    };
+    append(s_brightness);append(s_dimMinutes);append(s_warningPercent);append(s_night);append(s_appearance);
+    append(s_rules);append(s_novaWindows);append(s_savedBrightness);append(s_savedDim);append(s_savedWarning);
+    append(s_savedNight);append(s_savedAppearance);append(s_savedRules);append(s_savedNovaWindows);
+    return bytes;
+  };
+  for(const char* key:{"appear_v1","night_v2","warn_rules","nova_win_v1"})for(unsigned fault=0;fault<3;++fault) {
+    fake_nvs::values=durable;fake_nvs::read_limits.clear();fake_nvs::fail_lengths.clear();
+    if(fault==2)fake_nvs::fail_lengths.insert(key);
+    else fake_nvs::read_limits[key]=fault?durable.at(key).size()-1:0;
+    s_loaded=s_loadFailed=false;settingsTick+=1001;
+    s_brightness=17;s_dimMinutes=0;s_warningPercent=12;s_night={false,60,120,25};
+    s_appearance={Companion::nova,Theme::ember};
+    const auto before=loaded_state();const auto writesBefore=fake_nvs::writes;
+    CHECK(!ensure_loaded());CHECK(!s_loaded && s_loadFailed && save_status()==SaveStatus::failed);
+    CHECK(loaded_state()==before);
+    set_nova_window("claude",manual_window(300,"Session"));
+    set_warning_for("claude","Session",300,10);
+    CHECK(fake_nvs::writes==writesBefore && fake_nvs::values==durable);
+    CHECK(loaded_state()==before);
+    fake_nvs::read_limits.clear();fake_nvs::fail_lengths.clear();settingsTick+=1001;
+    CHECK(ensure_loaded() && s_loaded && !s_loadFailed);
+    CHECK(brightness()==92 && dim_minutes()==10 && warning_percent()==35);
+    CHECK(appearance().companion==Companion::orbit && appearance().theme==Theme::ocean);
+    CHECK(night().enabled && night().start==1260 && night().end==390 && night().percent==10);
+    CHECK(warning_for("codex","Session",300)==15);
+    CHECK(!nova_window("codex").automatic && !nova_window("zcode").automatic);
+    set_nova_window("codex",manual_window(300,"Updated"));s_loaded=false;
+    CHECK(!nova_window("zcode").automatic && nova_window("zcode").minutes==300);
+  }
+  // Missing keys are defaults/migrations, not failed reads of present data.
+  fake_nvs::values.clear();s_loaded=s_loadFailed=false;
+  CHECK(ensure_loaded() && nova_window("codex").automatic && warning_override_for("codex","Session",300)==0);
+  CHECK(appearance().companion==Companion::nova && !night().enabled);
   if (failures) return EXIT_FAILURE;
   std::cout << "NVS persistence, failure/retry, window identity and migration checks passed\n";
 }
