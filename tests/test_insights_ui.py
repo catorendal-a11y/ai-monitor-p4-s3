@@ -85,9 +85,9 @@ class InsightsUiTests(unittest.TestCase):
         import csv
         view=self.window.history_view
         data=dict(tokens=[],quota=[],forecasts=[],error=None,daily_agents=[dict(
-            provider='zcode',date='2026-10-16',sessions=2,activeSeconds=65,
-            completedTurns=3,failedTurns=0),dict(provider='zcode',date='2026-10-15',
-            sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None)])
+            provider='zcode',date='2026-10-15',sessions=None,activeSeconds=None,
+            completedTurns=None,failedTurns=None),dict(provider='zcode',date='2026-10-16',
+            sessions=2,activeSeconds=65,completedTurns=3,failedTurns=0)])
         view._finished((view.generation,'zcode',data))
         self.assertTrue(view.export_button.isEnabled())
         self.assertEqual(view.daily_table.rowCount(),2)
