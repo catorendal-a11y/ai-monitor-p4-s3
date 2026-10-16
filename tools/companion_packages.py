@@ -10,6 +10,7 @@ import stat
 import struct
 import tempfile
 import zipfile
+from itertools import islice
 
 MAX_BLOB=2*1024*1024
 MAX_ARCHIVE=4*1024*1024
@@ -145,10 +146,10 @@ def parse_archive(raw):
         raise ValueError('Invalid companion archive') from error
 
 
-def directory(root):
+def directory(root,create=True):
     root=Path(root);path=root/'tools/companions'
     if path.is_symlink() or path.parent.is_symlink():raise ValueError('Invalid companion library')
-    path.mkdir(parents=True,exist_ok=True)
+    if create:path.mkdir(parents=True,exist_ok=True)
     return path
 
 
@@ -165,7 +166,7 @@ def write(path,data):
 def install(root,source):
     with Path(source).open('rb') as stream:raw=stream.read(MAX_ARCHIVE+1)
     pack=parse_archive(raw);folder=directory(root)
-    if not (folder/(pack.id+'.pack')).exists() and len(list(folder.glob('*.pack')))>=16:
+    if not (folder/(pack.id+'.pack')).exists() and sum(1 for _ in islice(folder.glob('*.pack'),16))>=16:
         raise ValueError('Companion library is full; remove an unused pack first')
     write(folder/(pack.id+'.zip'),raw) # Keep author notices with the original archive.
     write(folder/(pack.id+'.pack'),pack.blob)
@@ -174,7 +175,7 @@ def install(root,source):
 
 def load(root,identifier):
     if not isinstance(identifier,str) or not re.fullmatch('[0-9a-f]{64}',identifier):raise ValueError('Invalid companion selection')
-    path=directory(root)/(identifier+'.pack')
+    path=directory(root,create=False)/(identifier+'.pack')
     if path.is_symlink():raise ValueError('Invalid companion library entry')
     with path.open('rb') as stream:blob=stream.read(MAX_BLOB+1)
     pack=parse_blob(blob)
@@ -188,7 +189,7 @@ def select(root,identifier):
 
 
 def selected(root):
-    path=directory(root)/'selection.json'
+    path=directory(root,create=False)/'selection.json'
     if not path.exists():return ''
     if path.is_symlink():raise ValueError('Invalid companion selection')
     with path.open('rb') as stream:raw=stream.read(129)
@@ -198,3 +199,12 @@ def selected(root):
     if identifier!='' and (not isinstance(identifier,str) or not re.fullmatch('[0-9a-f]{64}',identifier)):
         raise ValueError('Invalid companion selection')
     return identifier
+
+
+def remove(root,identifier):
+    if not isinstance(identifier,str) or not re.fullmatch('[0-9a-f]{64}',identifier):raise ValueError('Invalid companion selection')
+    if selected(root)==identifier:raise ValueError('Choose built-in or another pack before removal')
+    folder=directory(root,create=False)
+    paths=[folder/(identifier+suffix) for suffix in ('.pack','.zip')]
+    if any(path.is_symlink() for path in paths):raise ValueError('Invalid companion library entry')
+    for path in paths:path.unlink(missing_ok=True)

@@ -17,6 +17,7 @@ def main():
             valid = not window.nova.pixmap().isNull() and not window.windowIcon().isNull() and all(
                 not image.isNull() for image in window.session_pixmaps.values())
             window.close()
+            if not window.status_pool.waitForDone(2000):return 1
         if getattr(sys, 'frozen', False):
             from desktop_support import check_flasher_runtime
             if not check_flasher_runtime(aim_control.ROOT):

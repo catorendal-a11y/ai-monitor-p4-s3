@@ -20,9 +20,13 @@ class CompanionView(QWidget):
         row=QHBoxLayout()
         self.import_button=QPushButton('Import and use pack…');self.use_button=QPushButton('Use selected pack')
         self.builtin_button=QPushButton('Use built-in NOVA / ORBIT');self.refresh_button=QPushButton('Refresh library')
-        self.buttons=(self.import_button,self.use_button,self.builtin_button,self.refresh_button)
-        for button in self.buttons:button.setMinimumHeight(44);row.addWidget(button)
+        self.remove_button=QPushButton('Remove unused pack')
+        self.buttons=(self.import_button,self.use_button,self.builtin_button,self.refresh_button,self.remove_button)
+        for button in self.buttons:button.setMinimumHeight(44)
+        for button in (self.import_button,self.use_button,self.refresh_button):row.addWidget(button)
         layout.addLayout(row)
+        second_row=QHBoxLayout();second_row.addWidget(self.builtin_button);second_row.addWidget(self.remove_button)
+        layout.addLayout(second_row)
         self.status=QLabel('Loading companion library…');self.status.setWordWrap(True)
         self.status.setTextFormat(Qt.TextFormat.PlainText);layout.addWidget(self.status)
         self.device_status=QLabel('Display activation is confirmed by the running host.');self.device_status.setWordWrap(True)
@@ -30,6 +34,7 @@ class CompanionView(QWidget):
         layout.addStretch()
         self.import_button.clicked.connect(self.choose_file);self.use_button.clicked.connect(self.use_selected)
         self.builtin_button.clicked.connect(self.use_builtin);self.refresh_button.clicked.connect(self.refresh)
+        self.remove_button.clicked.connect(self.remove_selected)
         self.timer=QTimer(self);self.timer.timeout.connect(self.refresh_device);self.timer.start(1000)
         self.refresh()
 
@@ -40,8 +45,10 @@ class CompanionView(QWidget):
         self.status.setText('Checking companion data…')
         def perform():
             operation()
-            folder=packages.directory(self.owner.root);rows=[];bad=0
-            for path in islice(sorted(folder.glob('*.pack')),16):
+            folder=packages.directory(self.owner.root,create=False);rows=[];bad=0
+            entries=list(islice(folder.glob('*.pack'),17))
+            if len(entries)>16:raise ValueError('Companion library exceeds its capacity')
+            for path in sorted(entries):
                 try:pack=packages.load(self.owner.root,path.stem);rows.append((pack.name,pack.id))
                 except (OSError,ValueError):bad+=1
             return rows,packages.selected(self.owner.root),success,bad
@@ -82,6 +89,10 @@ class CompanionView(QWidget):
 
     def use_builtin(self):
         self.run(lambda:packages.select(self.owner.root,''),'Built-in companions selected. Check display activation below.')
+
+    def remove_selected(self):
+        identifier=self.choices.currentData()
+        if identifier:self.run(lambda:packages.remove(self.owner.root,identifier),'Unused library pack removed; original import file was retained.')
 
     def refresh_device(self):
         health=self.owner.cached_health or {};value=health.get('companion',{})

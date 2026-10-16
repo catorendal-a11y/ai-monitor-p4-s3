@@ -112,7 +112,7 @@ def build_package(output, package, version, args):
         relative = Path(name)
         if any(part in {'.git', '.pio', '.venv', '.codex', '.zcode', 'node_modules', 'work', '__pycache__', 'outputs'} for part in relative.parts):
             raise RuntimeError('Private/generated path in tracked release source')
-        if relative.parts[:2] == ('tools', 'activity'):
+        if relative.parts[:2] in (('tools', 'activity'),('tools','companions')):
             raise RuntimeError('Runtime activity records must not be exported')
         if relative.name.startswith(('aim_host.invalid-','permission-trust','permission-endpoint.')) or relative.name in {'aim_host.json', 'aim_host.status.json', 'auth.json', 'credentials.json', 'secrets.json', '.env'} or \
                 (relative.name.startswith('.env.') and relative.name != '.env.example') or \
