@@ -1,7 +1,7 @@
 """Opt-in local numeric history. One bounded writer, no USB or model access."""
 from collections import OrderedDict, deque
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import math
 from pathlib import Path
 import sqlite3
@@ -224,6 +224,40 @@ class HistoryRecorder:
         self.worker.join(timeout=1)
 
 
+def calendar_days(now, days):
+    """Local calendar boundaries, including OS daylight-saving transitions."""
+    today=datetime.fromtimestamp(now).date()
+    result=[]
+    for offset in range(1-days,1):
+        day=today+timedelta(days=offset)
+        start=datetime.combine(day,datetime.min.time()).timestamp()
+        end=datetime.combine(day+timedelta(days=1),datetime.min.time()).timestamp()
+        result.append((day.isoformat(),max(0,start),max(0,end)))
+    return result
+
+
+def clear_history(directory):
+    """Revoke old writers and clear observations atomically; never unlink a live DB.
+
+    The caller must confirm host shutdown and restore its previous running state.
+    Saved collection preference is deliberately untouched. Readers may finish their
+    existing SQLite snapshot; subsequent reads see the complete empty transaction.
+    """
+    import history_consent as authority
+    folder=Path(directory)
+    if not folder.exists():return
+    with authority.lock(folder):
+        authority.revoke_locked(folder)
+        database=connect(folder)
+        if database is None:return
+        database.close()
+        with closing(sqlite3.connect((folder/'history.db').resolve().as_uri()+'?mode=rw',uri=True,timeout=.5)) as database,database:
+            database.execute('PRAGMA trusted_schema=OFF')
+            for table in ('tokens','quota','agent_events','task_events'):
+                if database.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
+                    database.execute('DELETE FROM '+table)
+
+
 def read_history(directory, providers, days=7, now=None):
     if type(days) is not int or days not in (7,30): raise ValueError('Choose 7 or 30 history days')
     if len(providers)>8 or any(p not in PROVIDERS for p in providers): raise ValueError('Invalid history providers')
@@ -238,17 +272,22 @@ def read_history(directory, providers, days=7, now=None):
         with closing(database):
             for provider in providers:
                 from agent_history import daily_summaries
-                result['daily_agents']+=daily_summaries(database,provider,days,now)
-                totals=list(database.execute(
-                    'SELECT minute/1440,SUM(tokens) FROM tokens WHERE provider=? AND minute>=? AND minute<=? '
-                    'GROUP BY minute/1440 ORDER BY minute/1440 LIMIT 31',
-                    (provider,int(now-days*86400)//60,int(now)//60)))
-                if any(type(day) is not int or type(total) is not int or not 0<=total<=MAX_INTEGER for day,total in totals):
-                    raise ValueError('Invalid numeric history')
-                result['tokens'] += [dict(provider=provider,day=day,total=total) for day,total in totals]
+                result['daily_agents']+=daily_summaries(database,provider,days,now,include_reasons=True)
+                boundaries=calendar_days(now,days)
+                for date,start,finish in boundaries:
+                    totals=database.execute('SELECT SUM(tokens),MIN(tokens),MAX(tokens) FROM tokens '
+                        'WHERE provider=? AND minute>=? AND minute<? AND minute<=?',
+                        (provider,int(start)//60,int(finish)//60,int(now)//60)).fetchone()
+                    total,minimum,maximum=totals
+                    if total is None:continue
+                    if any(type(value) is not int or not 0<=value<=MAX_INTEGER for value in totals):
+                        raise ValueError('Invalid numeric history')
+                    # Ordinal calendar offset retains chart spacing independently of UTC.
+                    day=(datetime.strptime(date,'%Y-%m-%d').date()-datetime(1970,1,1).date()).days
+                    result['tokens'].append(dict(provider=provider,day=day,date=date,total=total))
                 rows=list(database.execute('SELECT minute,window,kind,used,reset,epoch FROM quota '
                     'WHERE provider=? AND minute>=? AND minute<=? ORDER BY minute DESC LIMIT 256',
-                    (provider,int(now-days*86400)//60,int(now)//60)))
+                    (provider,int(boundaries[0][1])//60,int(now)//60)))
                 for m,w,k,u,r,e in rows:
                     if (type(m) is not int or type(w) is not int or not 0<=w<=525600 or k not in ('model','tools')
                             or type(u) not in (int,float) or not math.isfinite(u) or not 0<=u<=100

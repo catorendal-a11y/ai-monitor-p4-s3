@@ -8,7 +8,7 @@ from PySide6.QtCore import QSignalBlocker
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QFileDialog, QLabel,
     QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QAbstractItemView, QPlainTextEdit)
+    QHeaderView, QAbstractItemView, QPlainTextEdit, QMessageBox)
 from provider_catalog import PROVIDERS
 
 
@@ -133,7 +133,7 @@ class HistoryChart(QWidget):
         self.quota=[]
         self.quota_mode=False
         self.setMinimumHeight(155)
-        self.setAccessibleName('Daily observed token increases; UTC dates, gaps mean no observations')
+        self.setAccessibleName('Daily observed token increases; local calendar dates, gaps mean no observations')
 
     def set_rows(self,rows):
         self.rows=rows[:31]; self.quota=[]; self.quota_mode=False; self.update()
@@ -176,7 +176,7 @@ class HistoryChart(QWidget):
         painter.setPen(QColor('#b3c4cd'))
         start=datetime.fromtimestamp(first*86400,timezone.utc).strftime('%d %b')
         finish=datetime.fromtimestamp(last*86400,timezone.utc).strftime('%d %b')
-        painter.drawText(left,self.height()-8,start+' — '+finish+' UTC; gaps have no observations')
+        painter.drawText(left,self.height()-8,start+' — '+finish+' local; gaps have no observations')
         painter.end()
 
 
@@ -194,6 +194,9 @@ class HistoryView(QWidget):
         row.addWidget(self.provider,1); row.addWidget(self.period)
         self.refresh_button=QPushButton('Refresh history'); self.export_button=QPushButton('Export CSV…')
         for button in (self.refresh_button,self.export_button): button.setFixedHeight(44); row.addWidget(button)
+        self.clear_button=QPushButton('Clear local history...')
+        self.clear_button.setFixedHeight(44); row.addWidget(self.clear_button)
+        self.clear_button.clicked.connect(self.clear_history)
         layout.addLayout(row)
         metrics=QHBoxLayout()
         self.metric_combo=QComboBox(); self.metric_combo.addItem('Observed tokens / day','tokens'); self.metric_combo.addItem('Quota snapshots','quota')
@@ -271,7 +274,18 @@ class HistoryView(QWidget):
                     row.get('completedTasks'),row.get('failedTasks')]
             for column,value in enumerate(values):
                 text='--' if value is None else (f'{value} s' if column==2 else str(value))
-                self.daily_table.setItem(index,column,QTableWidgetItem(text))
+                item=QTableWidgetItem(text)
+                if value is None:
+                    field=(None,'sessions','activeSeconds','completedTurns','failedTurns','completedTasks','failedTasks')[column]
+                    reason=row.get('unknownReasons',{}).get(field)
+                    explanations={'no_session_start':'No session-start event was observed.',
+                        'no_activity_interval':'No bounded active interval was observed; waiting and gaps are excluded.',
+                        'no_terminal_evidence':'No matched terminal Stop or StopFailure event was observed.',
+                        'unsupported_tasks':'This source does not report this task metric.',
+                        'no_task_evidence':'No confirmed client task event was observed.',
+                        'mixed_task_identity':'Legacy and current task identities cannot be safely deduplicated.'}
+                    item.setToolTip(explanations.get(reason,'No reliable observation is available.'))
+                self.daily_table.setItem(index,column,item)
         rows=data['tokens']
         with QSignalBlocker(self.quota_window):
             selection=self.quota_window.currentData()
@@ -327,6 +341,13 @@ class HistoryView(QWidget):
             self.chart.set_quota([r for r in self.data['quota'] if selection and (r['window'],r['kind'])==tuple(selection)])
         else: self.chart.set_rows(self.data['tokens'])
 
+    def clear_history(self):
+        answer=QMessageBox.question(self,'Clear local history',
+            'Delete all locally recorded token, quota, session and task history? '
+            'This cannot be undone. Collection settings are preserved. A running host will briefly restart.',
+            QMessageBox.StandardButton.Yes|QMessageBox.StandardButton.No,QMessageBox.StandardButton.No)
+        if answer==QMessageBox.StandardButton.Yes:self.owner.clear_history()
+
     def export(self):
         if not self.data: return
         data=self.data
@@ -337,8 +358,8 @@ class HistoryView(QWidget):
                 writer=csv.writer(stream)
                 writer.writerow(['metric','provider','observed_utc','value','window_minutes','kind','reset_epoch','local_date'])
                 for row in data['tokens']:
-                    day=datetime.fromtimestamp(row['day']*86400,timezone.utc).strftime('%Y-%m-%d')
-                    writer.writerow(['observed_tokens',row['provider'],day,row['total'],'','','',''])
+                    day=row.get('date') or datetime.fromtimestamp(row['day']*86400,timezone.utc).strftime('%Y-%m-%d')
+                    writer.writerow(['observed_tokens',row['provider'],'',row['total'],'','','',day])
                 for row in data['quota']:
                     stamp=datetime.fromtimestamp(row['minute']*60,timezone.utc).isoformat()
                     writer.writerow(['quota_used_percent',row['provider'],stamp,row['used'],row['window'],row['kind'],row['reset'],''])

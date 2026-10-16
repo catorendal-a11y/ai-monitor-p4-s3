@@ -1,6 +1,6 @@
 """Compact read-only device summaries from existing numeric history. No new database/model."""
 from contextlib import closing
-from datetime import datetime, timedelta
+from datetime import datetime
 import math
 import threading
 import time
@@ -10,10 +10,9 @@ from usage_history import connect, MAX_INTEGER
 
 
 def day_boundaries(now):
-    today = datetime.fromtimestamp(now).date()
-    # Ask the OS for each local midnight, rather than assuming every day lasts 24 hours.
-    days = [today + timedelta(days=offset) for offset in range(-6, 2)]
-    return today.isoformat(), [int(time.mktime(datetime.combine(day, datetime.min.time()).timetuple())) // 60 for day in days]
+    from usage_history import calendar_days
+    days=calendar_days(now,7)
+    return days[-1][0], [int(start)//60 for _,start,_ in days]+[int(days[-1][2])//60]
 
 
 def compact_history(directory, providers, enabled, now=None, boundaries=None):

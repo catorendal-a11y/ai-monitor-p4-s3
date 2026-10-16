@@ -1,6 +1,5 @@
 """Opt-in fixed lifecycle journal. No prompts, arguments, outputs or permission hints."""
 from contextlib import closing
-from datetime import datetime,timedelta
 import math
 import os
 import hashlib
@@ -107,11 +106,13 @@ def observe_task(directory,payload,generation,at):
     except (OSError,ValueError,TypeError,sqlite3.Error):pass
 
 
-def task_summary(database,provider,start,end,end_exclusive=False):
+def task_summary(database,provider,start,end,end_exclusive=False,include_reasons=False):
     if (not isinstance(provider,str) or provider not in PROVIDERS or
             any(type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=253402300799
                 for value in (start,end)) or end<start):raise ValueError('Invalid task history interval')
     empty=dict(createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None)
+    reasons={field:('unsupported_tasks' if provider!='claude' or field=='failedTasks' else 'no_task_evidence') for field in empty}
+    if include_reasons:empty['unknownReasons']=reasons
     if not database.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='task_events'").fetchone():return empty
     rows=database.execute('SELECT task,generation,epoch,event,at FROM task_events '
         'WHERE provider=? AND at>=? AND at<=? ORDER BY at,rowid LIMIT ?',
@@ -130,7 +131,9 @@ def task_summary(database,provider,start,end,end_exclusive=False):
             # Old session-scoped hashes cannot be mapped to new task-list identities.
             # Preserve records but never sum possibly duplicate mixed-era tasks.
             versions={task.startswith('v2:') for task in counts[event]}
-            if len(versions)==1:empty[field]=len(counts[event])
+            if len(versions)==1:
+                empty[field]=len(counts[event]);reasons.pop(field,None)
+            else:reasons[field]='mixed_task_identity'
     return empty
 
 
@@ -227,15 +230,17 @@ def summarize(database,provider,start,end,end_exclusive=False):
                 completedTurns=completed if finished else None,failedTurns=failed if finished else None)
 
 
-def daily_summaries(database,provider,days,now):
+def daily_summaries(database,provider,days,now,include_reasons=False):
     """Local calendar days; a boundary event closes time but belongs to the next day."""
-    today=datetime.fromtimestamp(now).date()
+    from usage_history import calendar_days
     rows=[]
-    for offset in range(1-days,1):
-        day=today+timedelta(days=offset)
-        start=datetime.combine(day,datetime.min.time()).timestamp()
-        finish=datetime.combine(day+timedelta(days=1),datetime.min.time()).timestamp()
+    for date,start,finish in calendar_days(now,days):
         row=summarize(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now)
-        row.update(task_summary(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now))
-        rows.append(dict(provider=provider,date=day.isoformat(),**row))
+        row.update(task_summary(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now,
+                                include_reasons=include_reasons))
+        if include_reasons:
+            for field,reason in [('sessions','no_session_start'),('activeSeconds','no_activity_interval'),
+                                 ('completedTurns','no_terminal_evidence'),('failedTurns','no_terminal_evidence')]:
+                if row[field] is None:row['unknownReasons'][field]=reason
+        rows.append(dict(provider=provider,date=date,**row))
     return rows

@@ -32,7 +32,7 @@ class DailyAgentHistoryTests(unittest.TestCase):
         result=read_history(self.root,['zcode'],7,self.now)
         rows=result.get('daily_agents',[])
         self.assertEqual(len(rows),7)
-        self.assertEqual(rows[-1],dict(provider='zcode',date='2026-10-16',
+        self.assertEqual({k:v for k,v in rows[-1].items() if k!='unknownReasons'},dict(provider='zcode',date='2026-10-16',
             sessions=1,activeSeconds=30,completedTurns=1,failedTurns=0,
             createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None))
         self.assertIsNone(rows[0]['sessions'])
