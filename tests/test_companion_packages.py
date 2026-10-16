@@ -130,3 +130,37 @@ class CompanionUsbTests(unittest.TestCase):
         panel=self.Panel();panel.info=dict(bootId=17,companionProtocol=0)
         with self.assertRaises(ValueError):UsbPackClient(panel,self.pack)
         self.assertEqual(panel.messages,[])
+
+class CompanionServiceTests(unittest.TestCase):
+    def test_selected_library_loads_off_serial_owner_and_reinstalls_after_new_host(self):
+        import time
+        from companion_service import CompanionService
+        import companion_packages as p
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'pack.zip';source.write_bytes(archive())
+            pack=p.install(root,source);p.select(root,pack.id)
+            for _ in range(2):
+                service=CompanionService(root);panel=CompanionUsbTests.Panel()
+                try:
+                    deadline=time.monotonic()+3
+                    while service.state!='active' and time.monotonic()<deadline:
+                        service.pump(panel);time.sleep(.005)
+                    self.assertEqual(service.state,'active')
+                    self.assertEqual(service.snapshot()['id'],pack.id)
+                finally:service.close()
+
+    def test_corrupt_library_is_reported_without_serial_write(self):
+        import time
+        from companion_service import CompanionService
+        import companion_packages as p
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=root/'pack.zip';source.write_bytes(archive())
+            pack=p.install(root,source);p.select(root,pack.id)
+            (root/'tools/companions'/(pack.id+'.pack')).write_bytes(b'bad')
+            service=CompanionService(root);panel=CompanionUsbTests.Panel()
+            try:
+                deadline=time.monotonic()+3
+                while service.state!='error' and time.monotonic()<deadline:
+                    service.pump(panel);time.sleep(.005)
+                self.assertEqual(service.state,'error');self.assertEqual(panel.messages,[])
+            finally:service.close()
