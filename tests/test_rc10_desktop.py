@@ -73,7 +73,7 @@ class Rc10Tests(unittest.TestCase):
             self.assertEqual(control.main(['--prepare-uninstall']),1)
         self.assertNotIn('fixture-secret',output.getvalue())
 
-    def test_diagnostics_do_not_confirm_old_device_receipts_during_reconnect(self):
+    def test_diagnostics_separate_live_receipts_from_last_observed_device_facts(self):
         from diagnostic_report import build
         from project_version import HOST_VERSION
         config={'board':'guition-p4','port':'COM6','providers':['codex']}
@@ -91,8 +91,15 @@ class Rc10Tests(unittest.TestCase):
                 health['live']['updated_at']=health['hardware_at']=health['companion']['updated_at']=0
             report=build(config,health,now=110)
             self.assertEqual(report['agent_usb']['state'],'unconfirmed')
-            self.assertIsNone(report['firmware_version'])
-            self.assertEqual(report['companion_state'],'unconfirmed')
+            if disconnected:
+                self.assertIsNone(report['firmware_version'])
+                self.assertEqual(report['companion_state'],'unconfirmed')
+            else:
+                self.assertEqual(report['firmware_version'],HOST_VERSION)
+                self.assertEqual(report['firmware_age_s'],110)
+                self.assertEqual(report['companion_state'],'active')
+                self.assertEqual(report['companion_age_s'],110)
+                self.assertEqual(report['device_facts'],'last_observed')
 
     def test_lifecycle_timeout_is_reported_without_command_or_output(self):
         output=io.StringIO()
