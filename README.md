@@ -2,7 +2,7 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
-Development candidate: **v1.19.1-rc4**, with observed session history, companion animation playback
+Development candidate: **v1.19.1-rc5**, with daily observed session history and CSV export, companion animation playback
 and [real USB device-screen capture](docs/DEVICE_MIRROR.md). Published downloads below remain
 v1.19.0. Physical permission control is a disabled preview until hardware/provider validation.
 

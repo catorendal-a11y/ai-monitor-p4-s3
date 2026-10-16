@@ -20,7 +20,7 @@ The quota line identifies its exact model window. Percentage-point change is sho
 observations of the same window, reset and recorder epoch. Tool/MCP quotas are not mixed with
 model quotas. This is observation history, not billing, forecasting or task progress.
 
-The opt-in event journal stores fixed Codex/Claude lifecycle events and hashed session identities
+The opt-in event journal stores fixed Codex/Claude/ZCode lifecycle events and hashed session identities
 in the same local SQLite backend. Schema-1 numeric databases migrate transactionally to schema 2
 without changing token/quota records. Hooks retain no prompt, tool arguments, output or permission hint.
 The journal is capped at 50,000 events and 30 days; hook writes use a 20 ms lock timeout.
@@ -33,6 +33,18 @@ not guaranteed total work time. Missing events/unsupported providers stay `--`.
 These are turns, not completed tasks. TaskCreated/TaskCompleted hooks can precede a veto and do not
 prove task success. Task totals remain unavailable until an integration supplies confirmed results.
 The live-agent screen's current session timers remain a separate source/domain.
+
+The PC History tab also displays a daily agent summary for the selected provider over seven or
+30 local calendar days: observed sessions, active seconds, completed turns and failed turns.
+Unknown values stay `--`. Days use local midnights, including 23/25-hour daylight-saving days.
+An event exactly at midnight belongs to the next day, while a known activity interval ending
+there can close the preceding day's active time. Provider changes clear the previous summary
+and disable export until the new selection has finished loading.
+
+CSV export includes these observed metrics even when no token or quota sample exists. Local
+lifecycle dates use the explicit `local_date` column; numeric quota timestamps retain UTC.
+Unknown metrics are omitted rather than exported as zero. A zero failed-turn count means real
+completed/failed turn evidence was observed without failures; it is not a count of task success.
 
 History protocol 2 adds a strictly bounded `agents` summary to each provider packet. Schema 1 is
 still accepted; the host sends schema 1 to old historyProtocol-1 devices. No event log/database is

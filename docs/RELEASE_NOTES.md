@@ -1,3 +1,14 @@
+# AI Monitor v1.19.1-rc5
+
+- Retain ZCode's documented lifecycle events in opt-in history. The live observer
+  was working, but the journal's older provider allowlist silently dropped them.
+- Show daily observed sessions, active seconds and completed/failed turns in the
+  desktop History tab, with seven/30 local calendar days and CSV export.
+- Keep unknown metrics distinct from zero; separate local dates from UTC quota
+  timestamps and prevent midnight outcomes from being counted on two days.
+- Preserve history opt-in and existing records. Turn completions do not become
+  task-success claims. Physical approval and external pack loading remain gated.
+
 # AI Monitor v1.19.1-rc4
 
 - Fix actual Codex Windows hook execution through the client's PowerShell shell.
