@@ -85,3 +85,48 @@ class CompanionPackageTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class CompanionUsbTests(unittest.TestCase):
+    def setUp(self):
+        from companion_packages import parse_archive
+        self.pack=parse_archive(archive())
+
+    class Panel:
+        info=dict(bootId=17,companionProtocol=1)
+        def __init__(self):self.messages=[];self.offset=0;self.id='';self.change={}
+        def send_line(self,line):self.messages.append(json.loads(line))
+        def wait_for(self,kind,seconds,command):
+            message=self.messages[-1];cmd=message['cmd']
+            if cmd=='pack_begin':self.offset=0;self.id=message['id']
+            if cmd=='pack_chunk':self.offset+=len(bytes.fromhex(message['data']))
+            state='ready' if cmd=='pack_finish' else 'active' if cmd=='pack_status' else 'builtin' if cmd=='pack_builtin' else 'receiving'
+            return dict(type='pack_reply',schema=1,bootId=17,nonce=message['nonce'],cmd=cmd,
+                        ok=True,offset=self.offset,state=state,id=self.id,**self.change)
+
+    def test_complete_payload_is_chunked_and_only_matching_UI_activation_completes(self):
+        from usb_companions import UsbPackClient
+        panel=self.Panel();client=UsbPackClient(panel,self.pack)
+        for _ in range(100):
+            if client.step():break
+        else:self.fail('Pack transfer did not complete')
+        chunks=[bytes.fromhex(m['data']) for m in panel.messages if m['cmd']=='pack_chunk']
+        self.assertEqual(b''.join(chunks),self.pack.blob)
+        self.assertEqual(panel.messages[-1]['cmd'],'pack_status')
+        self.assertTrue(all(len(json.dumps(m))<4095 for m in panel.messages))
+
+    def test_wrong_boot_nonce_offset_and_boolean_numeric_replies_are_rejected(self):
+        from usb_companions import UsbPackClient
+        for change in ({'bootId':18},{'nonce':'0'*32},{'offset':True},{'ok':1}):
+            panel=self.Panel()
+            def response(kind,seconds,command,panel=panel,change=change):
+                result=self.Panel.wait_for(panel,kind,seconds,command);result.update(change);return result
+            panel.wait_for=response
+            with self.subTest(change=change),self.assertRaises((ValueError,RuntimeError)):
+                UsbPackClient(panel,self.pack).step()
+
+    def test_unsupported_hardware_never_gets_transfer_commands(self):
+        from usb_companions import UsbPackClient
+        panel=self.Panel();panel.info=dict(bootId=17,companionProtocol=0)
+        with self.assertRaises(ValueError):UsbPackClient(panel,self.pack)
+        self.assertEqual(panel.messages,[])
