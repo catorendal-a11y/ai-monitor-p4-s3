@@ -36,8 +36,8 @@ def reset_invalid_settings(root: Path, emit=print) -> None:
         raw = stream.read(65537)
     if len(raw) > 65536: raise control.SetupError('Configuration is too large for safe recovery. Repair it locally.')
     backup = source.with_name('aim_host.invalid-' + str(time.time_ns()) + '.json')
-    with backup.open('xb') as stream:
-        stream.write(raw)
+    from private_files import write_bytes
+    write_bytes(backup,raw)
     control.stop_host(root, emit=emit)
     control.save_config(dict(control.host.DEFAULT_CONFIG), root)
 

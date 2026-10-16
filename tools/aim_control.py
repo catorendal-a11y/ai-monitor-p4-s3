@@ -49,10 +49,11 @@ def local_config(root=ROOT):
 
 def save_config(config, root=ROOT):
     from private_files import write_json
-    write_json(root/'tools/aim_host.json',config)
-    if config.get('usage_history',False) is False:
-        from agent_history import revoke
-        revoke(root/'tools/activity')
+    from history_consent import policy_update
+    # Commit saved policy under the same authority lock as revocation/minting.
+    # Revocation failure cannot leave changed settings behind a failed Save.
+    with policy_update(root/'tools/activity',enabled=config.get('usage_history',False)):
+        write_json(root/'tools/aim_host.json',config)
 
 
 def choose_port(current="auto", ask=input):
