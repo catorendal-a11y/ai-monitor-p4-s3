@@ -1111,6 +1111,8 @@ int main(int argc, char** argv) {
   CHECK(app_settings::warning_for("codex", "Session", 300) == 30);
   app_settings::report_save(false); ui_settings_update();
   CHECK(std::string(lv_label_get_text(saveFeedback)) == "SAVE FAILED");
+  CHECK(lv_obj_get_index(saveFeedback) > lv_obj_get_index(alertsOverlay));
+  CHECK(lv_obj_get_x(saveFeedback) == 48 && lv_obj_get_y(saveFeedback) == 446);
   screenshot(screenshots, "settings-save-failed");
   fakeTick += 5000; ui_settings_update(); CHECK(lv_obj_is_hidden(saveFeedback));
   close_alerts(nullptr);
