@@ -81,6 +81,32 @@ class InsightsUiTests(unittest.TestCase):
         self.assertFalse(view.export_button.isEnabled())
         view.worker=None
 
+    def test_daily_lifecycle_summary_is_visible_exportable_and_cleared_on_selection(self):
+        import csv
+        view=self.window.history_view
+        data=dict(tokens=[],quota=[],forecasts=[],error=None,daily_agents=[dict(
+            provider='zcode',date='2026-10-16',sessions=2,activeSeconds=65,
+            completedTurns=3,failedTurns=0),dict(provider='zcode',date='2026-10-15',
+            sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None)])
+        view._finished((view.generation,'zcode',data))
+        self.assertTrue(view.export_button.isEnabled())
+        self.assertEqual(view.daily_table.rowCount(),2)
+        self.assertEqual(view.daily_table.item(0,2).text(),'65 s')
+        self.assertEqual(view.daily_table.item(1,1).text(),'--')
+        path=self.root/'daily.csv'
+        with patch('insights_ui.QFileDialog.getSaveFileName',return_value=(str(path),'CSV')):
+            view.export()
+        with path.open(newline='',encoding='utf-8') as stream:rows=list(csv.DictReader(stream))
+        active=next(row for row in rows if row['metric']=='observed_active_seconds')
+        self.assertEqual(active['local_date'],'2026-10-16')
+        self.assertEqual(active['value'],'65')
+        self.assertEqual(len(rows),4)
+        view.worker=Mock()
+        view.provider.setCurrentIndex(view.provider.findData('codex'))
+        self.assertEqual(view.daily_table.rowCount(),0)
+        self.assertFalse(view.export_button.isEnabled())
+        view.worker=None
+
     def test_stale_history_failure_still_schedules_current_selection(self):
         view=self.window.history_view
         view.generation=10; view.worker=Mock()
