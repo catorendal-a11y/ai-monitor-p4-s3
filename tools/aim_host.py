@@ -523,7 +523,7 @@ class Panel:
             mirror = getattr(self, "mirror_service", None)
             if mirror is not None: mirror.close()
             companion=getattr(self,'companion_service',None)
-            if companion is not None:companion.close()
+            if companion is not None:companion.detach()
             self.ser.close()
 
     def refresh_status(self, request_id, state, message):
@@ -990,6 +990,8 @@ def _run_loop(cfg, interval, zai_key, views):
     tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history, include_live=False)
     from live_events import LiveSampler
     live_sampler=LiveSampler(HERE/'activity',views)
+    from companion_service import CompanionService
+    companions=CompanionService(HERE.parent)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
     try:
         while True:
@@ -1048,8 +1050,8 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.history_sampler=history_sampler
                     from mirror_service import MirrorService
                     panel.mirror_service=MirrorService(HERE.parent)
-                    from companion_service import CompanionService
-                    panel.companion_service=CompanionService(HERE.parent)
+                    panel.companion_service=companions
+                    companions.reconnect()
                     panel.attach_permission_runtime(permissions)
                     health.data.pop('hardware', None)
                     health.data.pop('hardware_at', None)
@@ -1109,6 +1111,7 @@ def _run_loop(cfg, interval, zai_key, views):
         fetcher.close()
         if panel is not None:
             panel.close()
+        companions.close()
 
 
 def wait_for_config(watcher, seconds, sampler=None):

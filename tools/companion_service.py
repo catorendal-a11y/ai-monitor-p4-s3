@@ -10,6 +10,7 @@ class CompanionService:
     def __init__(self,root):
         self.root=Path(root);self.condition=threading.Condition();self.closed=False
         self.loaded=None;self.client=None;self.state='builtin';self.identifier='';self.name=''
+        self.generation=0;self.reload=True
         self.stamp=time.time();self.next_status=0
         self.worker=threading.Thread(target=self._read,daemon=True,name='aim-companion-library')
         self.worker.start()
@@ -19,20 +20,21 @@ class CompanionService:
         while True:
             with self.condition:
                 if self.closed:return
+                generation=self.generation;force=self.reload;self.reload=False
             try:
                 path=self.root/'tools/companions/selection.json'
                 meta=path.stat() if path.exists() else None
                 signature=(meta.st_mtime_ns,meta.st_size) if meta else ('missing',)
-                if signature!=previous:
+                if signature!=previous or force:
                     identifier=selected(self.root)
                     pack=load(self.root,identifier) if identifier else None
                     result=(identifier,pack,False)
                 else:result=None
             except (OSError,ValueError,TypeError):
-                signature=('error',);result=('',None,True) if previous!=signature else None
+                signature=('error',);result=('',None,True) if previous!=signature or force else None
             with self.condition:
                 if self.closed:return
-                if result is not None:self.loaded=result
+                if result is not None and generation==self.generation:self.loaded=result
                 previous=signature
                 self.condition.wait(.5)
 
@@ -78,3 +80,15 @@ class CompanionService:
         with self.condition:self.closed=True;self.loaded=None;self.condition.notify_all()
         if self.client:self.client.cancel()
         self.worker.join(timeout=.6)
+
+    def detach(self):
+        if self.client:self.client.cancel()
+        self.client=None
+        with self.condition:
+            self.generation+=1;self.loaded=None
+
+    def reconnect(self):
+        self.detach();self.state='installing';self.stamp=time.time()
+        with self.condition:
+            if self.closed:return
+            self.reload=True;self.condition.notify_all()
