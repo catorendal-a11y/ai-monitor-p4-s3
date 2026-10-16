@@ -11,6 +11,7 @@ namespace fake_nvs {
 inline std::map<std::string, std::vector<uint8_t>> values;
 inline bool fail_open = false, fail_write = false;
 inline unsigned writes = 0;
+inline std::set<std::string> fail_scalar;
 inline std::map<std::string,size_t> read_limits;
 inline std::set<std::string> fail_lengths;
 }
@@ -44,6 +45,7 @@ class Preferences {
  private:
   template<typename T> T get(const char* key, T fallback) {
     T value = fallback;
+    if (fake_nvs::fail_scalar.count(key)) return fallback;
     const auto& bytes = fake_nvs::values[key];
     if (bytes.size() == sizeof(T)) std::memcpy(&value, bytes.data(), sizeof(T));
     return value;

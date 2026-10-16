@@ -189,6 +189,25 @@ int main() {
   fake_nvs::values.clear();s_loaded=s_loadFailed=false;
   CHECK(ensure_loaded() && nova_window("codex").automatic && warning_override_for("codex","Session",300)==0);
   CHECK(appearance().companion==Companion::nova && !night().enabled);
+  // Scalar SDK reads return their fallback on error, even for a present key.
+  for (const char* key : {"brightness","dim_min","warn_pct","night_on","night_start","night_end","night_pct"}) {
+    fake_nvs::values.clear();fake_nvs::fail_scalar.clear();s_loaded=s_loadFailed=false;
+    Preferences stored;
+    stored.putUChar("brightness",90);stored.putUChar("dim_min",10);stored.putUChar("warn_pct",15);
+    stored.putBool("night_on",true);stored.putUShort("night_start",1200);
+    stored.putUShort("night_end",360);stored.putUChar("night_pct",15);
+    fake_nvs::fail_scalar.insert(key);
+    const auto before=fake_nvs::writes;
+    CHECK(!ensure_loaded() && !s_loaded);
+    set_brightness(DISPLAY_DEFAULT_BRIGHTNESS);
+    CHECK(save_status()==SaveStatus::failed && fake_nvs::writes==before);
+    fake_nvs::fail_scalar.clear();settingsTick+=1001;
+    CHECK(ensure_loaded() && brightness()==90 && dim_minutes()==10 && warning_percent()==15);
+    CHECK(night().enabled && night().start==1200 && night().end==360 && night().percent==15);
+    set_brightness(DISPLAY_DEFAULT_BRIGHTNESS);
+    CHECK(save_status()==SaveStatus::saved && fake_nvs::writes==before+1);
+    CHECK(fake_nvs::values["brightness"][0]==DISPLAY_DEFAULT_BRIGHTNESS);
+  }
   if (failures) return EXIT_FAILURE;
   std::cout << "NVS persistence, failure/retry, window identity and migration checks passed\n";
 }
