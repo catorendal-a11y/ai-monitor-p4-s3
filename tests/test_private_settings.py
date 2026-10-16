@@ -80,3 +80,33 @@ class PrivateSettingsTests(unittest.TestCase):
             root=Path(d);configure(root/'tools/activity',True,123)
             save_config({'providers':['claude'],'usage_history':False},root)
             self.assertFalse(json.loads((root/'tools/activity/agent-history-consent.json').read_text())['enabled'])
+
+    def test_recovery_backup_keeps_original_bytes_and_private_protection(self):
+        import aim_control as control
+        import desktop_support as desktop
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            control.save_config(dict(control.host.DEFAULT_CONFIG,board='not-a-board',zai_key='synthetic-private-key'),root)
+            original=(root/'tools/aim_host.json').read_bytes()
+            with patch.object(control,'owned_hosts',return_value=[]):desktop.reset_invalid_settings(root,emit=lambda _:None)
+            backup=next((root/'tools').glob('aim_host.invalid-*.json'))
+            self.assertEqual(backup.read_bytes(),original)
+            self.assertTrue(protected(backup),'Recovery must not create a weaker private copy')
+
+    def test_failed_consent_revocation_does_not_persist_new_settings(self):
+        import aim_control as control
+        import desktop_support as desktop
+        import private_files
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)
+            control.save_config(dict(control.host.DEFAULT_CONFIG,board='guition-p4',providers=['claude'],usage_history=True),root)
+            from agent_history import configure
+            configure(root/'tools/activity',True,123)
+            before=(root/'tools/aim_host.json').read_bytes();original=private_files.write_bytes
+            def fail_consent(path,data):
+                if Path(path).parent==root/'tools/activity':raise OSError('Synthetic consent-storage failure')
+                return original(path,data)
+            with patch.object(private_files,'write_bytes',side_effect=fail_consent):
+                with self.assertRaises(OSError):
+                    desktop.save_settings(root,'guition-p4',['claude'],'COM6',30,key='new-fixture-key',options={'usage_history':False})
+            self.assertEqual((root/'tools/aim_host.json').read_bytes(),before)
