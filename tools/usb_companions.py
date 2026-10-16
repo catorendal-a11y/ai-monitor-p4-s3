@@ -12,7 +12,7 @@ class UsbPackClient:
         if type(info.get('bootId')) is not int or not 0<info['bootId']<=0xffffffff:
             raise ValueError('Invalid companion device identity')
         self.panel=panel;self.pack=pack;self.clock=clock;self.boot=info['bootId']
-        self.nonce=secrets.token_hex(16);self.offset=0;self.phase='begin';self.started=clock();self.done=False
+        self.nonce=secrets.token_hex(16);self.offset=0;self.phase='prepare';self.started=clock();self.done=False
         self.total_bytes=len(pack.blob) if pack else 0
 
     def request(self,command,check_offset=True,**fields):
@@ -30,7 +30,16 @@ class UsbPackClient:
     def step(self):
         if self.done:return True
         if self.clock()-self.started>300:raise TimeoutError('Companion installation timed out')
-        if self.phase=='begin':
+        if self.phase=='prepare':
+            # A prior complete transfer can still await UI adoption, even when
+            # its host client was replaced. Wait using read-only status before
+            # starting this new transaction; never replay a mutation receipt.
+            value=self.request('pack_status',check_offset=False)
+            if value.get('state') in ('ready','clearing'):return False
+            if value.get('state') not in ('active','builtin','receiving'):
+                raise ValueError('Companion device is not ready for a new transfer')
+            self.phase='begin'
+        elif self.phase=='begin':
             if self.pack is None:self.request('pack_builtin');self.phase='status'
             else:self.request('pack_begin',id=self.pack.id,bytes=len(self.pack.blob));self.phase='chunks'
         elif self.phase=='chunks':
