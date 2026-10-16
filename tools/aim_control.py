@@ -48,27 +48,11 @@ def local_config(root=ROOT):
 
 
 def save_config(config, root=ROOT):
-    directory = root / "tools"
-    directory.mkdir(exist_ok=True)
-    path = directory / "aim_host.json"
-    descriptor, temporary = tempfile.mkstemp(prefix=".aim-config-", suffix=".tmp", dir=directory)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as output:
-            json.dump(config, output, indent=2)
-            output.write("\n")
-        for attempt in range(4):
-            try:
-                os.replace(temporary, path)
-                break
-            except PermissionError as error:
-                # Windows scanners can briefly hold the existing config open.
-                # Retain atomic replacement; never relax file permissions.
-                if getattr(error, 'winerror', None) not in (5, 32) or attempt == 3:
-                    raise
-                time.sleep(0.025 * (2 ** attempt))
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+    from private_files import write_json
+    write_json(root/'tools/aim_host.json',config)
+    if config.get('usage_history',False) is False:
+        from agent_history import revoke
+        revoke(root/'tools/activity')
 
 
 def choose_port(current="auto", ask=input):
@@ -197,6 +181,8 @@ def stop_host(root=ROOT, emit=print):
     _, alive = psutil.wait_procs(processes, timeout=5)
     if alive:
         raise SetupError("Host could not stop. Close this installation's host and retry. No new host or firmware write was started.")
+    from agent_history import revoke
+    revoke(root/'tools/activity')
     emit("Host stopped." if processes else "Host is already stopped.")
 
 

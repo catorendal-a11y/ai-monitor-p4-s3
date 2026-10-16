@@ -11,20 +11,8 @@ from host_security import read_local_json
 
 
 def write_record(path, record):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(suffix='.tmp', dir=path.parent)
-    try:
-        with os.fdopen(descriptor, 'w', encoding='utf-8') as output:
-            json.dump(record, output)
-        for attempt in range(4):
-            try:
-                os.replace(temporary, path)
-                break
-            except PermissionError as error:
-                if os.name!='nt' or getattr(error,'winerror',None) not in (5,32,33) or attempt==3: raise
-                time.sleep(.02)
-    finally:
-        if os.path.exists(temporary): os.unlink(temporary)
+    from private_files import write_json
+    write_json(path,record)
 
 
 def ingest(provider, payload, directory):

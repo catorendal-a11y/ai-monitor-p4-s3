@@ -1,3 +1,4 @@
+from private_files import backup as private_backup
 """Explicit interactive-hook setup. Separate from observational hooks and runtime helper."""
 from pathlib import Path
 import copy
@@ -60,7 +61,7 @@ def update(root, remove=False, home=None, opted_in=False):
         return 'Permission helper already ' + ('removed.' if remove else 'linked.')
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        shutil.copy2(path, path.with_name('settings.ai-monitor-permission-backup-' + str(time.time_ns()) + '.json'))
+        private_backup(path, path.with_name('settings.ai-monitor-permission-backup-' + str(time.time_ns()) + '.json'))
     write_record(path, document)
     return ('Permission helper removed; other Claude hooks and rules were preserved.' if remove else
             'Permission helper linked. Restart Claude Code. Physical decisions require both PC and display opt-in; '

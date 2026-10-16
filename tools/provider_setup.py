@@ -1,3 +1,4 @@
+from private_files import backup as private_backup
 """Explicit local integration setup. Preserve unrelated client settings."""
 import base64
 import os
@@ -90,7 +91,7 @@ def zcode_session_link(root,remove=False,home=None):
         if not remove and 'hooks' not in document:hooks['enabled']=True
         hooks['events']=events;document['hooks']=hooks
         settings.parent.mkdir(parents=True,exist_ok=True)
-        if settings.exists():shutil.copy2(settings,settings.with_name('config.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+        if settings.exists():private_backup(settings,settings.with_name('config.ai-monitor-backup-'+str(time.time_ns())+'.json'))
         write_record(settings,document)
     if not remove and (changed or not marker(activity,'zcode')['enabled']):
         write_record(marker_path,dict(enabled=True,generation=time.time_ns()))
@@ -205,7 +206,7 @@ def codex_session_link(root, remove=False, home=None):
         if hooks: document['hooks']=hooks
         else: document.pop('hooks',None)
         settings.parent.mkdir(parents=True,exist_ok=True)
-        if settings.exists(): shutil.copy2(settings,settings.with_name('hooks.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+        if settings.exists(): private_backup(settings,settings.with_name('hooks.ai-monitor-backup-'+str(time.time_ns())+'.json'))
         write_record(settings,document)
     if not remove and (changed or not marker(activity,'codex')['enabled']):
         write_record(marker_path,dict(enabled=True,generation=time.time_ns()))
@@ -231,7 +232,7 @@ def claude_bridge(root, remove=False, home=None):
         document['statusLine'] = expected
     settings.parent.mkdir(parents=True, exist_ok=True)
     if settings.exists():
-        shutil.copy2(settings, settings.with_name('settings.ai-monitor-backup-' + str(time.time_ns()) + '.json'))
+        private_backup(settings, settings.with_name('settings.ai-monitor-backup-' + str(time.time_ns()) + '.json'))
     write_record(settings, document)
     return ('Claude quota link removed. Local activity remains available.' if remove else
             'Claude quota link installed. Use Claude Code to receive fresh data. A private settings backup is on this PC.')
@@ -307,7 +308,7 @@ def claude_session_link(root, remove=False, home=None):
     if hooks: document['hooks']=hooks
     else: document.pop('hooks',None)
     settings.parent.mkdir(parents=True,exist_ok=True)
-    if settings.exists(): shutil.copy2(settings,settings.with_name('settings.ai-monitor-backup-'+str(time.time_ns())+'.json'))
+    if settings.exists(): private_backup(settings,settings.with_name('settings.ai-monitor-backup-'+str(time.time_ns())+'.json'))
     write_record(settings,document)
     if not remove: write_record(marker_path,{'enabled':True,'generation':time.time_ns()})
     return ('Claude session events removed; other hooks were preserved.' if remove else
