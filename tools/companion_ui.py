@@ -98,7 +98,11 @@ class CompanionView(QWidget):
         health=self.owner.cached_health or {};value=health.get('companion',{})
         stamp=health.get('updated_at')
         current=type(stamp) in (int,float) and 0<=time.time()-stamp<=45
-        if health.get('state')!='connected' or not current:caption='Display: start the host and connect the P4.'
+        config=self.owner.config
+        selected_device=(health.get('board')==config.get('board') and
+                         config.get('port') in ('auto',health.get('port')))
+        if health.get('state')!='connected' or not current or not selected_device:
+            caption='Display: start the host and connect the selected P4 and USB port.'
         elif value.get('state') in ('active','builtin') and value.get('id')!=self.selected_id:
             caption='Display: the selected companion has not been confirmed yet.'
         else:

@@ -40,6 +40,7 @@ class CompanionUiTests(unittest.TestCase):
         app=QApplication.instance() or QApplication([])
         class Owner:
             closed=False;busy=False;cached_health={};status_pool=QThreadPool()
+            config=dict(board='guition-p4',port='COM9999')
         owner=Owner()
         with tempfile.TemporaryDirectory() as directory:
             owner.root=Path(directory);path=owner.root/'pack.zip';path.write_bytes(archive())
@@ -51,7 +52,7 @@ class CompanionUiTests(unittest.TestCase):
             settle();view.import_path(path);settle()
             self.assertTrue(packages.selected(owner.root))
             self.assertEqual(view.choices.count(),1)
-            owner.cached_health=dict(state='connected',updated_at=time.time(),companion=dict(
+            owner.cached_health=dict(state='connected',updated_at=time.time(),board='guition-p4',port='COM9999',companion=dict(
                 state='active',id='f'*64,updated_at=time.time()))
             view.refresh_device()
             self.assertNotIn('activated',view.device_status.text())
