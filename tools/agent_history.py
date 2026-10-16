@@ -191,5 +191,6 @@ def daily_summaries(database,provider,days,now):
         start=datetime.combine(day,datetime.min.time()).timestamp()
         finish=datetime.combine(day+timedelta(days=1),datetime.min.time()).timestamp()
         row=summarize(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now)
+        row.update(task_summary(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now))
         rows.append(dict(provider=provider,date=day.isoformat(),**row))
     return rows

@@ -32,15 +32,17 @@ def compact_history(directory, providers, enabled, now=None, boundaries=None):
     if not enabled:return result
     for provider in providers:
         result['providers'].append(dict(provider=provider,today=None,daily=[None]*7,hourly=[None]*24,quota=None,
-            agents=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None)))
+            agents=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None,
+                        createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None)))
     try:
         database=connect(directory)
         if database is None:return result
         with closing(database):
             for record in result['providers']:
                 provider=record['provider']
-                from agent_history import summarize
+                from agent_history import summarize,task_summary
                 record['agents']=summarize(database,provider,starts[6]*60,now)
+                record['agents'].update(task_summary(database,provider,starts[6]*60,now))
                 # At most seven days of minute buckets, with the DB's existing 500ms hard deadline.
                 rows=database.execute('SELECT minute,tokens FROM tokens WHERE provider=? AND minute>=? AND minute<=? ORDER BY minute',
                     (provider,min(starts[0],(hour-23)*60),minute))
@@ -75,7 +77,8 @@ def compact_history(directory, providers, enabled, now=None, boundaries=None):
         result['error']=True
         for record in result['providers']:
             record.update(today=None,daily=[None]*7,hourly=[None]*24,quota=None,
-                agents=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None))
+                agents=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None,
+                            createdTasks=None,startedTasks=None,completedTasks=None,failedTasks=None))
     return result
 
 

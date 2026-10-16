@@ -206,15 +206,16 @@ class HistoryView(QWidget):
         self.summary.setWordWrap(True); self.summary.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.summary)
         self.chart=HistoryChart(); layout.addWidget(self.chart)
-        self.daily_table=QTableWidget(0,5)
-        self.daily_table.setHorizontalHeaderLabels(['Local day','Sessions','Observed active time','Completed turns','Failed turns'])
+        self.daily_table=QTableWidget(0,7)
+        self.daily_table.setHorizontalHeaderLabels(['Local day','Sessions','Active seconds','Turns done','Turns failed','Tasks done','Tasks failed'])
         self.daily_table.setAccessibleName('Daily observed agent summary')
         self.daily_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.daily_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.daily_table.setMinimumHeight(200)
         layout.addWidget(self.daily_table)
         daily_notice=QLabel('Daily summary uses local dates and observed lifecycle events. -- means unknown. '
-                           'Waiting and long gaps are excluded. Completed turns are not confirmed tasks.')
+                           'Waiting and long gaps are excluded. Turns and client-reported tasks are separate. '
+                           'Task completion does not prove tests passed.')
         daily_notice.setWordWrap(True);layout.addWidget(daily_notice)
         self.details=QPlainTextEdit(); self.details.setReadOnly(True)
         self.details.setAccessibleName('Quota observations and estimated consumption pace')
@@ -266,7 +267,8 @@ class HistoryView(QWidget):
         daily=sorted(data.get('daily_agents',[]),key=lambda row:row['date'],reverse=True)
         self.daily_table.setRowCount(len(daily))
         for index,row in enumerate(daily):
-            values=[row['date'],row['sessions'],row['activeSeconds'],row['completedTurns'],row['failedTurns']]
+            values=[row['date'],row['sessions'],row['activeSeconds'],row['completedTurns'],row['failedTurns'],
+                    row.get('completedTasks'),row.get('failedTasks')]
             for column,value in enumerate(values):
                 text='--' if value is None else (f'{value} s' if column==2 else str(value))
                 self.daily_table.setItem(index,column,QTableWidgetItem(text))
@@ -309,7 +311,8 @@ class HistoryView(QWidget):
         if not data['forecasts']: captions.append('No reliable pace estimate yet: needs fresh increasing samples in the same reset window.')
         self.details.setPlainText('\n'.join(captions))
         observed=any(row.get(metric) is not None for row in daily
-                     for metric in ('sessions','activeSeconds','completedTurns','failedTurns'))
+                     for metric in ('sessions','activeSeconds','completedTurns','failedTurns',
+                                    'createdTasks','startedTasks','completedTasks','failedTasks'))
         self.export_button.setEnabled(bool(data['tokens'] or data['quota'] or observed))
 
     def _chart(self,*unused):
@@ -341,7 +344,9 @@ class HistoryView(QWidget):
                     writer.writerow(['quota_used_percent',row['provider'],stamp,row['used'],row['window'],row['kind'],row['reset'],''])
                 for row in data.get('daily_agents',[]):
                     for metric,field in [('observed_sessions','sessions'),('observed_active_seconds','activeSeconds'),
-                                         ('completed_turns','completedTurns'),('failed_turns','failedTurns')]:
+                                         ('completed_turns','completedTurns'),('failed_turns','failedTurns'),
+                                         ('client_tasks_created','createdTasks'),('client_tasks_started','startedTasks'),
+                                         ('client_tasks_completed','completedTasks'),('client_tasks_failed','failedTasks')]:
                         if row.get(field) is not None:
                             writer.writerow([metric,row['provider'],'',row[field],'','','',row['date']])
             self.summary.setText('Numeric history exported. No prompts, account identifiers or credentials were included.')
