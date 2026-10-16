@@ -69,6 +69,9 @@ class HostStatus:
         if name not in PROVIDERS or state not in ('ready', 'unavailable', 'activity_only'):
             raise ValueError('Unknown provider health')
         self.data['providers'][name] = state
+        stamp=time.time()
+        self.data.setdefault('provider_updated_at',{})[name]=stamp
+        if state=='ready': self.data.setdefault('provider_success_at',{})[name]=stamp
         self.update()
 
 
@@ -86,6 +89,12 @@ def read_status(root, pids):
         from provider_catalog import PROVIDERS
         for name, value in data['providers'].items():
             if name not in PROVIDERS or value not in ('ready', 'unavailable', 'activity_only'): return None
+        for field in ('provider_updated_at','provider_success_at'):
+            if field not in data: continue
+            stamps=data[field]
+            if not isinstance(stamps,dict) or len(stamps)>len(PROVIDERS): return None
+            for name,stamp in stamps.items():
+                if name not in PROVIDERS or type(stamp) not in (int,float) or not math.isfinite(stamp) or not 0<=stamp<=time.time()+1: return None
         if 'display_sources' in data:
             mask,stamp=data['display_sources'],data.get('display_sources_at')
             if type(mask) is not int or not 0<=mask<=255 or type(stamp) not in (int,float) or not math.isfinite(stamp): return None

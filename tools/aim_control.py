@@ -378,7 +378,21 @@ def main(argv=None):
     events=parser.add_mutually_exclusive_group()
     events.add_argument('--link-events',choices=('codex','claude','zcode'),help='Explicitly link selected-provider observational hooks')
     events.add_argument('--unlink-events',choices=('codex','claude','zcode'),help='Remove only this installation\'s observational hooks')
+    lifecycle=parser.add_mutually_exclusive_group()
+    lifecycle.add_argument('--prepare-upgrade',action='store_true',help='Stop this installation before upgrading')
+    lifecycle.add_argument('--prepare-uninstall',action='store_true',help='Remove only this installation integrations before uninstalling')
+    parser.add_argument('--installation-root',type=Path,help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.installation_root is not None and not (args.prepare_upgrade or args.prepare_uninstall):
+        parser.error('--installation-root requires a lifecycle action')
+    if args.prepare_upgrade or args.prepare_uninstall:
+        try:
+            from installation_lifecycle import prepare
+            prepare((args.installation_root or ROOT).resolve(),uninstall=args.prepare_uninstall)
+            return 0
+        except (ValueError,RuntimeError,OSError,psutil.Error):
+            print('Installation cleanup could not finish. Close this installation and retry; private details were not printed.')
+            return 1
     if args.quota_worker:
         return host.quota_worker(args.quota_worker)
     (ROOT / "tools").mkdir(exist_ok=True)

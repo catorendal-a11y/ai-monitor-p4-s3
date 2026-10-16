@@ -11,7 +11,7 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Qt, Signal, 
 from PySide6.QtGui import QDesktopServices, QFont, QIcon, QPixmap, QShortcut, QKeySequence
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFrame, QFileDialog,
     QGridLayout, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox,
     QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox,
     QTabWidget, QVBoxLayout, QWidget, QSystemTrayIcon, QMenu, QSizePolicy, QStackedWidget,
@@ -818,6 +818,8 @@ class MonitorWindow(QMainWindow):
         layout.addWidget(self.hardware_diagnostics)
         self.device_screen_button = self._button("Device screen…", self.device_screen)
         layout.addWidget(self.device_screen_button)
+        self.diagnostic_button=self._button('Export diagnostics…',self.export_diagnostics)
+        layout.addWidget(self.diagnostic_button)
         self.recover_button = self._button('Recover invalid settings…', self.recover_settings)
         reserve_hidden_space(self.recover_button)
         self.recover_button.setVisible(self.config_error)
@@ -827,6 +829,28 @@ class MonitorWindow(QMainWindow):
         layout.addStretch()
         scroll = QScrollArea(); scroll.setWidgetResizable(True); scroll.setWidget(content)
         return scroll
+
+    def export_diagnostics(self):
+        if self.busy or self.closed:return
+        path,_=QFileDialog.getSaveFileName(self,'Export diagnostic metadata','ai-monitor-diagnostics.json','JSON files (*.json)')
+        if not path:return
+        config=dict(self.config)
+        def export(emit):
+            import json
+            from diagnostic_report import build
+            from private_files import write_bytes
+            health=read_status(self.root,{process.pid for process in control.owned_hosts(self.root)})
+            write_bytes(Path(path),json.dumps(build(config,health),indent=2,allow_nan=False).encode('utf-8'))
+            emit('Diagnostic metadata exported. No keys, account identifiers or conversations were included.')
+        self._run('Exporting diagnostics',export)
+
+    def clear_history(self):
+        if self.busy or self.closed:return
+        view=self.history_view
+        view.generation+=1
+        view.data=None;view.chart.set_rows([]);view.details.clear()
+        view.daily_table.setRowCount(0);view.export_button.setEnabled(False)
+        self._run('Clearing local history',lambda emit:desktop.clear_local_history(self.root,emit))
 
     def device_screen(self):
         from desktop_mirror import MirrorDialog
@@ -1243,6 +1267,7 @@ class MonitorWindow(QMainWindow):
         self.notice.setText(message)
         self.append_output(message)
         self.worker = None
+        if action_name=='Clearing local history': self.history_view.refresh()
         if not success:
             self.quit_requested = False
             if self.hidden_to_tray: self.restore_from_tray()
@@ -1488,11 +1513,8 @@ class MonitorWindow(QMainWindow):
                 health.get('board') == self.config.get('board') and
                 self.config['port'] in ('auto', health.get('port')))
             self._update_setup_progress()
-            captions = {'ready': 'quota received', 'unavailable': 'quota unavailable — check Host log / Provider setup',
-                        'activity_only': 'activity only; no account quota'}
-            self.provider_health.setText('\n'.join(PROVIDERS[key][0] + ': ' + captions.get(states.get(key),
-                'waiting for quota status' if running else 'host stopped') for key in self.config['providers']) or
-                'Choose your AI providers in AI setup.')
+            from diagnostic_report import provider_health_text
+            self.provider_health.setText(provider_health_text(self.config,health))
             text = data['log']
             if text != self.previous_log:
                 scrollbar = self.host_log.verticalScrollBar()

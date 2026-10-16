@@ -14,6 +14,18 @@ from provider_catalog import selected_providers
 from host_status import validate_options, read_status
 
 
+def clear_local_history(root: Path, emit=print) -> None:
+    """Stop the owned writer before clearing; restore the prior host lifecycle."""
+    from usage_history import clear_history
+    was_running=bool(control.owned_hosts(root))
+    control.stop_host(root,emit=emit)
+    try:
+        clear_history(root/'tools/activity')
+    finally:
+        if was_running: control.start_host(root,emit=emit)
+    emit('Local history cleared. Collection settings were preserved.')
+
+
 def load_settings(root: Path) -> dict:
     config = control.local_config(root)
     validate_options(config)
