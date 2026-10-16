@@ -168,6 +168,16 @@ r.record_tokens({'claude':9});time.sleep(.1);r.close()
   with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':str(self.root/'other-config'),'CLAUDE_CODE_TASK_LIST_ID':'list-0'}):
    history.observe_task(self.root,self.task('resumed-session','other','TaskCreate'),7,40)
   with closing(connect(self.root)) as db:self.assertEqual(history.task_summary(db,'claude',0,100)['createdTasks'],3)
+ def test_mixed_legacy_namespace_summary_stays_unknown_without_deleting_rows(self):
+  legacy=hashlib.sha256(b'old-session-and-task').hexdigest()
+  with closing(connect(self.root,True)) as db,db:
+   db.execute('INSERT INTO task_events VALUES(?,?,?,?,?,?,?)',('legacy','claude',legacy,7,17,'completed',10))
+  history.observe_task(self.root,self.task('session-a','new'),7,20)
+  with closing(connect(self.root)) as db:
+   self.assertIsNone(history.task_summary(db,'claude',0,100)['completedTasks'])
+   self.assertEqual(history.task_summary(db,'claude',15,100)['completedTasks'],1)
+   self.assertEqual(history.task_summary(db,'claude',0,15)['completedTasks'],1)
+   self.assertEqual(db.execute('SELECT COUNT(*) FROM task_events').fetchone()[0],2)
  def test_cancel_and_session_end_close_activity_without_outcome_evidence(self):
   for terminal,state in [('Interrupt','IDLE'),('SessionEnd','closed')]:
    with self.subTest(event=terminal):
