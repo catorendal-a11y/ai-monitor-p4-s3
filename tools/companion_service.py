@@ -52,13 +52,17 @@ class CompanionService:
             self.state='installing'
         if self.client is None:return
         if self.client.done:
-            if self.state=='active' and time.monotonic()>=self.next_status:
+            if self.state in ('active','unconfirmed','different') and time.monotonic()>=self.next_status:
                 try:
                     value=self.client.request('pack_status',check_offset=False)
-                    if value.get('state')=='builtin' and value.get('id')=='':self.state='overridden'
-                    elif value.get('state')!='active' or value.get('id')!=self.identifier:self.state='error'
-                    self.stamp=time.time();self.next_status=time.monotonic()+15
-                except (OSError,ValueError,RuntimeError,TimeoutError):self.state='error';self.stamp=time.time()
+                    if value.get('state')=='active':
+                        self.state='active' if value.get('id')==self.identifier else 'different'
+                    elif value.get('state')=='builtin' and value.get('id')=='':
+                        self.state='builtin' if not self.identifier else 'overridden' if self.state=='active' else 'different'
+                    else:self.state='unconfirmed'
+                    self.stamp=time.time();self.next_status=time.monotonic()+(1 if self.state=='unconfirmed' else 15)
+                except (OSError,ValueError,RuntimeError,TimeoutError):
+                    self.state='unconfirmed';self.stamp=time.time();self.next_status=time.monotonic()+15
             return
         deadline=time.monotonic()+.12
         try:
@@ -68,12 +72,12 @@ class CompanionService:
                     self.next_status=time.monotonic()+15;return
                 if time.monotonic()>=deadline:return
         except (OSError,ValueError,RuntimeError,TimeoutError):
-            self.client.cancel();self.state='error';self.stamp=time.time()
+            self.client.cancel();self.state='unconfirmed';self.stamp=time.time();self.next_status=time.monotonic()+1
 
     def snapshot(self):
         client=self.client
         return dict(state=self.state,id='' if self.state=='overridden' else self.identifier,name=self.name,
-            sent_bytes=client.offset if client else 0,total_bytes=len(client.pack.blob) if client and client.pack else 0,
+            sent_bytes=client.offset if client else 0,total_bytes=client.total_bytes if client else 0,
             updated_at=self.stamp)
 
     def close(self):

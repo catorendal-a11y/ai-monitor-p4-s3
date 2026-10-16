@@ -13,6 +13,7 @@ class UsbPackClient:
             raise ValueError('Invalid companion device identity')
         self.panel=panel;self.pack=pack;self.clock=clock;self.boot=info['bootId']
         self.nonce=secrets.token_hex(16);self.offset=0;self.phase='begin';self.started=clock();self.done=False
+        self.total_bytes=len(pack.blob) if pack else 0
 
     def request(self,command,check_offset=True,**fields):
         self.panel.send_line(json.dumps(dict(cmd=command,bootId=self.boot,nonce=self.nonce,**fields),separators=(',',':')))

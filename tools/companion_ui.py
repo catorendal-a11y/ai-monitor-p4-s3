@@ -104,7 +104,9 @@ class CompanionView(QWidget):
         else:
             caption={'builtin':'Display: built-in companions confirmed.','active':'Display: external pack activated.',
                 'installing':'Display: transferring and verifying the selected pack…',
-                'error':'Display: installation failed; previous companion retained. Select the pack again to retry.',
+                'error':'Display: local pack data unavailable. Refresh the library and select a verified pack.',
+                'unconfirmed':'Display: activation unconfirmed; checking device status. No activation is retried automatically.',
+                'different':'Display: the selected pack is not active. Select it again to retry.',
                 'overridden':'Display: built-in companion selected on the screen. Use selected pack to restore it.',
                 'unsupported':'Display: update to firmware with external companion support.'}.get(value.get('state'),'Display: waiting for confirmation.')
         self.device_status.setText(caption)
