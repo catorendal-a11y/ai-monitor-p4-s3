@@ -85,6 +85,19 @@ async def mounted_widget(pilot,selector):
 
 
 class TerminalUITests(unittest.IsolatedAsyncioTestCase):
+    async def test_reference_layout_has_separate_device_robot_tables_and_bottom_status(self):
+        from textual.widgets import Static
+        app=TerminalApp(ROOT,reader=lambda _:fixture())
+        async with app.run_test(size=(120,40)) as pilot:
+            await pilot.pause(.2)
+            main=app.screen_stack[0]
+            self.assertTrue(main.query('#nova-panel'))
+            self.assertTrue(main.query('#overview-device'))
+            quota=main.query_one('#quota',Static)
+            agents=main.query_one('#overview-agents',Static)
+            self.assertNotIsInstance(quota.render(),str)
+            self.assertIn('Provider',str(agents.render()))
+            self.assertGreater(main.query_one('#connection').region.y,agents.region.y)
     async def test_operation_forms_cancel_without_backend_calls(self):
         from unittest.mock import Mock
         from terminal_forms import ActionForm
