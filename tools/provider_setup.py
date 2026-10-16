@@ -79,7 +79,7 @@ def zcode_session_link(root,remove=False,home=None):
             for entry in entries:
                 if entry.get('matcher','')!='' or expected not in entry['hooks']:kept.append(entry);continue
                 remaining=[h for h in entry['hooks'] if h!=expected]
-                if remaining:kept.append(dict(entry,hooks=remaining))
+                if remaining or set(entry)-{'matcher','hooks'}:kept.append(dict(entry,hooks=remaining))
                 changed=True
             if kept:events[event]=kept
             else:events.pop(event,None)
@@ -193,7 +193,7 @@ def codex_session_link(root, remove=False, home=None):
                 owned=entry.get('matcher','')=='' and any(h==expected or _legacy_codex_hook(h,root) for h in entry['hooks'])
                 if not owned: kept.append(entry); continue
                 remaining=[hook for hook in entry['hooks'] if hook!=expected and not _legacy_codex_hook(hook,root)]
-                if remaining: kept.append(dict(entry,hooks=remaining))
+                if remaining or set(entry)-{'matcher','hooks'}: kept.append(dict(entry,hooks=remaining))
                 changed=True
             if kept: hooks[event]=kept
             else: hooks.pop(event,None)
@@ -290,7 +290,7 @@ def claude_session_link(root, remove=False, home=None):
                 owned=entry.get('matcher','')==matcher and expected in entry['hooks']
                 if not owned: kept.append(entry); continue
                 remaining=[h for h in entry['hooks'] if h!=expected]
-                if remaining: kept.append(dict(entry,hooks=remaining))
+                if remaining or set(entry)-{'matcher','hooks'}: kept.append(dict(entry,hooks=remaining))
                 changed=True
             if kept: hooks[event]=kept
             else: hooks.pop(event,None)

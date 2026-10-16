@@ -62,10 +62,11 @@ class LifecycleTests(unittest.TestCase):
                 events=data['hooks'].get('events',data['hooks'])
                 event=event if event in events else next(iter(events))
                 events[event][0]['fixtureCustomMetadata']='preserve'
+                expected=dict(events[event][0],hooks=[])
                 path.write_text(json.dumps(data)); link(root,remove=True,home=home)
                 after=json.loads(path.read_text())
                 events=after.get('hooks',{}).get('events',after.get('hooks',{}))
-                self.assertEqual(events[event],[{'matcher':'','hooks':[],'fixtureCustomMetadata':'preserve'}] if link!=providers.zcode_session_link else [{'hooks':[],'fixtureCustomMetadata':'preserve'}])
+                self.assertEqual(events[event],[expected])
 
     def test_custom_statusline_and_permission_hook_survive(self):
         import installation_lifecycle as life

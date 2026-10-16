@@ -3,7 +3,6 @@
 Private configuration, history, account trust and unrelated integrations survive.
 Only the installed console calls this module; no uninstall is started here.
 """
-import os
 from pathlib import Path
 import subprocess
 from host_security import powershell_executable
@@ -16,7 +15,7 @@ def remove_startup_task(root):
 $tasks=@(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop | Where-Object {$_.TaskName -ceq 'AI Monitor Host'});
 if ($tasks.Count -eq 0) { exit 0 }; if ($tasks.Count -ne 1) { exit 1 };
 $task=$tasks[0]; $actions=@($task.Actions);
-if ($actions.Count -ne 1 -or $actions[0].Execute -ine '__EXECUTABLE__' -or $actions[0].Arguments -cne '--start-host') { exit 0 };
+if ($actions.Count -ne 1 -or ([string]$actions[0].Execute).Trim('"') -ine '__EXECUTABLE__' -or $actions[0].Arguments -cne '--start-host') { exit 0 };
 $user=$task.Principal.UserId;
 if ($user -notmatch '^S-1-') { $user=([System.Security.Principal.NTAccount]::new($user)).Translate([System.Security.Principal.SecurityIdentifier]).Value };
 if ($user -ne [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value) { exit 0 };

@@ -59,6 +59,7 @@ var
   Helper: String;
   ResultCode: Integer;
 begin
+  ResultCode := -1;
   Helper := ExpandConstant('{app}\AI-Monitor-Console.exe');
   Result := Exec(Helper, Option, ExpandConstant('{app}'), SW_HIDE,
     ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
@@ -72,7 +73,7 @@ begin
   if FileExists(ExpandConstant('{app}\AI-Monitor-Console.exe')) then begin
     ExtractTemporaryFile('AI-Monitor-Console.exe');
     if not Exec(ExpandConstant('{tmp}\AI-Monitor-Console.exe'),
-      '--prepare-upgrade --installation-root ' + AddQuotes(ExpandConstant('{app}')),
+      '--prepare-upgrade --installation-root "' + ExpandConstant('{app}') + '"',
       ExpandConstant('{app}'), SW_HIDE, ewWaitUntilTerminated, ResultCode) then
       ResultCode := -1;
     if ResultCode <> 0 then

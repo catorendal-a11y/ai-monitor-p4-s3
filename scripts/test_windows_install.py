@@ -4,6 +4,10 @@ import hashlib
 from pathlib import Path
 import subprocess
 import tempfile
+import os
+import sys
+import time
+from unittest.mock import patch
 import winreg
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,11 +23,23 @@ def main():
             raise RuntimeError('Run installer smoke tests on a clean user profile; an installed AI Monitor already exists.')
     except FileNotFoundError:
         pass
+    # This exercises real installed hooks only inside a disposable profile.
+    sys.path.insert(0,str(ROOT/'tools'))
+    from claude_paths import config_root
+    from codex_support import codex_home
+    from private_files import write_json
+    import provider_setup as providers
+    from claude_permission_setup import update as permission_update
+    profile_files=[config_root()/'settings.json',codex_home()/'hooks.json',Path.home()/'.zcode/cli/config.json']
+    if any(path.exists() for path in profile_files):
+        raise RuntimeError('Use a disposable Windows profile without existing provider settings.')
     scratch = ROOT/'work'; scratch.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='installer-test-', dir=scratch) as directory:
         target = Path(directory)/'AI Monitor'
         arguments = [str(args.installer.resolve()), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOICONS', f'/DIR={target}']
         installed = False
+        fixture_host = None
+        before = None
         try:
             subprocess.run(arguments, check=True, timeout=180, creationflags=subprocess.CREATE_NO_WINDOW)
             installed = True
@@ -33,17 +49,50 @@ def main():
                 subprocess.run(arguments_check, check=True, timeout=40, stdout=subprocess.DEVNULL,
                                stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW)
             config = target/'tools/aim_host.json'
-            config.write_text('{"providers":["copilot"],"board":"guition-p4","port":"COM9999","zai_key":"fixture-private-key"}')
+            write_json(config,dict(providers=['claude'],board='guition-p4',port='COM9999',
+                                   zai_key='fixture-private-key',usage_history=False))
+            # Exact installed command generation, with custom settings/hooks alongside it.
+            with patch.object(sys,'frozen',True,create=True):
+                for link in (providers.codex_session_link,providers.claude_session_link,providers.zcode_session_link): link(target)
+                providers.claude_bridge(target)
+                permission_update(target,opted_in=True)
+            import json
+            claude_settings=profile_files[0]
+            document=json.loads(claude_settings.read_text())
+            custom={'type':'command','command':'echo fixture-custom-observer'}
+            document['env']={'AI_MONITOR_SMOKE_FIXTURE':'preserve'}
+            document['hooks']['Stop'][0]['hooks'].append(custom)
+            write_json(claude_settings,document)
+            fixture_host=subprocess.Popen([str(target/'AI-Monitor-Console.exe'),'--host'],
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
+            time.sleep(3)
+            assert fixture_host.poll() is None, 'Fixture host did not remain running'
+
             before = hashlib.sha256(config.read_bytes()).digest()
             subprocess.run(arguments, check=True, timeout=180, creationflags=subprocess.CREATE_NO_WINDOW)
             assert hashlib.sha256(config.read_bytes()).digest() == before, 'Upgrade modified local settings'
+            fixture_host.wait(timeout=15)
+            fixture_host=subprocess.Popen([str(target/'AI-Monitor-Console.exe'),'--host'],
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
+            time.sleep(3)
+            assert fixture_host.poll() is None, 'Uninstall fixture host did not remain running'
         finally:
             if installed:
                 subprocess.run([str(target/'unins000.exe'), '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
                                check=True, timeout=90, creationflags=subprocess.CREATE_NO_WINDOW)
-        assert config.is_file() and hashlib.sha256(config.read_bytes()).digest() == before
+        if fixture_host is not None: fixture_host.wait(timeout=15)
+        assert config.is_file() and before is not None and hashlib.sha256(config.read_bytes()).digest() == before
+        document=json.loads(claude_settings.read_text())
+        assert document.get('env')=={'AI_MONITOR_SMOKE_FIXTURE':'preserve'}
+        assert 'statusLine' not in document
+        assert document['hooks']['Stop'][0]['hooks']==[custom], 'Uninstall removed custom hooks'
+        assert not document['hooks'].get('PermissionRequest'), 'Permission helper was retained'
+        with patch.object(sys,'frozen',True,create=True):
+            # State readers require helper files; inspect exact stored collections instead.
+            assert not json.loads(profile_files[1].read_text()).get('hooks')
+            assert not json.loads(profile_files[2].read_text()).get('hooks',{}).get('events')
         assert not (target/'AI-Monitor.exe').exists(), 'Uninstaller left application files'
-    print('PASS: clean per-user installation, exact EXE/Qt startup, CLI flasher, upgrade and private-settings-preserving uninstall.')
+    print('PASS: clean per-user installation, EXE/Qt startup, running-host upgrade/uninstall, exact-owned integration cleanup and private-settings preservation.')
 
 
 if __name__ == '__main__': main()
