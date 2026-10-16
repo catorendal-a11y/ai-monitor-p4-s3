@@ -160,6 +160,21 @@ class InsightsUiTests(unittest.TestCase):
             view.clear_button.click()
         self.window.clear_history.assert_called_once()
 
+    def test_history_does_not_read_or_accept_pending_results_during_clear(self):
+        view=self.window.history_view
+        self.window.current_action='Clearing local history'
+        view.worker=None
+        with patch.object(self.window.status_pool,'start') as start:
+            view.provider.setCurrentIndex(view.provider.findData('codex'))
+            view.refresh()
+        start.assert_not_called()
+        data=dict(tokens=[dict(provider='codex',day=1,date='1970-01-02',total=99)],
+                  quota=[],forecasts=[],error=None,daily_agents=[])
+        view._finished((view.generation,'codex',data))
+        self.assertIsNone(view.data)
+        self.assertFalse(view.export_button.isEnabled())
+        self.window.current_action=None
+
     def test_live_test_resets_cells_expires_and_deconfirms_wrong_or_stale_display(self):
         dialog=SetupReportDialog(self.report(),self.window)
         self.window.live_sampler=Mock(); self.window.live_sampler.poll.return_value=None
