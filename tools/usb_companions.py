@@ -14,14 +14,15 @@ class UsbPackClient:
         self.panel=panel;self.pack=pack;self.clock=clock;self.boot=info['bootId']
         self.nonce=secrets.token_hex(16);self.offset=0;self.phase='begin';self.started=clock();self.done=False
 
-    def request(self,command,**fields):
+    def request(self,command,check_offset=True,**fields):
         self.panel.send_line(json.dumps(dict(cmd=command,bootId=self.boot,nonce=self.nonce,**fields),separators=(',',':')))
         value=self.panel.wait_for('pack_reply',seconds=.4,command=command)
         if (not isinstance(value,dict) or type(value.get('schema')) is not int or value['schema']!=1 or
                 value.get('cmd')!=command or value.get('nonce')!=self.nonce or
                 type(value.get('bootId')) is not int or value['bootId']!=self.boot or
                 type(value.get('ok')) is not bool or not value['ok'] or
-                type(value.get('offset')) is not int or value['offset']!=self.offset):
+                type(value.get('offset')) is not int or not 0<=value['offset']<=2*1024*1024 or
+                (check_offset and value['offset']!=self.offset)):
             raise ValueError('Companion transfer was not acknowledged by the selected device')
         return value
 

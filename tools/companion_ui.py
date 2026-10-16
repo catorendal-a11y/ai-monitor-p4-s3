@@ -1,6 +1,7 @@
 """Explicit data-only companion library actions; decoding and disk work stay off Qt."""
 from pathlib import Path
 from itertools import islice
+import time
 from PySide6.QtCore import Qt,QTimer
 from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QComboBox,QPushButton,QFileDialog
 import companion_packages as packages
@@ -8,7 +9,7 @@ import companion_packages as packages
 
 class CompanionView(QWidget):
     def __init__(self,owner):
-        super().__init__();self.owner=owner;self.worker=None
+        super().__init__();self.owner=owner;self.worker=None;self.selected_id=None
         layout=QVBoxLayout(self)
         heading=QLabel('External companion packs');heading.setWordWrap(True);layout.addWidget(heading)
         note=QLabel('Import a version-2 animation ZIP and use it on a supported P4. '
@@ -53,8 +54,9 @@ class CompanionView(QWidget):
         if self.owner.closed:return
         for button in self.buttons:button.setEnabled(True)
         if result is None:
-            self.status.setText('Pack rejected or local library unavailable. The previous selection was preserved.');return
+            self.status.setText('Pack rejected or local library unavailable. Refresh to check the saved selection.');return
         rows,selected,caption,bad=result
+        self.selected_id=selected
         self.choices.clear()
         for name,identifier in rows:self.choices.addItem(name,identifier)
         index=self.choices.findData(selected)
@@ -83,10 +85,15 @@ class CompanionView(QWidget):
 
     def refresh_device(self):
         health=self.owner.cached_health or {};value=health.get('companion',{})
-        if health.get('state')!='connected':caption='Display: start the host and connect the P4.'
+        stamp=health.get('updated_at')
+        current=type(stamp) in (int,float) and 0<=time.time()-stamp<=45
+        if health.get('state')!='connected' or not current:caption='Display: start the host and connect the P4.'
+        elif value.get('state') in ('active','builtin') and value.get('id')!=self.selected_id:
+            caption='Display: the selected companion has not been confirmed yet.'
         else:
             caption={'builtin':'Display: built-in companions confirmed.','active':'Display: external pack activated.',
                 'installing':'Display: transferring and verifying the selected pack…',
                 'error':'Display: installation failed; previous companion retained. Select the pack again to retry.',
+                'overridden':'Display: built-in companion selected on the screen. Use selected pack to restore it.',
                 'unsupported':'Display: update to firmware with external companion support.'}.get(value.get('state'),'Display: waiting for confirmation.')
         self.device_status.setText(caption)

@@ -48,19 +48,29 @@ class CompanionService:
             try:self.client=UsbPackClient(panel,pack)
             except ValueError:self.state='unsupported';return
             self.state='installing'
-        if self.client is None or self.client.done:return
+        if self.client is None:return
+        if self.client.done:
+            if self.state=='active' and time.monotonic()>=self.next_status:
+                try:
+                    value=self.client.request('pack_status',check_offset=False)
+                    if value.get('state')=='builtin' and value.get('id')=='':self.state='overridden'
+                    elif value.get('state')!='active' or value.get('id')!=self.identifier:self.state='error'
+                    self.stamp=time.time();self.next_status=time.monotonic()+15
+                except (OSError,ValueError,RuntimeError,TimeoutError):self.state='error';self.stamp=time.time()
+            return
         deadline=time.monotonic()+.12
         try:
             for _ in range(8):
                 if self.client.step():
-                    self.state='active' if self.identifier else 'builtin';self.stamp=time.time();return
+                    self.state='active' if self.identifier else 'builtin';self.stamp=time.time()
+                    self.next_status=time.monotonic()+15;return
                 if time.monotonic()>=deadline:return
         except (OSError,ValueError,RuntimeError,TimeoutError):
             self.client.cancel();self.state='error';self.stamp=time.time()
 
     def snapshot(self):
         client=self.client
-        return dict(state=self.state,id=self.identifier,name=self.name,
+        return dict(state=self.state,id='' if self.state=='overridden' else self.identifier,name=self.name,
             sent_bytes=client.offset if client else 0,total_bytes=len(client.pack.blob) if client and client.pack else 0,
             updated_at=self.stamp)
 
