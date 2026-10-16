@@ -22,11 +22,38 @@ It does not certify every hardware interaction or provider model.
 | Permission/enrollment | Opt-in, physical comparison, request identity, hold/release, visibility and delivery gates | Production approval remains disabled; synthetic tests do not establish physical validation |
 | Upgrade/uninstall | Exact installation host/task/integrations, old-version compatibility, cleanup failure | New helper stops old host; uncertain cleanup blocks uninstall; private data retained |
 
-Changed Python modules have 89% combined executable-line coverage. Actual LVGL UI
-translation units have 97-100% executable-line coverage and 54-74% branch execution.
+Changed Python modules have 89% combined executable-line coverage. The nine main
+firmware UI modules have 97-100% executable-line coverage; connection UI has 89%.
+The main modules take 54-74% of branch outcomes at least once (gcov), including
+compiler-generated paths. The permission wrapper has its own separate native target.
 Coverage is a measure of exercised code, not a guarantee that no defect remains.
 
 Full suite and version-specific package/device/endurance results are recorded with
 the local rc10 delivery. Real hold/release/enrollment, physical unplug/suspend,
 S3 panel/touch, clean Windows profile installation, genuine publisher signing and
 the full eight-hour endurance result remain distinct validation gates.
+
+
+## Visual follow-up
+
+Reviewed all main screens and sub-screens using 75 native 800x480 states and 19
+Qt views/dialogs with real Segoe fonts at minimum desktop size. This includes
+provider paging and precision, remaining/used labels, offline/last-good values,
+long errors, session versus token activity, old agent observations, history gaps,
+warning/critical overlays, notification pages, brightness choices, night minutes,
+quota-window selection, themes, enrollment comparison and blocked/held permissions.
+Desktop views cover setup, provider instructions, host preferences, firmware
+operation/confirmation, help, history, companions, the checklist and empty mirror.
+
+The visual review exposed two additional defects after the initial source audit:
+
+- History actions exceeded the minimum desktop width. Selection/refresh and
+  export/clear now use two rows; real-font geometry asserts no horizontal overflow.
+- SAVED / SAVE FAILED could be covered by alert and night overlays. Feedback now
+  stays in front of every active settings overlay and outside its action buttons.
+  Tests verify stacking, position and visibility; the final failure frame was
+  inspected rather than relying on the stored label text alone.
+
+Snapshot data and comparison codes used in this review are synthetic. Physical
+screen capture verifies only the actual current P4 frame, not unperformed touch
+flows. No virtual approval/touch path was added.

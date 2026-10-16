@@ -11,6 +11,8 @@
   Reject health and companion activation from another saved board or port.
 - Stop the exact host before upgrades. Uninstall removes only confirmed owned hooks
   and startup tasks, preserving private data and custom integration metadata.
+- Fit history actions within the minimum desktop width and keep save success/failure
+  feedback visible above alert and night settings overlays.
 - Physical approvals remain disabled. Signing, clean-profile installation and long
   endurance remain separate validation gates.
 
