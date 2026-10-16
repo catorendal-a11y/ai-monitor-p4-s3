@@ -234,7 +234,7 @@ class HistoryView(QWidget):
         self.export_button.setEnabled(False)
 
     def refresh(self,*unused):
-        if self.owner.closed: return
+        if self.owner.closed or getattr(self.owner,'current_action',None)=='Clearing local history': return
         self.generation+=1
         self.data=None; self.chart.set_rows([]); self.details.clear()
         self.daily_table.setRowCount(0)
@@ -257,7 +257,7 @@ class HistoryView(QWidget):
 
     def _finished(self,result):
         self.worker=None
-        if self.owner.closed: return
+        if self.owner.closed or getattr(self.owner,'current_action',None)=='Clearing local history': return
         self.refresh_button.setEnabled(True)
         if result is None:
             self.summary.setText('History could not be read. Existing data was preserved.'); return
