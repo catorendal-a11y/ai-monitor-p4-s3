@@ -73,6 +73,27 @@ class Rc10Tests(unittest.TestCase):
             self.assertEqual(control.main(['--prepare-uninstall']),1)
         self.assertNotIn('fixture-secret',output.getvalue())
 
+    def test_diagnostics_do_not_confirm_old_device_receipts_during_reconnect(self):
+        from diagnostic_report import build
+        from project_version import HOST_VERSION
+        config={'board':'guition-p4','port':'COM6','providers':['codex']}
+        health={'state':'connected','board':'guition-p4','port':'COM6','updated_at':100,
+                'providers':{},'live':{'state':'acknowledged','updated_at':100,'agent_count':1},
+                'hardware':{'firmwareVersion':HOST_VERSION},'hardware_at':100,
+                'companion':{'state':'active','updated_at':100}}
+        current=build(config,health,now=110)
+        self.assertEqual(current['agent_usb']['state'],'acknowledged')
+        self.assertEqual(current['firmware_version'],HOST_VERSION)
+        self.assertEqual(current['companion_state'],'active')
+        for disconnected in (True,False):
+            health['state']='reconnecting' if disconnected else 'connected'
+            if not disconnected:
+                health['live']['updated_at']=health['hardware_at']=health['companion']['updated_at']=0
+            report=build(config,health,now=110)
+            self.assertEqual(report['agent_usb']['state'],'unconfirmed')
+            self.assertIsNone(report['firmware_version'])
+            self.assertEqual(report['companion_state'],'unconfirmed')
+
     def test_lifecycle_timeout_is_reported_without_command_or_output(self):
         output=io.StringIO()
         error=subprocess.TimeoutExpired(['fixture-secret'],12,output=b'fixture-secret')
