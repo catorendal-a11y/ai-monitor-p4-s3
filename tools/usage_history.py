@@ -184,13 +184,17 @@ def read_history(directory, providers, days=7, now=None):
     if type(days) is not int or days not in (7,30): raise ValueError('Choose 7 or 30 history days')
     if len(providers)>8 or any(p not in PROVIDERS for p in providers): raise ValueError('Invalid history providers')
     now=time.time() if now is None else now
-    result={'tokens':[], 'quota':[], 'forecasts':[], 'error':None}
+    if type(now) not in (int,float) or not math.isfinite(now) or not 0<=now<=253402214399:
+        raise ValueError('Invalid history clock')
+    result={'tokens':[], 'quota':[], 'forecasts':[], 'daily_agents':[], 'error':None}
     if not providers: return result
     try:
         database=connect(directory)
         if database is None: return result
         with closing(database):
             for provider in providers:
+                from agent_history import daily_summaries
+                result['daily_agents']+=daily_summaries(database,provider,days,now)
                 totals=list(database.execute(
                     'SELECT minute/1440,SUM(tokens) FROM tokens WHERE provider=? AND minute>=? AND minute<=? '
                     'GROUP BY minute/1440 ORDER BY minute/1440 LIMIT 31',
@@ -222,6 +226,6 @@ def read_history(directory, providers, days=7, now=None):
                     hours=max(0,(100-used)/rate)
                     result['forecasts'].append(dict(provider=provider,window=window,kind=kind,
                         percent_per_hour=rate,estimated_hours_to_limit=hours if now+hours*3600<reset else None,reset=reset))
-    except (ValueError,OSError,sqlite3.Error,TypeError):
-        result=dict(tokens=[],quota=[],forecasts=[],error='History unavailable. Check local storage; existing data was preserved.')
+    except (ValueError,OSError,sqlite3.Error,TypeError,OverflowError):
+        result=dict(tokens=[],quota=[],forecasts=[],daily_agents=[],error='History unavailable. Check local storage; existing data was preserved.')
     return result

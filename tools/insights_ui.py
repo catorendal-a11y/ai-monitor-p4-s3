@@ -206,10 +206,20 @@ class HistoryView(QWidget):
         self.summary.setWordWrap(True); self.summary.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.summary)
         self.chart=HistoryChart(); layout.addWidget(self.chart)
+        self.daily_table=QTableWidget(0,5)
+        self.daily_table.setHorizontalHeaderLabels(['Local day','Sessions','Observed active time','Completed turns','Failed turns'])
+        self.daily_table.setAccessibleName('Daily observed agent summary')
+        self.daily_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.daily_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.daily_table.setMinimumHeight(200)
+        layout.addWidget(self.daily_table)
+        daily_notice=QLabel('Daily summary uses local dates and observed lifecycle events. -- means unknown. '
+                           'Waiting and long gaps are excluded. Completed turns are not confirmed tasks.')
+        daily_notice.setWordWrap(True);layout.addWidget(daily_notice)
         self.details=QPlainTextEdit(); self.details.setReadOnly(True)
         self.details.setAccessibleName('Quota observations and estimated consumption pace')
         layout.addWidget(self.details,1)
-        notice=QLabel('Local history stores only observed token increases and numeric quota snapshots for up to 30 days. '
+        notice=QLabel('Local history stores observed token increases, numeric quota snapshots and fixed lifecycle metadata for up to 30 days. '
                      'The quota view/export contains the latest 256 observations per AI. '
                      'Missing periods are not zero usage. Predictions are estimates, not provider promises or billing.')
         notice.setWordWrap(True); notice.setTextFormat(Qt.TextFormat.PlainText); layout.addWidget(notice)
@@ -223,6 +233,7 @@ class HistoryView(QWidget):
         if self.owner.closed: return
         self.generation+=1
         self.data=None; self.chart.set_rows([]); self.details.clear()
+        self.daily_table.setRowCount(0)
         self.export_button.setEnabled(False)
         if self.worker is not None: return
         from desktop_window import ReadWorker
@@ -252,6 +263,13 @@ class HistoryView(QWidget):
         if data is None:
             self.summary.setText('History could not be read. Existing data was preserved.'); return
         self.data=data
+        daily=data.get('daily_agents',[])
+        self.daily_table.setRowCount(len(daily))
+        for index,row in enumerate(daily):
+            values=[row['date'],row['sessions'],row['activeSeconds'],row['completedTurns'],row['failedTurns']]
+            for column,value in enumerate(values):
+                text='--' if value is None else (f'{value} s' if column==2 else str(value))
+                self.daily_table.setItem(index,column,QTableWidgetItem(text))
         rows=data['tokens']
         with QSignalBlocker(self.quota_window):
             selection=self.quota_window.currentData()
@@ -290,7 +308,9 @@ class HistoryView(QWidget):
                 f'{forecast["percent_per_hour"]:.2f} percentage points/hour; '+outcome+' Reset: '+reset)
         if not data['forecasts']: captions.append('No reliable pace estimate yet: needs fresh increasing samples in the same reset window.')
         self.details.setPlainText('\n'.join(captions))
-        self.export_button.setEnabled(bool(data['tokens'] or data['quota']))
+        observed=any(row.get(metric) is not None for row in daily
+                     for metric in ('sessions','activeSeconds','completedTurns','failedTurns'))
+        self.export_button.setEnabled(bool(data['tokens'] or data['quota'] or observed))
 
     def _chart(self,*unused):
         quota=self.metric_combo.currentData()=='quota'
@@ -312,12 +332,17 @@ class HistoryView(QWidget):
         try:
             with Path(path).open('w',newline='',encoding='utf-8') as stream:
                 writer=csv.writer(stream)
-                writer.writerow(['metric','provider','observed_utc','value','window_minutes','kind','reset_epoch'])
+                writer.writerow(['metric','provider','observed_utc','value','window_minutes','kind','reset_epoch','local_date'])
                 for row in data['tokens']:
                     day=datetime.fromtimestamp(row['day']*86400,timezone.utc).strftime('%Y-%m-%d')
-                    writer.writerow(['observed_tokens',row['provider'],day,row['total'],'','',''])
+                    writer.writerow(['observed_tokens',row['provider'],day,row['total'],'','','',''])
                 for row in data['quota']:
                     stamp=datetime.fromtimestamp(row['minute']*60,timezone.utc).isoformat()
-                    writer.writerow(['quota_used_percent',row['provider'],stamp,row['used'],row['window'],row['kind'],row['reset']])
+                    writer.writerow(['quota_used_percent',row['provider'],stamp,row['used'],row['window'],row['kind'],row['reset'],''])
+                for row in data.get('daily_agents',[]):
+                    for metric,field in [('observed_sessions','sessions'),('observed_active_seconds','activeSeconds'),
+                                         ('completed_turns','completedTurns'),('failed_turns','failedTurns')]:
+                        if row.get(field) is not None:
+                            writer.writerow([metric,row['provider'],'',row[field],'','','',row['date']])
             self.summary.setText('Numeric history exported. No prompts, account identifiers or credentials were included.')
         except OSError: self.summary.setText('Export failed. Choose a writable local CSV file.')

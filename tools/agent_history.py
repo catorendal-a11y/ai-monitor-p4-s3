@@ -1,5 +1,6 @@
 """Opt-in fixed lifecycle journal. No prompts, arguments, outputs or permission hints."""
 from contextlib import closing
+from datetime import datetime,timedelta
 import math
 from pathlib import Path
 import re
@@ -61,7 +62,7 @@ def record(directory,provider,agent,generation,event,state,at,root):
     except (OSError,ValueError,TypeError,sqlite3.Error):pass
 
 
-def summarize(database,provider,start,end):
+def summarize(database,provider,start,end,end_exclusive=False):
     """Observed metrics only. Waiting/gaps excluded; concurrent activity intervals are unioned."""
     if (not isinstance(provider,str) or provider not in PROVIDERS
             or any(type(value) not in (int,float) or not math.isfinite(value)
@@ -84,17 +85,18 @@ def summarize(database,provider,start,end):
             raise ValueError('Invalid agent history')
         key=(agent,generation,epoch)
         if state=='TASK_REQUESTED':continue  # Hook requests are not confirmed task success.
-        if at>=start:observed=True
+        in_period=at>=start and (not end_exclusive or at<end)
+        if in_period:observed=True
         old=previous.get(key)
         if old and old[1] in ACTIVE and 0<=at-old[0]<=900:
             left,right=max(start,old[0]),min(end,at)
             if left<right:intervals.append((left,right))
         previous[key]=(at,state)
-        if event=='SessionStart' and root and at>=start:sessions.add((agent,generation))
+        if event=='SessionStart' and root and in_period:sessions.add((agent,generation))
         if event=='UserPromptSubmit' and root:turns[key]=at
         if event in ('Stop','StopFailure','Interrupt','SessionEnd') and key in turns:
             identity=(key,turns.pop(key))
-            if identity not in finished and at>=start:
+            if identity not in finished and in_period:
                 finished.add(identity)
                 completed+=event=='Stop';failed+=event=='StopFailure'
     if not observed:return empty
@@ -105,3 +107,16 @@ def summarize(database,provider,start,end):
     # Absence of a SessionStart is unknown, not proof that no sessions occurred.
     return dict(sessions=len(sessions) if sessions else None,activeSeconds=int(total) if intervals else None,
                 completedTurns=completed if finished else None,failedTurns=failed if finished else None)
+
+
+def daily_summaries(database,provider,days,now):
+    """Local calendar days; a boundary event closes time but belongs to the next day."""
+    today=datetime.fromtimestamp(now).date()
+    rows=[]
+    for offset in range(1-days,1):
+        day=today+timedelta(days=offset)
+        start=datetime.combine(day,datetime.min.time()).timestamp()
+        finish=datetime.combine(day+timedelta(days=1),datetime.min.time()).timestamp()
+        row=summarize(database,provider,max(0,start),min(finish,now),end_exclusive=finish<=now)
+        rows.append(dict(provider=provider,date=day.isoformat(),**row))
+    return rows
