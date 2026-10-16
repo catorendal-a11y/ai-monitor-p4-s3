@@ -390,7 +390,7 @@ def main(argv=None):
             from installation_lifecycle import prepare
             prepare((args.installation_root or ROOT).resolve(),uninstall=args.prepare_uninstall)
             return 0
-        except (ValueError,RuntimeError,OSError,psutil.Error):
+        except (ValueError,RuntimeError,OSError,psutil.Error,subprocess.SubprocessError):
             print('Installation cleanup could not finish. Close this installation and retry; private details were not printed.')
             return 1
     if args.quota_worker:
