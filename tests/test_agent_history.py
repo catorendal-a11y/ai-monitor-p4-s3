@@ -32,6 +32,19 @@ class AgentHistoryTests(unittest.TestCase):
             self.event(event,state,at)
         self.assertEqual(self.summary(),dict(sessions=1,activeSeconds=40,completedTurns=1,failedTurns=0))
         self.assertNotIn('task',str(self.summary()).lower())
+    def test_zcode_documented_lifecycle_is_recorded_in_opt_in_history(self):
+        for event,state,at in [('SessionStart','IDLE',1),('UserPromptSubmit','WORKING',10),
+                               ('PreToolUse','READING',20),('Stop','COMPLETED',40)]:
+            history.record(self.root,'zcode',self.agent,7,event,state,at,True)
+        with closing(connect(self.root)) as db:
+            result=history.summarize(db,'zcode',0,100)
+        self.assertEqual(result,dict(sessions=1,activeSeconds=30,completedTurns=1,failedTurns=0))
+
+    def test_zcode_history_respects_disabled_consent(self):
+        history.configure(self.root,False,18)
+        history.record(self.root,'zcode',self.agent,7,'SessionStart','IDLE',1,True)
+        with closing(connect(self.root)) as db:
+            self.assertIsNone(history.summarize(db,'zcode',0,100)['sessions'])
     def test_parallel_agents_union_active_time_and_subagents_do_not_inflate_sessions(self):
         second=hashlib.sha256(b'synthetic subagent').hexdigest()
         self.event('SessionStart','IDLE',1);self.event('UserPromptSubmit','WORKING',10)
