@@ -52,7 +52,7 @@ void ui_history_init() {
   ui_interaction::keep_target(provider);lv_obj_add_event_cb(provider,choice,LV_EVENT_VALUE_CHANGED,nullptr);
   total=label(412,92,364,"--",&lv_font_montserrat_40);label(412,140,364,"RECORDED TOKENS TODAY",&lv_font_montserrat_18,ui_theme::muted);
   status=label(24,178,752,"Waiting for history from PC",&lv_font_montserrat_22,ui_theme::muted);
-  quota=label(24,212,752,"Sessions / active time: not recorded",&lv_font_montserrat_22,ui_theme::muted);
+  quota=label(24,212,752,"Quota history: not available",&lv_font_montserrat_22,ui_theme::muted);
   metrics=label(24,246,752,"Agent history: no observed session events",&lv_font_montserrat_22,ui_theme::muted);
   graphLabel=label(24,281,752,"24 HOURLY BUCKETS / GAPS UNKNOWN",&lv_font_montserrat_18,ui_theme::accent);
   taskMetrics=label(24,405,752,"Client tasks: outcomes not observed",&lv_font_montserrat_18,ui_theme::muted);
@@ -100,7 +100,7 @@ void ui_history_update() {
     char window[48];quota_window_label(row->windowMinutes,"Model",window,sizeof(window));
     if(row->changeKnown)snprintf(value,sizeof(value),"%s: %.0f%% used / +%.0f points / %" PRIu32 "m ago",window,row->usedPercent,row->changePercent,row->quotaAgeMinutes);
     else snprintf(value,sizeof(value),"%s: %.0f%% used / %" PRIu32 "m ago",window,row->usedPercent,row->quotaAgeMinutes);
-  } else snprintf(value,sizeof(value),"Sessions / active time: not recorded");
+  } else snprintf(value,sizeof(value),"Quota history: not available");
   text(quota,value);
   if(available && (row->agentKnown&15)) {
     char sessions[16]="--",active[24]="--",completed[16]="--",failed[16]="--";

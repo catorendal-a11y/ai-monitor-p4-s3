@@ -17,7 +17,7 @@ static lv_obj_t *screen=nullptr,*returnScreen=nullptr;
 static void home(lv_event_t*) {ui_nova_show();}
 static void usage(lv_event_t*) {dashboard_show();}
 static void agents(lv_event_t*) {ui_agents_show();}
-static void events(lv_event_t*) {ui_event_center_show();}
+static void events(lv_event_t*) {if(returnScreen)lv_screen_load(returnScreen);ui_event_center_show();}
 static void settings(lv_event_t*) {
   // Settings must return to the original screen, not to the navigation menu.
   if(returnScreen)lv_screen_load(returnScreen);

@@ -29,7 +29,7 @@ inline SessionStatus session_status(const aim::Snapshot& snapshot, uint32_t now,
       const auto& item=live.agents[i];const auto* style=aim::provider_style(item.provider);
       if(!style || !(style->activityMask&selected))continue;
       represented|=style->activityMask;
-      if(item.observedAgeSeconds>30)continue; // Historical phase is not fresh companion activity.
+      if(live_agent::observed_age_ms(live,item,now)>30000u)continue; // Historical phase is not fresh companion activity.
       result.known=true;result.sources|=style->activityMask;
       switch(item.state) {
         case agent::State::WAITING:case agent::State::NEEDS_ATTENTION:++result.waiting;break;

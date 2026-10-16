@@ -3,6 +3,10 @@
 #include <cstdio>
 #include "../ai_monitor/ai_monitor.h"
 
+inline uint64_t token_idle_seconds(const aim::Snapshot& snapshot,uint32_t now) {
+  return static_cast<uint64_t>(snapshot.tokenIdleSeconds)+static_cast<uint32_t>(now-snapshot.tokenActivityMs)/1000u;
+}
+
 inline bool token_signal_fresh(const aim::Snapshot& snapshot, uint32_t now) {
   // The host allows a 15-second poll interval. Budget another full interval
   // for scheduling and local I/O; USB loss still invalidates immediately.
@@ -48,7 +52,7 @@ inline void token_activity_hint(const aim::Snapshot& snapshot, uint32_t now, cha
   } else if (!snapshot.tokenUsageSeen) {
     snprintf(out, capacity, "Waiting for a token increase / tap to say hi");
   } else {
-    const uint64_t seconds = static_cast<uint64_t>(snapshot.tokenIdleSeconds) + (now - snapshot.tokenActivityMs) / 1000u;
+    const uint64_t seconds = token_idle_seconds(snapshot,now);
     if (seconds < 60) snprintf(out, capacity, "Last increase: %llu s ago / tap to say hi", static_cast<unsigned long long>(seconds));
     else if (seconds < 3600) snprintf(out, capacity, "Last increase: %llu min ago / tap to say hi", static_cast<unsigned long long>(seconds / 60));
     else snprintf(out, capacity, "Last increase: %llu h ago / tap to say hi", static_cast<unsigned long long>(seconds / 3600));

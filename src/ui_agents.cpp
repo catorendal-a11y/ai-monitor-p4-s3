@@ -107,11 +107,12 @@ void update() {
     const auto& entry=snapshot.agents[index];
     const auto* style=aim::provider_style(entry.provider);
     text(row.provider,style?style->label:"UNKNOWN PROVIDER");
-    char identifier[64];
-    if(entry.hasElapsed)snprintf(identifier,sizeof(identifier),"%lu:%02lu:%02lu / event %us ago",
+    char identifier[80];
+    const auto observedAge=static_cast<unsigned long long>(live_agent::observed_age_ms(snapshot,entry,millis())/1000u);
+    if(entry.hasElapsed)snprintf(identifier,sizeof(identifier),"%lu:%02lu:%02lu / event %llus ago",
         static_cast<unsigned long>(entry.elapsedSeconds/3600),
-        static_cast<unsigned long>((entry.elapsedSeconds/60)%60),static_cast<unsigned long>(entry.elapsedSeconds%60),entry.observedAgeSeconds);
-    else snprintf(identifier,sizeof(identifier),"Start unknown / event %us ago",entry.observedAgeSeconds);
+        static_cast<unsigned long>((entry.elapsedSeconds/60)%60),static_cast<unsigned long>(entry.elapsedSeconds%60),observedAge);
+    else snprintf(identifier,sizeof(identifier),"Start unknown / event %llus ago",observedAge);
     text(row.identity,identifier);
     const unsigned state=static_cast<unsigned>(entry.state);
     char phase[32];snprintf(phase,sizeof(phase),"%s",state<agent::state_count?live_agent::activity_names[state]:"UNKNOWN");

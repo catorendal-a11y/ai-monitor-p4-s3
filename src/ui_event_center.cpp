@@ -10,7 +10,7 @@
 #include "ui/interaction.h"
 namespace event_center_ui {
 static events::Center center;
-static lv_obj_t *screen=nullptr,*summary=nullptr,*next=nullptr;
+static lv_obj_t *screen=nullptr,*returnScreen=nullptr,*summary=nullptr,*next=nullptr;
 struct Row {lv_obj_t *card=nullptr,*heading=nullptr,*detail=nullptr;};
 static Row rows[4];static unsigned page=0,pages=1;
 static void text(lv_obj_t* label,const char* value){if(strcmp(lv_label_get_text(label),value))lv_label_set_text(label,value);}
@@ -19,7 +19,7 @@ static lv_obj_t* label(lv_obj_t* parent,int x,int y,int width,const char* value,
   lv_label_set_long_mode(result,LV_LABEL_LONG_CLIP);lv_obj_set_style_text_font(result,font,0);
   lv_obj_set_style_text_color(result,lv_color_hex(color),0);lv_label_set_text(result,value);lv_obj_set_clickable(result,false);return result;
 }
-static void back(lv_event_t*){ui_agents_show();}
+static void back(lv_event_t*){if(returnScreen)lv_screen_load(returnScreen);}
 static void mark_read(lv_event_t*){center.mark_read();ui_event_center_update();}
 static void next_page(lv_event_t*){page=(page+1)%pages;ui_event_center_update();}
 static lv_obj_t* button(int x,const char* name,lv_event_cb_t handler) {
@@ -50,7 +50,7 @@ void initialize() {
 void ui_event_center_init(){event_center_ui::initialize();}
 bool ui_event_center_is_active(){return event_center_ui::screen && lv_screen_active()==event_center_ui::screen;}
 unsigned ui_event_center_unread(){return event_center_ui::center.unread();}
-void ui_event_center_show(){if(!event_center_ui::screen)return;event_center_ui::page=0;lv_screen_load(event_center_ui::screen);ui_event_center_update();ui_notifications_update();}
+void ui_event_center_show(){if(!event_center_ui::screen || ui_event_center_is_active())return;event_center_ui::returnScreen=lv_screen_active();event_center_ui::page=0;lv_screen_load(event_center_ui::screen);ui_event_center_update();ui_notifications_update();}
 void ui_event_center_quota(const char* source,bool critical){event_center_ui::center.quota(source,critical,millis());}
 namespace event_center_ui {
 void update() {

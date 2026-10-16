@@ -18,5 +18,9 @@ struct UsbLiveSnapshot {
   uint8_t count=0;
   bool fresh=false;
 };
+// The host age is measured at receipt; unsigned subtraction preserves clock rollover.
+inline uint64_t observed_age_ms(const UsbLiveSnapshot& snapshot,const AgentMetadata& item,uint32_t now) {
+  return static_cast<uint64_t>(item.observedAgeSeconds)*1000u+static_cast<uint32_t>(now-snapshot.receivedAt);
+}
 UsbLiveSnapshot read_usb();
 }

@@ -236,7 +236,7 @@ void update() {
   if(mood==NovaMood::session_working && live.fresh && now-live.receivedAt<live_agent::activity_lease_ms)
     for(unsigned i=0;i<live.count && i<8;++i) {
       const auto& item=live.agents[i];const auto* style=aim::provider_style(item.provider);
-      if(item.state==agent::State::TESTING && item.observedAgeSeconds<=30 && style &&
+      if(item.state==agent::State::TESTING && live_agent::observed_age_ms(live,item,now)<=30000u && style &&
          session_status(snapshot,now,style->activityMask,agentCounts,live).running)animationMood=companions::Mood::testing;
     }
   animation.select(external?external->resolve(animationMood):companions::builtin_animation(animationMood),now,animatedCompanion!=static_cast<uint8_t>(companion));
@@ -274,7 +274,7 @@ void update() {
   uint16_t minutes = 0; char value[128];
   text(tracking, sessions.known ? "SESSION EVENTS / selected AIs" : token_tracking_label(snapshot, now));
   if(token_signal_fresh(snapshot,now) && snapshot.lastTokenDelta)
-    snprintf(value,sizeof(value),"Tokens %lus ago",static_cast<unsigned long>(snapshot.tokenIdleSeconds+(now-snapshot.tokenActivityMs)/1000));
+    snprintf(value,sizeof(value),"Tokens %llus ago",static_cast<unsigned long long>(token_idle_seconds(snapshot,now)));
   else snprintf(value,sizeof(value),"Tap to say hi");
   text(hint, mood == NovaMood::attention || mood == NovaMood::session_error ? "Check AI on your PC" : value);
   if (local_minutes(snapshot, now, minutes)) snprintf(value, sizeof(value), "%02u:%02u", minutes / 60, minutes % 60);

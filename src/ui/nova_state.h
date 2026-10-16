@@ -20,6 +20,7 @@ class NovaState {
     if (sessions.running) return NovaMood::session_working;
     if (sessions.completed) return NovaMood::completed;
     bool tokenSignalFresh = token_signal_fresh(snapshot, now);
+    const uint64_t idleSeconds=token_idle_seconds(snapshot,now);
     if (snapshot.viewsConfigured) {
       uint8_t selectedSources = 0;
       for (size_t v = 0; v < snapshot.viewCount && v < aim::kMaxViews; ++v) {
@@ -46,13 +47,13 @@ class NovaState {
         low |= remaining <= limit; critical |= remaining <= (limit < 10 ? limit : 10);
       }
     }
-    if (tokenSignalFresh && snapshot.tokenUsageSeen && snapshot.tokenIdleSeconds < 90u) return NovaMood::working;
+    if (tokenSignalFresh && snapshot.tokenUsageSeen && idleSeconds < 90u) return NovaMood::working;
     if (critical) return NovaMood::critical;
     if (low) return NovaMood::low;
     if (issue || (snapshot.activity == aim::HostActivity::failed && now - snapshot.activityMs < 60000u)) return NovaMood::issue;
     if (!hasFresh) return NovaMood::waiting;
-    if (tokenSignalFresh && snapshot.tokenUsageSeen && snapshot.tokenIdleSeconds >= 90u && snapshot.tokenIdleSeconds < 95u) return NovaMood::updated;
-    if (tokenSignalFresh && snapshot.tokenIdleSeconds >= 300u && !(greeted_ && now - greetedMs_ < 60000u)) return NovaMood::resting;
+    if (tokenSignalFresh && snapshot.tokenUsageSeen && idleSeconds >= 90u && idleSeconds < 95u) return NovaMood::updated;
+    if (tokenSignalFresh && idleSeconds >= 300u && !(greeted_ && now - greetedMs_ < 60000u)) return NovaMood::resting;
     (void)resting;  // backlight dimming never proves token activity has stopped
     return NovaMood::ready;
   }
