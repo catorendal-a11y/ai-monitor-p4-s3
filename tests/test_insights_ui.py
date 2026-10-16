@@ -175,6 +175,27 @@ class InsightsUiTests(unittest.TestCase):
         self.assertFalse(view.export_button.isEnabled())
         self.window.current_action=None
 
+    def test_history_actions_fit_minimum_window_without_horizontal_scroll(self):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QFontDatabase
+        from PySide6.QtWidgets import QScrollArea
+        if os.name=='nt':
+            for name in ('segoeui.ttf','segoeuib.ttf','consola.ttf'):
+                QFontDatabase.addApplicationFont(str(Path(os.environ['SystemRoot'])/'Fonts'/name))
+        self.window.resize(1040,760)
+        self.window.tabs.setCurrentWidget(self.window.history_view.parentWidget().parentWidget())
+        view=self.window.history_view
+        scroll=view.parentWidget()
+        while scroll is not None and not isinstance(scroll,QScrollArea):scroll=scroll.parentWidget()
+        self.assertIsNotNone(scroll)
+        self.window.tabs.setCurrentWidget(scroll)
+        for _ in range(3):self.app.processEvents()
+        self.assertEqual(scroll.horizontalScrollBar().maximum(),0)
+        for widget in (view.provider,view.period,view.refresh_button,view.export_button,view.clear_button):
+            point=widget.mapTo(scroll.viewport(),QPoint())
+            self.assertGreaterEqual(point.x(),0)
+            self.assertLessEqual(point.x()+widget.width(),scroll.viewport().width())
+
     def test_live_test_resets_cells_expires_and_deconfirms_wrong_or_stale_display(self):
         dialog=SetupReportDialog(self.report(),self.window)
         self.window.live_sampler=Mock(); self.window.live_sampler.poll.return_value=None
