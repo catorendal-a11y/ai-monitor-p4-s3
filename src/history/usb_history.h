@@ -16,7 +16,7 @@ class UsbHistory {
   bool handle(JsonObjectConst message,uint32_t boot,uint32_t now) {
     poll(now);
     if(!text_field(message["cmd"],0,32) || !message["schema"].is<uint32_t>() ||
-       (message["schema"].as<uint32_t>()!=1 && message["schema"].as<uint32_t>()!=2))return fail();
+       (message["schema"].as<uint32_t>()!=1 && message["schema"].as<uint32_t>()!=2 && message["schema"].as<uint32_t>()!=3))return fail();
     const char* cmd=message["cmd"];
     if(!strcmp(cmd,"history_begin")) {
       if(!fields(message,{"cmd","schema","bootId","epoch","revision","enabled","error","providers","date","sampleAgeSeconds"}) || !boot || !message["bootId"].is<uint32_t>() || message["bootId"].as<uint32_t>()!=boot ||
@@ -39,7 +39,7 @@ class UsbHistory {
       if(!staging_.count){publish(now);return true;}
       started_=now;pending_=true;return true;
     }
-    const bool shape=message["schema"].as<uint32_t>()==2?
+    const bool shape=message["schema"].as<uint32_t>()>=2?
       fields(message,{"cmd","schema","epoch","revision","index","today","daily","hourly","quota","agents"}):
       fields(message,{"cmd","schema","epoch","revision","index","today","daily","hourly","quota"});
     if(strcmp(cmd,"history_provider") || !shape || !pending_ || message["schema"].as<uint32_t>()!=schema_ || !number(message["epoch"]) || !number(message["revision"]) ||
@@ -47,11 +47,15 @@ class UsbHistory {
     const uint32_t index=message["index"];
     if(index>=staging_.count || (received_&(1u<<index)))return fail();
     auto& provider=staging_.providers[index];
-    if(schema_==2) {
+    if(schema_>=2) {
       const auto agents=message["agents"];
-      if(!agents.is<JsonObjectConst>() || !fields(agents.as<JsonObjectConst>(),{"sessions","activeSeconds","completedTurns","failedTurns"}))return fail();
-      unsigned i=0;uint32_t* values[]={&provider.sessions,&provider.activeSeconds,&provider.completedTurns,&provider.failedTurns};
-      for(const char* key:{"sessions","activeSeconds","completedTurns","failedTurns"}) {
+      if(!agents.is<JsonObjectConst>())return fail();
+      if(schema_==2 && !fields(agents.as<JsonObjectConst>(),{"sessions","activeSeconds","completedTurns","failedTurns"}))return fail();
+      if(schema_==3 && !fields(agents.as<JsonObjectConst>(),{"sessions","activeSeconds","completedTurns","failedTurns","createdTasks","startedTasks","completedTasks","failedTasks"}))return fail();
+      unsigned i=0;uint32_t* values[]={&provider.sessions,&provider.activeSeconds,&provider.completedTurns,&provider.failedTurns,
+        &provider.createdTasks,&provider.startedTasks,&provider.completedTasks,&provider.failedTasks};
+      for(const char* key:{"sessions","activeSeconds","completedTurns","failedTurns","createdTasks","startedTasks","completedTasks","failedTasks"}) {
+        if(schema_==2 && i==4)break;
         const auto value=agents[key];
         if(!value.isNull()) {
           if(!value.is<uint32_t>() || value.as<uint32_t>()>(i==1?100800u:50000u))return fail();

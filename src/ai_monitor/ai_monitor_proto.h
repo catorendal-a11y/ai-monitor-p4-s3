@@ -270,7 +270,7 @@ class ProtoCore {
           "\"experimental\":%s,\"brightnessControl\":\"%s\","
           "\"orientation\":\"landscape\",\"theme\":\"dark\",\"language\":\"en\",\"brightness\":%u,"
           "\"serialTransport\":\"line\",\"maxFrameBytes\":%u,\"hostActivity\":true,\"tokenActivity\":true,\"providerSelection\":true,\"sessionActivity\":true,"
-          "\"liveProtocol\":1,\"liveMetadata\":2,\"historyProtocol\":2,\"livePermissions\":false,\"interactionProtocol\":%u,\"enrollmentProtocol\":%u,\"mirrorProtocol\":%u,\"companionProtocol\":%u,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
+          "\"liveProtocol\":1,\"liveMetadata\":2,\"historyProtocol\":3,\"livePermissions\":false,\"interactionProtocol\":%u,\"enrollmentProtocol\":%u,\"mirrorProtocol\":%u,\"companionProtocol\":%u,\"hardwareDiagnostics\":%s,\"uptime\":%lu,\"heap\":%u,\"psramFree\":%u,\"tokenKnown\":%s,\"tokenSeen\":%s,\"tokenSources\":%u,\"tokenIdleSeconds\":%u,\"tokenDelta\":%llu,\"tokenAgeSeconds\":%lu}\n",
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,

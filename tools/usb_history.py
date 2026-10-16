@@ -11,14 +11,18 @@ class UsbHistoryClient:
         age=self.clock()-summary['sampledAt']
         if not 0<=age<=120:raise ValueError('Stale history sample')
         providers=summary['providers']
-        schema=2 if self.panel.info.get('historyProtocol')==2 else 1
+        capability=self.panel.info.get('historyProtocol')
+        schema=capability if type(capability) is int and capability in (2,3) else 1
         begin=dict(cmd='history_begin',schema=schema,bootId=self.panel.info['bootId'],epoch=self.epoch,revision=self.revision,
                    enabled=summary['enabled'],error=summary['error'],date=summary['date'],sampleAgeSeconds=int(age),providers=[p['provider'] for p in providers])
         self._send(begin)
         for index,provider in enumerate(providers):
             message=dict(cmd='history_provider',schema=schema,epoch=self.epoch,revision=self.revision,index=index,
                             **{key:provider[key] for key in ('today','daily','hourly','quota')})
-            if schema==2:message['agents']=provider.get('agents',dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None))
+            if schema>=2:
+                keys=['sessions','activeSeconds','completedTurns','failedTurns']
+                if schema>=3:keys+=['createdTasks','startedTasks','completedTasks','failedTasks']
+                message['agents']={key:provider.get('agents',{}).get(key) for key in keys}
             self._send(message)
     def _send(self,message):
         raw=json.dumps(message,separators=(',',':'),allow_nan=False)

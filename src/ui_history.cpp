@@ -13,6 +13,7 @@
 #include <algorithm>
 namespace history_ui {
 static lv_obj_t *screen=nullptr,*returnScreen=nullptr,*provider=nullptr,*total=nullptr,*status=nullptr,*quota=nullptr,*metrics=nullptr,*period=nullptr,*graphLabel=nullptr;
+static lv_obj_t* taskMetrics=nullptr;
 static lv_obj_t* bars[24]{};static uint8_t mode=0,selected=0,count=0;static char keys[8][16]{};
 static uint32_t drawnRevision=UINT32_MAX,drawnTheme=UINT32_MAX;static uint8_t drawnMode=255,drawnProvider=255;static bool drawnStale=false;
 static lv_obj_t* label(int x,int y,int w,const char* text,const lv_font_t* font,uint32_t color=ui_theme::text) {
@@ -54,6 +55,7 @@ void ui_history_init() {
   quota=label(24,212,752,"Sessions / active time: not recorded",&lv_font_montserrat_22,ui_theme::muted);
   metrics=label(24,246,752,"Agent history: no observed session events",&lv_font_montserrat_22,ui_theme::muted);
   graphLabel=label(24,281,752,"24 HOURLY BUCKETS / GAPS UNKNOWN",&lv_font_montserrat_18,ui_theme::accent);
+  taskMetrics=label(24,405,752,"Client tasks: outcomes not observed",&lv_font_montserrat_18,ui_theme::muted);
   for(unsigned i=0;i<24;++i) {
     bars[i]=lv_obj_create(screen);lv_obj_set_pos(bars[i],24+i*31,397);lv_obj_set_size(bars[i],23,3);
     lv_obj_set_style_border_width(bars[i],0,0);lv_obj_set_style_radius(bars[i],3,0);lv_obj_set_scrollable(bars[i],false);lv_obj_set_clickable(bars[i],false);
@@ -100,7 +102,7 @@ void ui_history_update() {
     else snprintf(value,sizeof(value),"%s: %.0f%% used / %" PRIu32 "m ago",window,row->usedPercent,row->quotaAgeMinutes);
   } else snprintf(value,sizeof(value),"Sessions / active time: not recorded");
   text(quota,value);
-  if(available && row->agentKnown) {
+  if(available && (row->agentKnown&15)) {
     char sessions[16]="--",active[24]="--",completed[16]="--",failed[16]="--";
     if(row->agentKnown&1)snprintf(sessions,sizeof(sessions),"%" PRIu32,row->sessions);
     if(row->agentKnown&2) {
@@ -112,6 +114,13 @@ void ui_history_update() {
     snprintf(value,sizeof(value),"Sessions %s   Active %s   Turns %s / Failed %s",sessions,active,completed,failed);
   } else snprintf(value,sizeof(value),"Agent history: no observed session events");
   text(metrics,value);
+  if(available && (row->agentKnown&240)) {
+    char counts[4][16]={"--","--","--","--"};
+    const uint32_t tasks[]={row->createdTasks,row->startedTasks,row->completedTasks,row->failedTasks};
+    for(unsigned i=0;i<4;++i)if(row->agentKnown&(16u<<i))snprintf(counts[i],sizeof(counts[i]),"%" PRIu32,tasks[i]);
+    snprintf(value,sizeof(value),"Client tasks: created %s / started %s / done %s / failed %s",counts[0],counts[1],counts[2],counts[3]);
+  }else snprintf(value,sizeof(value),"Client tasks: outcomes not observed / unsupported");
+  text(taskMetrics,value);
   text(graphLabel,mode?"7 LOCAL DAYS / GAPS UNKNOWN":"24 HOURLY BUCKETS / GAPS UNKNOWN");
   text(lv_obj_get_child(period,0),mode?"SHOW 24 HOURS":"SHOW 7 DAYS");
   const unsigned bins=mode?7:24;const uint64_t* values=available?(mode?row->daily:row->hourly):nullptr;

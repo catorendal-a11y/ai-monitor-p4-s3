@@ -54,6 +54,11 @@ def main():
         subprocess.run([compiler,"-std=c++17","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
                         "-I",str(json_include),str(ROOT/"tests/test_animation.cpp"),"-o",str(animation_binary)],cwd=ROOT,check=True)
         subprocess.run([str(animation_binary)],cwd=ROOT,check=True)
+        for name in ('companion_store','pack_protocol'):
+            target=Path(directory)/(name+('.exe' if os.name=='nt' else ''))
+            subprocess.run([compiler,'-std=c++17','-Wall','-Wextra','-Werror','-I',str(ROOT/'src'),
+                '-I',str(json_include),str(ROOT/('tests/test_'+name+'.cpp')),'-o',str(target)],cwd=ROOT,check=True)
+            subprocess.run([str(target)],cwd=ROOT,check=True)
         subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-I", str(ROOT / "src"),
                         "-I", str(ROOT / "tests/native"), str(ROOT / "tests/test_settings.cpp"), "-o", str(settings_binary)],
                        cwd=ROOT, check=True)

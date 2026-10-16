@@ -630,7 +630,7 @@ class Panel:
         runtime = getattr(self, 'permission_runtime', None)
         if runtime is not None: runtime.pump()
         sampler=getattr(self,'history_sampler',None)
-        if sampler is not None and type(self.info.get('historyProtocol')) is int and self.info['historyProtocol'] in (1,2):
+        if sampler is not None and type(self.info.get('historyProtocol')) is int and self.info['historyProtocol'] in (1,2,3):
             summary=sampler.take()
             if summary is not None:
                 from usb_history import UsbHistoryClient

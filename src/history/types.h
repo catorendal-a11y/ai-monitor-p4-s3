@@ -10,6 +10,7 @@ struct Provider {
   float usedPercent=0,changePercent=0;
   uint8_t agentKnown=0;
   uint32_t sessions=0,activeSeconds=0,completedTurns=0,failedTurns=0;
+  uint32_t createdTasks=0,startedTasks=0,completedTasks=0,failedTasks=0;
 };
 struct Snapshot {
   bool fresh=false,enabled=false,error=false;
