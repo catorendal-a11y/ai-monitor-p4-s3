@@ -147,6 +147,14 @@ class CompanionServiceTests(unittest.TestCase):
                         service.pump(panel);time.sleep(.005)
                     self.assertEqual(service.state,'active')
                     self.assertEqual(service.snapshot()['id'],pack.id)
+                    if _==0:
+                        original=panel.wait_for
+                        def changed(kind,seconds,command):
+                            value=original(kind,seconds,command)
+                            value.update(state='builtin',id='',offset=0);return value
+                        panel.wait_for=changed
+                        service.next_status=0;service.pump(panel)
+                        self.assertEqual(service.state,'overridden')
                 finally:service.close()
 
     def test_corrupt_library_is_reported_without_serial_write(self):

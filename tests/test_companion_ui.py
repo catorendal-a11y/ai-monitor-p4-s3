@@ -30,6 +30,16 @@ class CompanionUiTests(unittest.TestCase):
             settle();view.import_path(path);settle()
             self.assertTrue(packages.selected(owner.root))
             self.assertEqual(view.choices.count(),1)
+            owner.cached_health=dict(state='connected',updated_at=time.time(),companion=dict(
+                state='active',id='f'*64,updated_at=time.time()))
+            view.refresh_device()
+            self.assertNotIn('activated',view.device_status.text())
+            owner.cached_health['companion']['id']=packages.selected(owner.root)
+            owner.cached_health['updated_at']=time.time()-60
+            view.refresh_device()
+            self.assertNotIn('activated',view.device_status.text())
+            owner.cached_health['updated_at']=time.time()
+            view.refresh_device();self.assertIn('activated',view.device_status.text())
             view.use_builtin();settle()
             self.assertEqual(packages.selected(owner.root),'')
             path.write_bytes(b'not a pack');view.import_path(path);settle()
