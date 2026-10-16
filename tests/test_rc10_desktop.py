@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -69,6 +70,13 @@ class Rc10Tests(unittest.TestCase):
     def test_lifecycle_failure_prints_no_exception_content(self):
         output=io.StringIO()
         with patch.dict(sys.modules,installation_lifecycle=types.SimpleNamespace(prepare=Mock(side_effect=RuntimeError('fixture-secret')))),contextlib.redirect_stdout(output):
+            self.assertEqual(control.main(['--prepare-uninstall']),1)
+        self.assertNotIn('fixture-secret',output.getvalue())
+
+    def test_lifecycle_timeout_is_reported_without_command_or_output(self):
+        output=io.StringIO()
+        error=subprocess.TimeoutExpired(['fixture-secret'],12,output=b'fixture-secret')
+        with patch.dict(sys.modules,installation_lifecycle=types.SimpleNamespace(prepare=Mock(side_effect=error))),contextlib.redirect_stdout(output):
             self.assertEqual(control.main(['--prepare-uninstall']),1)
         self.assertNotIn('fixture-secret',output.getvalue())
 
