@@ -63,6 +63,7 @@ def manifest_from(raw):
     for frame in m['frames']:
         fields(frame,'id file width height originX originY encodedBytes decodedBytes encodedSha256 decodedSha256')
         if not isinstance(frame['id'],str) or not re.fullmatch('[a-z0-9_-]{1,24}',frame['id']):raise ValueError('Invalid companion frame ID')
+        filename(frame['id'])
         name=filename(frame['file'])
         if frame['id'] in ids or name in names:raise ValueError('Duplicate companion frame')
         ids.add(frame['id']);names.add(name)
