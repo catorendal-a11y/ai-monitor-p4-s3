@@ -1149,6 +1149,11 @@ int main(int argc, char** argv) {
   CHECK(std::string(lv_label_get_text(nightTimeValues[3])) == "45");
   for (auto* button : nightTimeButtons) CHECK(lv_obj_get_height(button) >= 44);
   ui_settings_update(); screenshot(screenshots, "settings-night-precise");
+  app_settings::report_save(false); ui_settings_update();
+  CHECK(lv_obj_get_index(saveFeedback) > lv_obj_get_index(nightOverlay));
+  CHECK(lv_obj_get_x(saveFeedback) == 48 && lv_obj_get_y(saveFeedback) == 446);
+  CHECK(!lv_obj_is_hidden(saveFeedback));
+  screenshot(screenshots, "settings-night-save-failed");
   close_night(nullptr); ui_settings_hide();
   set_sample(1, 2);
   sample.views[0].rows[0].usedPercent = 24;
