@@ -69,54 +69,73 @@ static bool ensure_loaded(bool retry = false) {
   if (s_loadFailed && !retry && now - s_loadAttemptMs < 1000u) return false;
   s_loadAttemptMs = now;
   Preferences prefs;
-  // A fresh device may have no namespace yet. Opening it writable creates
-  // that namespace, but does not replace existing values on a read failure.
-  if (prefs.begin(NVS_NAMESPACE, true) || prefs.begin(NVS_NAMESPACE, false)) {
-    s_brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
-    s_dimMinutes = normalize_dim_minutes(prefs.getUChar(KEY_DIM_MIN, 5));
-    s_warningPercent = normalize_warning_percent(prefs.getUChar("warn_pct", 25));
-    uint8_t look[2] = {};
-    if (prefs.getBytesLength("appear_v1") == sizeof(look) && prefs.getBytes("appear_v1", look, sizeof(look)) == sizeof(look))
-      s_appearance = normalize_appearance({static_cast<Companion>(look[0]), static_cast<Theme>(look[1])});
-    s_night = normalize_night({prefs.getBool("night_on", false), prefs.getUShort("night_start", 1320),
-                              prefs.getUShort("night_end", 420), prefs.getUChar("night_pct", 20)});
-    uint8_t bytes[6] = {};
-    if (prefs.getBytesLength("night_v2") == sizeof(bytes) && prefs.getBytes("night_v2", bytes, sizeof(bytes)) == sizeof(bytes))
-      s_night = normalize_night({bytes[0] != 0, static_cast<uint16_t>(bytes[1] | bytes[2] << 8),
-                                static_cast<uint16_t>(bytes[3] | bytes[4] << 8), bytes[5]});
-    if (prefs.getBytesLength("warn_rules") == sizeof(s_rules)) {
-      prefs.getBytes("warn_rules", s_rules, sizeof(s_rules));
-      for (auto& rule : s_rules) {
-        rule.provider[15] = rule.title[35] = '\0';
-        if (!aim::provider_style(rule.provider) || rule.percent < 5 || rule.percent > 50) rule = WarningRule{};
-      }
-    }
-    for (auto& value : s_novaWindows) value = NovaWindow{};
-    uint8_t windows[kNovaWindowBytes] = {};
-    if (prefs.getBytesLength("nova_win_v1") == sizeof(windows) &&
-        prefs.getBytes("nova_win_v1", windows, sizeof(windows)) == sizeof(windows)) {
-      for (size_t i = 0; i < 8; ++i) {
-        const auto* cell = windows + i * 41;
-        if (cell[0] != 1) continue;
-        NovaWindow value; value.automatic = false;
-        for (unsigned b = 0; b < 4; ++b) value.minutes |= static_cast<uint32_t>(cell[b + 1]) << (b * 8);
-        memcpy(value.title, cell + 5, 36);
-        if (valid_nova_window(value)) s_novaWindows[i] = value;
-      }
-    }
+  auto failed = [&]() {
     prefs.end();
-  } else {
     if (!s_loadFailed) report_save(false);
     s_loadFailed = true;
-    return false;  // Unread defaults are not confirmed persisted settings.
+    return false;
+  };
+  // A fresh device may have no namespace yet. Opening it writable creates
+  // that namespace without publishing defaults over an unread existing value.
+  if (!prefs.begin(NVS_NAMESPACE, true) && !prefs.begin(NVS_NAMESPACE, false)) return failed();
+
+  // Stage the complete load. A short read may have filled only a prefix of its
+  // destination; neither runtime values nor confirmed save baselines may see it.
+  const uint8_t brightness = prefs.getUChar("brightness", DISPLAY_DEFAULT_BRIGHTNESS);
+  const uint8_t dim = normalize_dim_minutes(prefs.getUChar(KEY_DIM_MIN, 5));
+  const uint8_t warning = normalize_warning_percent(prefs.getUChar("warn_pct", 25));
+  Appearance appearance;
+  NightSettings night = normalize_night({prefs.getBool("night_on", false), prefs.getUShort("night_start", 1320),
+                                        prefs.getUShort("night_end", 420), prefs.getUChar("night_pct", 20)});
+  WarningRule rules[24]{};
+  NovaWindow novaWindows[8]{};
+  auto read_blob = [&](const char* key, void* destination, size_t expected, bool& present) {
+    present = false;
+    const size_t length = prefs.getBytesLength(key);
+    // Missing and malformed legacy data retain their default/migration policy.
+    // A present key whose length lookup fails is not a missing setting.
+    if (!length) return !prefs.isKey(key);
+    if (length != expected) return true;
+    if (prefs.getBytes(key, destination, expected) != expected) return false;
+    present = true;
+    return true;
+  };
+  bool present = false;
+  uint8_t look[2]{};
+  if (!read_blob("appear_v1", look, sizeof(look), present)) return failed();
+  if (present) appearance = normalize_appearance({static_cast<Companion>(look[0]), static_cast<Theme>(look[1])});
+  uint8_t bytes[6]{};
+  if (!read_blob("night_v2", bytes, sizeof(bytes), present)) return failed();
+  if (present) night = normalize_night({bytes[0] != 0, static_cast<uint16_t>(bytes[1] | bytes[2] << 8),
+                                      static_cast<uint16_t>(bytes[3] | bytes[4] << 8), bytes[5]});
+  if (!read_blob("warn_rules", rules, sizeof(rules), present)) return failed();
+  if (present) for (auto& rule : rules) {
+    rule.provider[15] = rule.title[35] = '\0';
+    if (!aim::provider_style(rule.provider) || rule.percent < 5 || rule.percent > 50) rule = WarningRule{};
   }
-  s_loadFailed = false;
-  s_loaded = true;
+  uint8_t windows[kNovaWindowBytes]{};
+  if (!read_blob("nova_win_v1", windows, sizeof(windows), present)) return failed();
+  if (present) for (size_t i = 0; i < 8; ++i) {
+    const auto* cell = windows + i * 41;
+    if (cell[0] != 1) continue;
+    NovaWindow value; value.automatic = false;
+    for (unsigned b = 0; b < 4; ++b) value.minutes |= static_cast<uint32_t>(cell[b + 1]) << (b * 8);
+    memcpy(value.title, cell + 5, 36);
+    if (valid_nova_window(value)) novaWindows[i] = value;
+  }
+  prefs.end();
+
+  s_brightness = brightness; s_dimMinutes = dim; s_warningPercent = warning;
+  s_appearance = appearance; s_night = night;
+  memcpy(s_rules, rules, sizeof(s_rules));
+  memcpy(s_novaWindows, novaWindows, sizeof(s_novaWindows));
   s_savedBrightness = s_brightness;
   s_savedDim = s_dimMinutes; s_savedWarning = s_warningPercent; s_savedNight = s_night;
   s_savedAppearance = s_appearance;
   memcpy(s_savedNovaWindows, s_novaWindows, sizeof(s_novaWindows));
   memcpy(s_savedRules, s_rules, sizeof(s_rules));
+  s_loadFailed = false;
+  s_loaded = true;
   return true;
 }
 
