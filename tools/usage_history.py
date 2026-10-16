@@ -76,13 +76,17 @@ def quota_rows(provider, rows, timestamp):
 
 
 class HistoryRecorder:
-    def __init__(self, directory, enabled=False, clock=time.time):
+    def __init__(self, directory, enabled=False, clock=time.time, policy_path=None):
         if type(enabled) is not bool: raise ValueError('History preference must be boolean')
         self.directory, self.clock = Path(directory), clock
+        self.policy_path=policy_path
         self.enabled, self.closed = bool(enabled), False
         self.condition = threading.Condition()
         self.generation = 0
         self.epoch = time.time_ns()
+        self.needs_epoch = bool(enabled)
+        self.recheck_requested = False
+        self.request_epoch = self.epoch
         self.tokens = OrderedDict()
         self.quotas = deque(maxlen=128)
         self.last_error = None
@@ -92,22 +96,35 @@ class HistoryRecorder:
     def configure(self, enabled):
         if type(enabled) is not bool: raise ValueError('History preference must be boolean')
         with self.condition:
-            if self.closed or self.enabled == enabled: return
-            self.enabled = enabled
-            self.generation += 1
-            self.epoch = time.time_ns()
-            if not enabled: self.tokens.clear(); self.quotas.clear()
+            if self.closed:return
+            if self.enabled==enabled:
+                if enabled:
+                    self.recheck_requested=True;self.request_epoch=max(time.time_ns(),self.epoch+1)
+                    self.condition.notify()
+                return
+        # Minting/validation belongs to the existing writer, never the USB owner.
+        with self.condition:
+            if self.closed or self.enabled == enabled:return
+            self.enabled=enabled;self.generation+=1
+            self.epoch=max(time.time_ns(),self.epoch+1);self.needs_epoch=enabled
+            if not enabled:self.tokens.clear();self.quotas.clear()
             self.condition.notify()
 
-    def _publish_consent(self, enabled, epoch):
-        """Publish off the queue lock, then revoke a superseded publication."""
+    def _publish_consent(self, enabled, epoch, allow_shutdown=False):
+        """Caller holds cross-process authority; disabled policy never renews an old host."""
         from agent_history import configure
-        configure(self.directory,enabled,epoch)
+        from history_consent import policy_allows
+        if enabled and not policy_allows(self.directory,self.policy_path):
+            configure(self.directory,False,epoch)
+            return False
+        admitted=configure(self.directory,enabled,epoch)
         with self.condition:
-            stale = self.closed or self.epoch != epoch or self.enabled != enabled
+            stale = (self.closed and not allow_shutdown) or self.epoch != epoch or self.enabled != enabled
             current_epoch = self.epoch
         if enabled and stale:
             configure(self.directory,False,current_epoch)
+            return False
+        return admitted is not False
 
     def record_tokens(self, deltas):
         minute = int(self.clock())//60
@@ -136,11 +153,14 @@ class HistoryRecorder:
         published_epoch=0
         while True:
             with self.condition:
-                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed or self.epoch!=published_epoch,
+                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed or self.epoch!=published_epoch or self.recheck_requested,
                                         timeout=CONSENT_RENEW_SECONDS if self.enabled else None)
                 tokens, quotas, generation, enabled, epoch = self.tokens, list(self.quotas), self.generation, self.enabled, self.epoch
                 self.tokens=OrderedDict(); self.quotas.clear()
                 stopped=self.closed
+                needs_epoch=self.needs_epoch
+                explicit_recheck=self.recheck_requested;self.recheck_requested=False
+                request_epoch=self.request_epoch
             # No disk I/O under the queue lock: quota submission/USB stays
             # responsive. Disabling discards queued work; an in-flight sample
             # that was observed before disabling may finish its transaction.
@@ -150,23 +170,42 @@ class HistoryRecorder:
                     self._publish_consent(False,epoch);published_epoch=epoch
                     if stopped:return
                     continue
-                with closing(connect(self.directory,create=True)) as database, database:
+                from history_consent import lock,mint_epoch,floor
+                if explicit_recheck and not needs_epoch:
+                    with lock(self.directory):revoked=epoch<=floor(self.directory)
+                    if revoked:
+                        needs_epoch=True;epoch=request_epoch
+                        # Samples queued under revoked authority never move into a fresh epoch.
+                        tokens=OrderedDict();quotas=[]
+                        with self.condition:self.tokens.clear();self.quotas.clear()
+                if needs_epoch:
+                    fresh=mint_epoch(self.directory,request_epoch=epoch)
+                    with self.condition:
+                        if generation!=self.generation or not self.enabled:continue
+                        self.epoch=epoch=fresh;self.needs_epoch=False
+                    quotas=[row[:-1]+(epoch,) for row in quotas]
+                with closing(connect(self.directory,create=True)) as database, lock(self.directory):
                     with self.condition:
                         if generation != self.generation or not self.enabled: continue
-                    self._publish_consent(True,epoch);published_epoch=epoch
-                    for (provider,minute),count in tokens.items():
-                        old=database.execute('SELECT tokens FROM tokens WHERE provider=? AND minute=?',
-                                             (provider,minute)).fetchone()
-                        total=(old[0] if old else 0)+count
-                        if total>MAX_INTEGER: raise ValueError('History numeric limit reached')
-                        database.execute('INSERT OR REPLACE INTO tokens VALUES(?,?,?)',(provider,minute,total))
-                    database.executemany('INSERT OR REPLACE INTO quota VALUES(?,?,?,?,?,?,?)',quotas)
-                    oldest=int(self.clock()-RETENTION_SECONDS)//60
-                    database.execute('DELETE FROM tokens WHERE minute<?',(oldest,))
-                    database.execute('DELETE FROM quota WHERE minute<?',(oldest,))
-                    # Hook sources may be idle for weeks; shared maintenance owns retention.
-                    for table in ('agent_events','task_events'):
-                        database.execute('DELETE FROM '+table+' WHERE at<?',(self.clock()-RETENTION_SECONDS,))
+                    if not self._publish_consent(True,epoch,allow_shutdown=stopped):
+                        published_epoch=epoch
+                        continue
+                    published_epoch=epoch
+                    with database:
+                        for (provider,minute),count in tokens.items():
+                            old=database.execute('SELECT tokens FROM tokens WHERE provider=? AND minute=?',
+                                                 (provider,minute)).fetchone()
+                            total=(old[0] if old else 0)+count
+                            if total>MAX_INTEGER: raise ValueError('History numeric limit reached')
+                            database.execute('INSERT OR REPLACE INTO tokens VALUES(?,?,?)',(provider,minute,total))
+                        database.executemany('INSERT OR REPLACE INTO quota VALUES(?,?,?,?,?,?,?)',
+                                             [row[:-1]+(epoch,) for row in quotas])
+                        oldest=int(self.clock()-RETENTION_SECONDS)//60
+                        database.execute('DELETE FROM tokens WHERE minute<?',(oldest,))
+                        database.execute('DELETE FROM quota WHERE minute<?',(oldest,))
+                        # Hook sources may be idle for weeks; shared maintenance owns retention.
+                        for table in ('agent_events','task_events'):
+                            database.execute('DELETE FROM '+table+' WHERE at<?',(self.clock()-RETENTION_SECONDS,))
                 if stopped:
                     configure(self.directory,False,epoch)
                     return

@@ -980,7 +980,7 @@ def _run_loop(cfg, interval, zai_key, views):
     health.data['board'] = cfg.get('board', '')
     health.update('starting')
     from usage_history import HistoryRecorder
-    history = HistoryRecorder(HERE / 'activity', cfg.get('usage_history',False))
+    history = HistoryRecorder(HERE / 'activity', cfg.get('usage_history',False),policy_path=CONFIG_PATH)
     from device_history import HistorySampler
     history_sampler=HistorySampler(HERE/'activity',views,cfg.get('usage_history',False))
     from permission_runtime import PermissionRuntime
