@@ -123,6 +123,11 @@ class CompanionPackageTests(unittest.TestCase):
             compressed(m,files);m['frames'][0]['decodedSha256']='0'*64
         with self.assertRaises(ValueError):self.p.parse_archive(archive(damaged))
 
+    def test_read_only_library_checks_never_create_a_runtime_directory(self):
+        target=self.root/'missing'
+        self.assertEqual(self.p.selected(target),'')
+        self.assertFalse(target.exists())
+
 
 if __name__=='__main__':unittest.main()
 
