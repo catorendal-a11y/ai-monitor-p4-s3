@@ -7,7 +7,8 @@ static int failures=0;
 #define CHECK(x) do{if(!(x)){std::cerr<<__LINE__<<": "<<#x<<"\n";++failures;}}while(0)
 static bool hash(const uint8_t*,size_t,const char* expected){return std::string(expected)==std::string(64,'a');}
 static bool decode(companions::Codec codec,const uint8_t* source,size_t count,uint8_t* target,size_t bytes){
- if(codec!=companions::Codec::raw || count!=bytes)return false;memcpy(target,source,count);return true;
+ if(codec!=companions::Codec::raw || count!=bytes)return false;
+ memcpy(target,source,count);return true;
 }
 int main(){
  using companions::PackStore;
