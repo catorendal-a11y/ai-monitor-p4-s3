@@ -47,20 +47,23 @@ def build(config, health, *, now=None):
     from usage_history import ERRORS
     history=health.get('history',{}) if current else {}
     hardware_age=_age(health.get('hardware_at'),now) if connected else None
-    hardware=health.get('hardware',{}) if hardware_age is not None and hardware_age<=45 else {}
+    # Hardware is queried at connection startup; its version is a retained fact,
+    # whereas USB delivery receipts expire independently during the connection.
+    hardware=health.get('hardware',{}) if hardware_age is not None else {}
     firmware=hardware.get('firmwareVersion')
     if not isinstance(firmware,str) or not re.fullmatch(r'v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?:-rc[0-9]{1,4})?',firmware):firmware=None
     companion=health.get('companion',{}) if connected else {}
     companion_age=_age(companion.get('updated_at'),now)
     return {'schema':1,'app_version':HOST_VERSION,'board':board,'configured_port':port,
-        'firmware_version':firmware,'firmware_age_s':hardware_age,
+        'firmware_version':firmware,'firmware_age_s':hardware_age,'device_facts':'last_observed',
         'host':{'confirmed':current,'state':_choice(health.get('state'),STATES) if current else 'unconfirmed','age_s':age},
         'providers':providers,
         'agent_usb':{'state':_choice(live.get('state'),('unsupported','acknowledged','stale','error')) if live_current else 'unconfirmed',
                      'age_s':live_age,'agent_count':count if live_current and type(count) is int and 0<=count<=8 else None},
         'local_reader':_choice(health.get('local_reader'),('starting','reading','ready','unavailable','stalled')) if current else 'unconfirmed',
         'history':{'collection_enabled':config.get('usage_history') is True,'error':_choice(history.get('error'),ERRORS,None)},
-        'companion_state':_choice(companion.get('state'),('active','builtin','overridden','different','installing','unconfirmed')) if companion_age is not None and companion_age<=45 else 'unconfirmed',
+        'companion_state':_choice(companion.get('state'),('active','builtin','overridden','different','installing','unconfirmed')) if companion_age is not None else 'unconfirmed',
+        'companion_age_s':companion_age,
         'physical_permissions_enabled':False}
 
 
