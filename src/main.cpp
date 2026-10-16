@@ -26,6 +26,7 @@
 #include "ui/theme.h"
 #include "diagnostics/hardware_types.h"
 #include "diagnostics/ppa_benchmark.h"
+#include "companions/runtime.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -116,6 +117,7 @@ void setup() {
   diagnostics::capture_startup_memory(diagnostics::StartupStage::afterLvgl);
   diagnostics::initialize_hardware();
   diagnostics::run_isolated_ppa_benchmark();
+  companions::runtime::initialize();
   aim::begin();  // initializes the control queue before the UI task starts
 
   if (xTaskCreatePinnedToCore(uiTask, "ui", board_profile::ui_stack_bytes, nullptr, 2, &uiHandle, 1) != pdPASS) {

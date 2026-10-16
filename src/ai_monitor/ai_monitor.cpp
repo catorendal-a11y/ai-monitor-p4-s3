@@ -26,6 +26,7 @@
 #include "../interaction/enrollment_runtime.h"
 #include "../interaction/permission_runtime_esp.h"
 #include "../mirror/runtime.h"
+#include "../companions/runtime_esp.h"
 #if defined(AIM_USB_AUTH_BENCHMARK)
 #include "../interaction/crypto_benchmark.h"
 #endif
@@ -120,6 +121,11 @@ static void ai_monitor_task(void*) {
   core.firmware_version = FW_VERSION;
   core.boot_id = esp_random();
   if(!core.boot_id)core.boot_id=1;
+  companions::runtime::set_boot(core.boot_id);
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+  core.companion_command=companions::runtime::command;
+  core.companion_available=companions::runtime::available;
+#endif
   if(interaction::enrollment_runtime_initialize(core.boot_id))core.enrollment_command=interaction::enrollment_runtime_command;
 #if defined(AIM_USB_PERMISSION_RUNTIME)
   if(interaction::permission_runtime_initialize(core.boot_id))core.interaction_command=interaction::permission_runtime_command;
@@ -156,6 +162,7 @@ static void ai_monitor_task(void*) {
     const bool changed = core.poll();
     interaction::enrollment_runtime_poll(millis(),core.snapshot().hostPresent);
     mirror::poll(millis(),core.snapshot().hostPresent);
+    companions::runtime::poll(millis(),core.snapshot().hostPresent);
     interaction::permission_runtime_poll(millis(),core.snapshot().hostPresent);
     if(core.agent_snapshot().revision!=agentRevision) {
       agentRevision=core.agent_snapshot().revision;agent::publish(core.agent_snapshot());

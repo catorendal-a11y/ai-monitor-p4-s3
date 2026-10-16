@@ -539,6 +539,10 @@ class MonitorWindow(QMainWindow):
         self.history_view=HistoryView(self)
         history_scroll=QScrollArea(); history_scroll.setWidgetResizable(True); history_scroll.setWidget(self.history_view)
         self.tabs.addTab(history_scroll, 'History')
+        from companion_ui import CompanionView
+        self.companion_view=CompanionView(self)
+        companion_scroll=QScrollArea();companion_scroll.setWidgetResizable(True);companion_scroll.setWidget(self.companion_view)
+        self.tabs.addTab(companion_scroll,'Companions')
         right.addWidget(self.tabs, 1)
         console_heading = QHBoxLayout()
         console_heading.addWidget(label('COMPANION TERMINAL', 'eyebrow'))

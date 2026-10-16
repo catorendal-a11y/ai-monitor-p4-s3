@@ -65,7 +65,7 @@ class PackStore {
     active_=staging_;ready_=false;++revision_;return true;
   }
   void disable() {active_=-1;receiving_=ready_=builtin_=false;offset_=total_=0;nonce_[0]=0;++revision_;}
-  void request_builtin(){receiving_=ready_=false;builtin_=true;}
+  void request_builtin(){receiving_=ready_=false;builtin_=true;offset_=total_=0;}
   void cancel(){receiving_=ready_=false;nonce_[0]=0;}
   void expire(uint32_t now){if((receiving_ || ready_) && uint32_t(now-received_)>30000u)cancel();}
   const AnimationManifest* active()const{return active_>=0?&banks_[active_].manifest:nullptr;}

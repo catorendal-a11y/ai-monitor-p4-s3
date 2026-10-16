@@ -503,6 +503,7 @@ class Panel:
         self.live_retry_at = 0
         self.permission_runtime = None  # Explicit validated setup only; never auto-enable from USB.
         self.mirror_service = None
+        self.companion_service = None
 
     def attach_permission_runtime(self, runtime):
         from permission_runtime import PermissionRuntime
@@ -521,6 +522,8 @@ class Panel:
         finally:
             mirror = getattr(self, "mirror_service", None)
             if mirror is not None: mirror.close()
+            companion=getattr(self,'companion_service',None)
+            if companion is not None:companion.close()
             self.ser.close()
 
     def refresh_status(self, request_id, state, message):
@@ -619,6 +622,11 @@ class Panel:
         message = None
         mirror = getattr(self, "mirror_service", None)
         if mirror is not None: mirror.pump(self)
+        companion=getattr(self,'companion_service',None)
+        if companion is not None:
+            companion.pump(self)
+            health=getattr(self,'health',None)
+            if health is not None:health.data['companion']=companion.snapshot()
         runtime = getattr(self, 'permission_runtime', None)
         if runtime is not None: runtime.pump()
         sampler=getattr(self,'history_sampler',None)
@@ -904,7 +912,9 @@ def wait_connected(panel, seconds, minimum_wait=0):
             return
         mirror = getattr(panel, "mirror_service", None)
         capture_active = isinstance(mirror, MirrorService) and mirror.client is not None
-        time.sleep(min(.05 if capture_active else 1, remaining))
+        companion=getattr(panel,'companion_service',None)
+        pack_active=companion is not None and companion.client is not None and not companion.client.done
+        time.sleep(min(.05 if capture_active or pack_active else 1, remaining))
         panel.collect_requests()
         if isinstance(panel, Panel): panel.report_tokens()
         watcher = getattr(panel, "config_watcher", None)
@@ -1038,6 +1048,8 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.history_sampler=history_sampler
                     from mirror_service import MirrorService
                     panel.mirror_service=MirrorService(HERE.parent)
+                    from companion_service import CompanionService
+                    panel.companion_service=CompanionService(HERE.parent)
                     panel.attach_permission_runtime(permissions)
                     health.data.pop('hardware', None)
                     health.data.pop('hardware_at', None)

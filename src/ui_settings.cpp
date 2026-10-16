@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include "app_settings.h"
+#include "companions/runtime.h"
 #include "config.h"
 #include "ui/backlight.h"
 #include "ui/idle_dim.h"
@@ -189,6 +190,7 @@ static void refresh_appearance() {
   lv_image_set_src(companionPreview, look.companion == app_settings::Companion::orbit ? &nova_assets::orbit_thumb : &nova_assets::nova_thumb);
 }
 static void companion_select(lv_event_t* event) {
+  companions::runtime::use_builtin();
   auto look = app_settings::appearance();
   look.companion = static_cast<app_settings::Companion>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
   app_settings::set_appearance(look); refresh_appearance();

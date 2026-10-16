@@ -54,6 +54,7 @@ class ProtoCore {
   std::function<bool(JsonObjectConst,uint32_t,std::string&)> enrollment_command;
   std::function<bool(JsonObjectConst,uint32_t,std::string&)> mirror_command;
     std::function<bool(JsonObjectConst,uint32_t,std::string&)> companion_command;
+    std::function<bool()> companion_available;
   std::function<void(uint32_t)> interaction_tick;
   std::function<std::string()> crypto_benchmark; // Developer-only, no enrolled key/permission path.
 
@@ -273,7 +274,7 @@ class ProtoCore {
           kReportedVersion, firmware_version, (unsigned)boot_id, mac_, board_profile::display, board_profile::panel,
           board_profile::panel_id, board_profile::id, board_profile::chip, board_profile::experimental ? "true" : "false",
           board_profile::brightness_control, (unsigned)brightness(), (unsigned)kAim1MaxPayload,
-          interaction_command ? 1u : 0u, enrollment_command ? 1u : 0u, mirror_command ? 1u : 0u, companion_command ? 1u : 0u, hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
+          interaction_command ? 1u : 0u, enrollment_command ? 1u : 0u, mirror_command ? 1u : 0u, companion_command && (!companion_available || companion_available()) ? 1u : 0u, hardware ? "true" : "false", (unsigned long)(tick() / 1000u), (unsigned)heap(), (unsigned)psram_free(), snap_.tokenUsageKnown ? "true" : "false", snap_.tokenUsageSeen ? "true" : "false",
           (unsigned)snap_.tokenSourceMask, (unsigned)snap_.tokenIdleSeconds, static_cast<unsigned long long>(snap_.lastTokenDelta),
           static_cast<unsigned long>((tick()-snap_.tokenActivityMs)/1000u));
     note_host_seen();
@@ -609,7 +610,7 @@ class ProtoCore {
         if(!companion_command || !companion_command(doc.as<JsonObjectConst>(),tick(),response) || response.empty() || response.size()>kAim1MaxPayload) {
           reply_error(-1,0,"external companions unavailable");return;
         }
-        emit(response.c_str());emit("\n");return;
+        note_host_seen();emit(response.c_str());emit("\n");return;
       }
     if(!strcmp(cmd,"get_crypto_benchmark")) {
       if(doc.as<JsonObjectConst>().size()!=1 || !crypto_benchmark) {

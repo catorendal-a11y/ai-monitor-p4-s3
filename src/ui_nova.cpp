@@ -11,6 +11,7 @@
 #include "ui/nova_assets.h"
 #include "ui/companion_renderer.h"
 #include "companions/builtin_animation.h"
+#include "companions/runtime.h"
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
 #include "companions/psram_cache.h"
 #include "diagnostics/hardware_types.h"
@@ -50,6 +51,7 @@ static companions::PsramCache companionCache;
 static diagnostics::CompanionCache cacheTelemetry;
 #endif
 static CompanionRenderer renderer;
+static void detach_external(){renderer.reset();animation=companions::AnimationPlayer{};animatedCompanion=255;}
 static int motionY = 0;
 static uint32_t previousMotion = 0;
 
@@ -103,11 +105,11 @@ static void details(lv_event_t* event) {
 namespace nova_ui {
 void init() {
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
-    if (companionCache.initialize(370u*284u*3u)) {
+    if (companionCache.initialize(companions::max_frame_bytes)) {
       renderer.initialize(companionCache.frames(),companions::PsramCache::hash,companions::PsramCache::decode);
       cacheTelemetry.enabled=true;
       cacheTelemetry.allocatedBytes=companionCache.allocated_bytes();
-    }
+    } else companions::runtime::rendering_ready(false);
 #endif
   dashboard = lv_screen_active();
   screen = lv_obj_create(nullptr);
@@ -181,10 +183,12 @@ bool is_active() { return screen && lv_screen_active() == screen; }
 void show() { lv_screen_load(screen); ui_nova_update(); }
 
 void update() {
+  companions::runtime::ui_tick(detach_external);
   if (!is_active()) return;
   const auto snapshot = aim::read(); const uint32_t now = millis();
   const auto companion = app_settings::appearance().companion;
-  text(companionLabel, app_settings::companion_name(companion));
+  const auto* external=companions::runtime::current();
+  text(companionLabel, external?external->name:app_settings::companion_name(companion));
   const bool resting = strcmp(idle_dim_mode(), "NIGHT") == 0 || strcmp(idle_dim_mode(), "IDLE") == 0;
   const auto live=live_agent::read_usb();const auto agentCounts=agent::read();
   mood = state.evaluate(snapshot, now, resting, [](const char* provider, const aim::Row& row) {
@@ -235,11 +239,12 @@ void update() {
       if(item.state==agent::State::TESTING && item.observedAgeSeconds<=30 && style &&
          session_status(snapshot,now,style->activityMask,agentCounts,live).running)animationMood=companions::Mood::testing;
     }
-  animation.select(companions::builtin_animation(animationMood),now,animatedCompanion!=static_cast<uint8_t>(companion));
+  animation.select(external?external->resolve(animationMood):companions::builtin_animation(animationMood),now,animatedCompanion!=static_cast<uint8_t>(companion));
   animatedCompanion=static_cast<uint8_t>(companion);
   const lv_image_dsc_t* animatedPoses[]={&nova_assets::work,&nova_assets::done,&nova_assets::low,
     &nova_assets::critical,&nova_assets::sleep,&nova_assets::blink};
-  pose=animatedPoses[animation.frame(now)];
+  const auto animationFrame=animation.frame(now);
+  if(!external)pose=animatedPoses[animationFrame];
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
   if (now - previousMotion >= 160u) {
     previousMotion = now;
@@ -250,7 +255,9 @@ void update() {
   const auto decodeCount=renderer.decoded_frames(), failureCount=renderer.decode_failures();
   const uint32_t switchStarted=micros();
 #endif
-  renderer.render(figure, companion == app_settings::Companion::orbit, pose, -55, motionY);
+  if(!external || !renderer.render_external(figure,external->frames[animationFrame].frame,external->codec,
+      companions::runtime::frame(animationFrame),-55,motionY))
+    renderer.render(figure, companion == app_settings::Companion::orbit, pose, -55, motionY);
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
   if (decodeCount!=renderer.decoded_frames() || failureCount!=renderer.decode_failures()) {
     cacheTelemetry.lastSwitchUs=micros()-switchStarted;
