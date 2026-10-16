@@ -48,6 +48,64 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(life.subprocess,'run',return_value=Mock(returncode=1,stdout='sensitive errors')):
             with self.assertRaisesRegex(RuntimeError,'startup task'): life.remove_startup_task(Path('C:/fixture/app'))
 
+    def test_observer_removal_preserves_custom_entry_metadata(self):
+        import installation_lifecycle as life
+        import provider_setup as providers
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            root=(Path(td)/'app').resolve(); root.mkdir(); home=Path(td)/'home'; home.mkdir()
+            cases=((providers.codex_session_link,home/'.codex/hooks.json','Stop'),
+                   (providers.claude_session_link,home/'.claude/settings.json','Stop'),
+                   (providers.zcode_session_link,home/'.zcode/cli/config.json','TurnEnd'))
+            for link,path,event in cases:
+                link(root,home=home); data=json.loads(path.read_text())
+                events=data['hooks'].get('events',data['hooks'])
+                event=event if event in events else next(iter(events))
+                events[event][0]['fixtureCustomMetadata']='preserve'
+                path.write_text(json.dumps(data)); link(root,remove=True,home=home)
+                after=json.loads(path.read_text())
+                events=after.get('hooks',{}).get('events',after.get('hooks',{}))
+                self.assertEqual(events[event],[{'matcher':'','hooks':[],'fixtureCustomMetadata':'preserve'}] if link!=providers.zcode_session_link else [{'hooks':[],'fixtureCustomMetadata':'preserve'}])
+
+    def test_custom_statusline_and_permission_hook_survive(self):
+        import installation_lifecycle as life
+        import json
+        with tempfile.TemporaryDirectory() as td:
+            root=(Path(td)/'app').resolve(); root.mkdir(); home=Path(td)/'home'
+            path=home/'.claude/settings.json'; path.parent.mkdir(parents=True)
+            custom={'type':'command','command':'custom'}
+            original={'statusLine':custom,'hooks':{'PermissionRequest':[{'hooks':[custom]}]},'permissions':{'allow':['fixture']}}
+            path.write_text(json.dumps(original)); life.remove_integrations(root,home=home)
+            self.assertEqual(json.loads(path.read_text()),original)
+
+    def test_invalid_client_settings_block_without_disclosing_content(self):
+        import installation_lifecycle as life
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)/'app'; root.mkdir(); home=Path(td)/'home'
+            path=home/'.claude/settings.json'; path.parent.mkdir(parents=True); path.write_text('{"hooks":"fixture-invalid"}')
+            with self.assertRaises(ValueError): life.remove_integrations(root,home=home)
+
+    @unittest.skipUnless(sys.platform=='win32','Windows task command mocks')
+    def test_powershell_task_ownership_checks_with_mocked_scheduler(self):
+        import installation_lifecycle as life
+        import subprocess
+        root=Path('C:/fixture/app')
+        with patch.object(life.subprocess,'run',return_value=Mock(returncode=0)) as run:
+            life.remove_startup_task(root)
+            script=run.call_args.args[0][-1]
+        executable=str(root.resolve()/'AI-Monitor.exe').replace("'","''")
+        for mode in ('absent','foreign','owned','unavailable'):
+            with self.subTest(mode=mode):
+                fixture=("$script:removed=$false; function Get-ScheduledTask { "
+                    + ("throw 'unavailable'" if mode=='unavailable' else "if ($script:removed) { return }; "
+                       + ("return" if mode=='absent' else
+                          "[pscustomobject]@{TaskName='AI Monitor Host'; Principal=[pscustomobject]@{UserId=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value};Actions=@([pscustomobject]@{Execute='"+
+                          (executable if mode=='owned' else 'C:/other/AI-Monitor.exe')+"';Arguments='--start-host'})}"))
+                    + " }; function Unregister-ScheduledTask { $script:removed=$true; Write-Output 'fixture-removed' }; ")
+                result=subprocess.run([life.powershell_executable(),'-NoProfile','-NonInteractive','-Command',fixture+script],capture_output=True,text=True,timeout=12)
+                self.assertEqual(result.returncode,1 if mode=='unavailable' else 0)
+                self.assertEqual('fixture-removed' in result.stdout,mode=='owned')
+
     def test_installer_runs_preflight_before_deleting_executables(self):
         script=(Path(__file__).resolve().parents[1]/'scripts/windows_installer.iss').read_text()
         self.assertIn('InitializeUninstall',script); self.assertIn('--prepare-uninstall',script)
