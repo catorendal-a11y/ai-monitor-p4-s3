@@ -1,6 +1,6 @@
 """Cross-process consent and lifecycle audit regressions; synthetic state only."""
 from contextlib import closing
-import hashlib,json,os
+import hashlib,json,os,threading
 from pathlib import Path
 import subprocess,sys,tempfile,time,unittest
 from unittest.mock import patch
@@ -76,6 +76,73 @@ r.record_tokens({'claude':9});time.sleep(.1);r.close()
   with closing(connect(self.root)) as db:
    self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],1)
    self.assertEqual(db.execute('SELECT COUNT(*) FROM task_events').fetchone()[0],1)
+ def test_constructor_contains_unavailable_authority_and_keeps_host_caller_responsive(self):
+  with patch('history_consent.mint_epoch',side_effect=OSError('synthetic unavailable store')):
+   recorder=HistoryRecorder(self.root,True);self.addCleanup(recorder.close)
+   deadline=time.monotonic()+2
+   while recorder.last_error is None and time.monotonic()<deadline:time.sleep(.01)
+   self.assertIsNotNone(recorder.last_error)
+   self.assertTrue(recorder.worker.is_alive())
+   recorder.close()
+ def test_constructor_and_reenable_never_wait_for_authority_on_caller(self):
+  entered=threading.Event();release=threading.Event()
+  import history_consent
+  original=history_consent.mint_epoch
+  def slow(directory):entered.set();release.wait(2);return original(directory)
+  with patch('history_consent.mint_epoch',side_effect=slow):
+   start=time.monotonic();recorder=HistoryRecorder(self.root,True)
+   try:
+    self.assertLess(time.monotonic()-start,.15)
+    self.assertTrue(entered.wait(2))
+   finally:release.set();recorder.close()
+  recorder=HistoryRecorder(self.root,False);self.addCleanup(recorder.close)
+  entered.clear();release.clear()
+  with patch('history_consent.mint_epoch',side_effect=slow):
+   try:
+    start=time.monotonic();recorder.configure(True)
+    self.assertLess(time.monotonic()-start,.15)
+   finally:release.set();recorder.close()
+ def test_authority_lock_contention_keeps_hook_bounded(self):
+  from history_consent import lock
+  entered=threading.Event();release=threading.Event()
+  def held():
+   with lock(self.root):entered.set();release.wait(2)
+  worker=threading.Thread(target=held);worker.start()
+  try:
+   self.assertTrue(entered.wait(2));start=time.monotonic()
+   history.record(self.root,'claude',self.agent,7,'Stop','COMPLETED',10,True)
+   self.assertLess(time.monotonic()-start,.15)
+  finally:release.set();worker.join(2)
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],0)
+ def test_saved_disabled_policy_blocks_hooks_and_policy_write_failure_stays_revoked(self):
+  from history_consent import policy_update
+  import private_files
+  store=self.root/'tools/activity';store.mkdir(parents=True)
+  with closing(connect(store,True)):pass
+  history.configure(store,True,17)
+  policy=self.root/'tools/aim_host.json';policy.write_text(json.dumps({'usage_history':False}))
+  history.record(store,'claude',self.agent,7,'Stop','COMPLETED',10,True)
+  with closing(connect(store)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],0)
+  with self.assertRaises(OSError):
+   with policy_update(self.root,enabled=False):raise OSError('synthetic saved-file failure')
+  history.record(self.root,'claude',self.agent,7,'Stop','COMPLETED',10,True)
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],0)
+ def test_durable_floor_blocks_hooks_if_disabled_marker_write_fails(self):
+  import private_files
+  original=private_files.write_bytes
+  def fail_marker(path,data):
+   if Path(path).name=='agent-history-consent.json':raise OSError('synthetic marker failure')
+   return original(path,data)
+  with patch.object(private_files,'write_bytes',side_effect=fail_marker):
+   with self.assertRaises(OSError):history.revoke(self.root)
+  self.assertTrue(json.loads((self.root/'agent-history-consent.json').read_text())['enabled'])
+  history.record(self.root,'claude',self.agent,7,'Stop','COMPLETED',10,True)
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0],0)
+ def test_policy_update_new_parent_preserves_missing_activity_directory(self):
+  from history_consent import policy_update
+  folder=self.root/'new-parent/activity'
+  with policy_update(folder):self.assertFalse(folder.exists())
+  self.assertFalse(folder.exists())
  def test_task_identity_uses_config_root_and_effective_task_list(self):
   config=str(self.root/'synthetic-config')
   with patch.dict(os.environ,{'CLAUDE_CONFIG_DIR':config,'CLAUDE_CODE_TASK_LIST_ID':'shared'}):
