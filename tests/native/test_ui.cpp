@@ -1641,12 +1641,13 @@ int main(int argc, char** argv) {
     liveSample.agents[0].state=agent::State::NEEDS_ATTENTION;
     liveSample.agents[0].hasElapsed=true;liveSample.agents[0].elapsedSeconds=3723;
     liveSample.agents[0].observedAgeSeconds=45;ui_agents_update();
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"NEEDS ATTENTION"));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"Last: NEEDS ATTENTION"));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"1:02:03 / event 45s ago"));
     screenshot(screenshots,"live-agent-session-timer");
     fakeTick+=5000;ui_agents_update();
     CHECK(strstr(lv_label_get_text(agents_ui::rows[0].identity),"event 50s ago"));
     fakeTick-=5000;
+    liveSample.agents[0].observedAgeSeconds=0;
     liveSample.agents[0].state=agent::State::ERROR;ui_agents_update();
     CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(0xFF6B6B)));
     CHECK(lv_obj_is_hidden(agents_ui::rows[1].card));
@@ -1656,6 +1657,9 @@ int main(int argc, char** argv) {
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(agents_ui::screen,LV_PART_MAIN),lv_color_hex(ui_theme::background)));
     ui_agents_update();
     CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(0xFF6B6B)));
+    liveSample.agents[0].observedAgeSeconds=31;ui_agents_update();
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"Last: ERROR"));
+    CHECK(lv_color_eq(lv_obj_get_style_text_color(agents_ui::rows[0].state,LV_PART_MAIN),lv_color_hex(ui_theme::muted)));
     fakeTick+=30000;ui_agents_update();
     CHECK(!lv_obj_is_hidden(agents_ui::empty) && lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),""));
