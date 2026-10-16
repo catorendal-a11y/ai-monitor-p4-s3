@@ -1350,6 +1350,20 @@ int main(int argc, char** argv) {
         CHECK(lv_obj_get_y(target)==-3+(orbit?nova_assets::orbit_origin_y:nova_assets::nova_origin_y));
       }
       CHECK(cached.decode_failures()==0);
+      cached.reset();
+      const auto& external=companions::builtin_frames[0];
+      auto externalFrame=external.frame;
+      CHECK(cached.render_external(target,externalFrame,companions::Codec::lz4,external.encoded,10,20));
+      const auto* externalImage=static_cast<const lv_image_dsc_t*>(lv_image_get_src(target));
+      CHECK(externalImage->data_size==nova_assets::work.data_size);
+      CHECK(!memcmp(externalImage->data,nova_assets::work.data,externalImage->data_size));
+      const auto externalDecodes=cached.decoded_frames();
+      CHECK(cached.render_external(target,externalFrame,companions::Codec::lz4,external.encoded,10,21));
+      CHECK(cached.decoded_frames()==externalDecodes);
+      externalFrame.originX=0; // Same encoded pixels can have a different manifest crop.
+      CHECK(cached.render_external(target,externalFrame,companions::Codec::lz4,external.encoded,10,21));
+      lv_obj_update_layout(target);CHECK(lv_obj_get_x(target)==10);
+      cached.reset();
     }
     for(unsigned i=0;i<2;++i)if(cache.slot(i))CHECK(!cache.slot(i)->pinned);
     cache.clear_unpinned();
