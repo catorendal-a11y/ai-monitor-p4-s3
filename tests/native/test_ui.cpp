@@ -619,6 +619,7 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   ui_settings_hide(); ui_nova_show(); fakeTick += 5000;
   set_sample(1, 1); sample.hostPresent = true; sample.viewsConfigured = true;
   std::strcpy(sample.viewKeys[0], "claude"); std::strcpy(sample.views[0].providerKey, "claude");
+  std::strcpy(sample.views[0].providerLabel, "CLAUDE");
   sample.views[0].informational = true; sample.views[0].hasUsage = false;
   sample.views[0].rowCount = 0; agentSample.sessionCount = 1; agentSample.sessionActivityMs = fakeTick;agentSample.fresh=true;
   agentSample.sessions[0] = agent::SessionCounts{1,0,0,0,4};
