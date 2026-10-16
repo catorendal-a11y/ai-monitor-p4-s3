@@ -628,18 +628,29 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   sample.views[0].informational = false; sample.views[0].hasUsage = true; sample.views[0].rowCount = 1;
   sample.views[0].notice = true; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "ERROR / last good");
+  screenshot(screenshots, "nova-session-quota-error");
   sample.views[0].notice = false; sample.views[0].quotaReceivedMs = fakeTick - 300001u; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "STALE / last good");
+  screenshot(screenshots, "nova-session-quota-stale");
   sample.views[0].quotaReceivedMs = fakeTick; sample.views[0].fetching = true; ui_nova_update();
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "UPDATING / last good");
   sample.views[0].fetching = false; sample.views[0].informational = true;
   sample.views[0].hasUsage = false; sample.views[0].rowCount = 0;
   const auto update_x = lv_obj_get_x(nova_ui::menuButton), update_y = lv_obj_get_y(nova_ui::menuButton);
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: running");
+  lv_obj_update_layout(nova_ui::screen);
+  for (auto* label : {nova_ui::title, nova_ui::providers[0].session}) {
+    lv_point_t size{};
+    lv_text_get_size(&size, lv_label_get_text(label), lv_obj_get_style_text_font(label, LV_PART_MAIN),
+                     0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    CHECK(size.x <= lv_obj_get_width(label));
+  }
   screenshot(screenshots, "nova-session-working");
   agentSample.sessions[0] = agent::SessionCounts{0,1,0,0,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::attention);
   CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Needs you");
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "Activity only / tap for setup");
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: needs you");
   screenshot(screenshots, "nova-session-waiting");
   agentSample.sessions[0] = agent::SessionCounts{0,0,1,0,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::completed); screenshot(screenshots, "nova-session-complete");
@@ -648,6 +659,7 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   CHECK(lv_obj_get_x(nova_ui::menuButton) == update_x && lv_obj_get_y(nova_ui::menuButton) == update_y);
   agentSample.sessionActivityMs = fakeTick - 35000u; ui_nova_update();
   CHECK(nova_ui::mood != NovaMood::session_error);
+  CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)).empty());
   agentSample.sessionCount = 0;
 }
 

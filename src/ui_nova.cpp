@@ -33,7 +33,7 @@ static lv_obj_t* companionLabel = nullptr;
 static lv_obj_t *menuButton = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 static lv_obj_t *refreshButton = nullptr, *refreshLabel = nullptr;
 struct ProviderCard {
-  lv_obj_t *card = nullptr, *icon = nullptr, *logoBox = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr;
+  lv_obj_t *card = nullptr, *icon = nullptr, *logoBox = nullptr, *name = nullptr, *percent = nullptr, *bar = nullptr, *status = nullptr, *session = nullptr;
   uint8_t view = 0;
   char providerKey[16] = {};
   uint32_t color = UINT32_MAX;
@@ -166,6 +166,7 @@ void init() {
     lv_obj_set_style_radius(logoBox, 12, 0); lv_obj_set_scrollable(logoBox, false); lv_obj_set_clickable(logoBox, false);
     item.icon = lv_image_create(logoBox); lv_obj_set_clickable(item.icon, false);
     item.name = label(item.card, 62, 4, 174, "", &lv_font_montserrat_22, ui_theme::text);
+    item.session = label(item.card, 62, 29, 174, "", &lv_font_montserrat_16, ui_theme::accent);
     item.percent = label(item.card, 242, 0, 170, "--", &lv_font_montserrat_40);
     lv_obj_set_style_text_align(item.percent, LV_TEXT_ALIGN_RIGHT, 0);
     item.bar = lv_bar_create(item.card); lv_obj_set_pos(item.bar, 62, 50); lv_obj_set_size(item.bar, 350, 10);
@@ -210,7 +211,7 @@ void update() {
     case NovaMood::completed: heading = "Turn complete"; message = "Reported by the AI client"; pose = &nova_assets::done; break;
     case NovaMood::session_error: heading = "Session error"; message = "Check the AI client on your PC"; break;
     case NovaMood::working: {
-      heading = "Working";
+      heading = "Recent activity";
       char count[24]; format_token_count(snapshot.lastTokenDelta, count, sizeof(count));
       snprintf(tokenMessage, sizeof(tokenMessage), "+%s registered tokens", count);
       message = tokenMessage; break;
@@ -335,12 +336,16 @@ void update() {
     const char* status = !snapshot.hostPresent ? "OFFLINE / last good" : (view.informational ? "Activity only / tap for setup" : (view.notice ? "ERROR / last good" :
                           (view.fetching ? "UPDATING / last good" : (!hasRow ? (choice.automatic ? "Waiting for data" : "Selected window unavailable") : (!fresh ? "STALE / last good" : selectedStatus)))));
     const auto provider_sessions = style ? session_status(snapshot, now, style->activityMask,agentCounts,live) : SessionStatus{};
+    // Session events and quota freshness are independent signals. Never let one
+    // erase the other; keep the existing card and touch target geometry stable.
+    const char* session = "";
     if (snapshot.hostPresent && provider_sessions.known) {
-      if (provider_sessions.waiting) status = "SESSION / needs you";
-      else if (provider_sessions.running) status = "SESSION / running";
-      else if (provider_sessions.error) status = "SESSION / error";
-      else if (provider_sessions.completed) status = "SESSION / turn complete";
+      if (provider_sessions.waiting) session = "Session: needs you";
+      else if (provider_sessions.running) session = "Session: running";
+      else if (provider_sessions.error) session = "Session: error";
+      else if (provider_sessions.completed) session = "Session: complete";
     }
+    text(item.session, session);
     text(item.status, status);
   }
 }
