@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 
@@ -88,6 +89,39 @@ class CompanionPackageTests(unittest.TestCase):
             m['frames'][0]['id']='con'
             for clip in m['animations']:clip['frames'][0]['id']='con'
         with self.assertRaises(ValueError):self.p.parse_archive(archive(reserved))
+
+    def test_library_capacity_is_checked_without_exhausting_an_unbounded_directory(self):
+        source=self.root/'robot.zip';source.write_bytes(archive())
+        visited=[]
+        def paths():
+            for i in range(100):
+                visited.append(i)
+                yield self.root/((f'{i:064x}')+'.pack')
+        with patch.object(self.p.Path,'glob',return_value=paths()),self.assertRaises(ValueError):
+            self.p.install(self.root,source)
+        self.assertLessEqual(len(visited),17)
+
+    def test_only_unused_content_addressed_library_entries_can_be_removed(self):
+        source=self.root/'robot.zip';source.write_bytes(archive())
+        pack=self.p.install(self.root,source);self.p.select(self.root,pack.id)
+        with self.assertRaises(ValueError):self.p.remove(self.root,pack.id)
+        self.p.select(self.root,'');self.p.remove(self.root,pack.id)
+        self.assertFalse((self.root/'tools/companions'/(pack.id+'.pack')).exists())
+        self.assertFalse((self.root/'tools/companions'/(pack.id+'.zip')).exists())
+        self.assertTrue(source.exists())
+
+    def test_lz4_block_and_decoded_digest_are_both_checked(self):
+        import lz4.block
+        def compressed(m,files):
+            m['codec']='lz4'
+            for frame in m['frames']:
+                raw=files.pop(frame['file']);frame['file']=frame['id']+'.lz4'
+                encoded=lz4.block.compress(raw,store_size=False);files[frame['file']]=encoded
+                frame['encodedBytes']=len(encoded);frame['encodedSha256']=hashlib.sha256(encoded).hexdigest()
+        good=archive(compressed);self.assertEqual(self.p.parse_archive(good).manifest['codec'],'lz4')
+        def damaged(m,files):
+            compressed(m,files);m['frames'][0]['decodedSha256']='0'*64
+        with self.assertRaises(ValueError):self.p.parse_archive(archive(damaged))
 
 
 if __name__=='__main__':unittest.main()
