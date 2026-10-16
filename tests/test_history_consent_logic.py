@@ -56,6 +56,14 @@ r.record_tokens({'claude':9});time.sleep(.1);r.close()
   out,err=child.communicate('continue\n',timeout=10)
   self.assertEqual(child.returncode,0,err)
   with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM tokens').fetchone()[0],0)
+ def test_stale_enabled_startup_cannot_override_saved_disabled_policy(self):
+  policy=self.root.parent/(self.root.name+'-synthetic-policy.json')
+  self.addCleanup(lambda:policy.unlink(missing_ok=True))
+  policy.write_text(json.dumps({'usage_history':False}))
+  recorder=HistoryRecorder(self.root,True,policy_path=policy);self.addCleanup(recorder.close)
+  recorder.record_tokens({'claude':9});time.sleep(.1);recorder.close()
+  with closing(connect(self.root)) as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM tokens').fetchone()[0],0)
+  self.assertFalse(json.loads((self.root/'agent-history-consent.json').read_text())['enabled'])
  def test_lease_refresh_same_epoch_does_not_drop_agent_or_task_event(self):
   original=history.read_local_json
   def refreshed(path,limit):
