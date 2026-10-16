@@ -12,6 +12,7 @@ from provider_catalog import PROVIDERS
 APPLICATION_ID = 0x41494d48
 MAX_INTEGER = (1 << 63)-1
 RETENTION_SECONDS = 30*86400
+CONSENT_RENEW_SECONDS = 30
 ERRORS = frozenset(('History numeric limit reached','History queue full; some observations were missed',
                    'History unavailable; check local storage. Some observations were missed.'))
 
@@ -135,7 +136,8 @@ class HistoryRecorder:
         published_epoch=0
         while True:
             with self.condition:
-                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed or self.epoch!=published_epoch)
+                self.condition.wait_for(lambda:self.tokens or self.quotas or self.closed or self.epoch!=published_epoch,
+                                        timeout=CONSENT_RENEW_SECONDS if self.enabled else None)
                 tokens, quotas, generation, enabled, epoch = self.tokens, list(self.quotas), self.generation, self.enabled, self.epoch
                 self.tokens=OrderedDict(); self.quotas.clear()
                 stopped=self.closed
@@ -162,6 +164,9 @@ class HistoryRecorder:
                     oldest=int(self.clock()-RETENTION_SECONDS)//60
                     database.execute('DELETE FROM tokens WHERE minute<?',(oldest,))
                     database.execute('DELETE FROM quota WHERE minute<?',(oldest,))
+                    # Hook sources may be idle for weeks; shared maintenance owns retention.
+                    for table in ('agent_events','task_events'):
+                        database.execute('DELETE FROM '+table+' WHERE at<?',(self.clock()-RETENTION_SECONDS,))
                 if stopped:
                     configure(self.directory,False,epoch)
                     return

@@ -20,12 +20,32 @@ STATES=frozenset(('IDLE','WORKING','READING','SEARCHING','EDITING','WRITING','RU
 ACTIVE=STATES-{'IDLE','WAITING','NEEDS_ATTENTION','ERROR','COMPLETED','closed','TASK_REQUESTED'}
 MAX_EVENTS=50000
 APPLICATION_ID=0x41494d48
+CONSENT_LEASE_SECONDS=90
 
 
 def configure(directory,enabled,epoch):
     if type(enabled) is not bool or type(epoch) is not int or not 0<epoch<(1<<63):
         raise ValueError('Invalid agent history preference')
-    write_record(Path(directory)/'agent-history-consent.json',dict(enabled=enabled,epoch=epoch))
+    write_record(Path(directory)/'agent-history-consent.json',dict(enabled=enabled,epoch=epoch,
+        expires_at=time.time()+CONSENT_LEASE_SECONDS if enabled else 0))
+
+
+def revoke(directory):
+    """Explicit host/config stop. No new directory is created; storage errors propagate."""
+    path=Path(directory)/'agent-history-consent.json'
+    if path.is_symlink():raise ValueError('Invalid history consent path')
+    if path.exists():configure(directory,False,time.time_ns())
+
+
+def valid_consent(consent):
+    if (not isinstance(consent,dict) or set(consent)!={'enabled','epoch','expires_at'}
+            or consent['enabled'] is not True or type(consent['epoch']) is not int
+            or not 0<consent['epoch']<(1<<63)
+            or type(consent['expires_at']) not in (int,float)
+            or not math.isfinite(consent['expires_at'])):return False
+    # Reject expired markers and clock rollback/reboot anomalies. Event timestamps
+    # are independent: hooks and synthetic fixtures cannot extend consent.
+    return 0<consent['expires_at']-time.time()<=CONSENT_LEASE_SECONDS
 
 
 def create_schema(database):
@@ -65,16 +85,14 @@ def observe_task(directory,payload,generation,at):
     try:
         folder=Path(directory);path=folder/'history.db'
         consent=read_local_json(folder/'agent-history-consent.json',256)
-        if (not isinstance(consent,dict) or set(consent)!={'enabled','epoch'} or consent['enabled'] is not True
-                or type(consent['epoch']) is not int or not 0<consent['epoch']<(1<<63)
-                or not path.is_file() or path.is_symlink()):return
+        if not valid_consent(consent) or not path.is_file() or path.is_symlink():return
         with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=rw',uri=True,timeout=.02)) as database,database:
             database.execute('PRAGMA trusted_schema=OFF')
             if (database.execute('PRAGMA application_id').fetchone()[0]!=APPLICATION_ID or
                     database.execute('PRAGMA user_version').fetchone()[0]!=2):return
             deadline=time.monotonic()+.05
             database.set_progress_handler(lambda:time.monotonic()>deadline,100)
-            if read_local_json(folder/'agent-history-consent.json',256)!=consent:return
+            if read_local_json(folder/'agent-history-consent.json',256)!=consent or not valid_consent(consent):return
             identity=hashlib.sha256((key+':'+str(generation)+':'+str(consent['epoch'])+':'+use+':'+event).encode()).hexdigest()
             database.execute('INSERT OR IGNORE INTO task_events VALUES(?,?,?,?,?,?,?)',
                 (identity,'claude',key,generation,consent['epoch'],event,float(at)))
@@ -116,9 +134,7 @@ def record(directory,provider,agent,generation,event,state,at,root):
     try:
         folder=Path(directory);path=folder/'history.db'
         consent=read_local_json(folder/'agent-history-consent.json',256)
-        if (not isinstance(consent,dict) or set(consent)!={'enabled','epoch'} or consent['enabled'] is not True
-                or type(consent['epoch']) is not int or not 0<consent['epoch']<(1<<63)
-                or not path.is_file() or path.is_symlink()):return
+        if not valid_consent(consent) or not path.is_file() or path.is_symlink():return
         with closing(sqlite3.connect(path.resolve().as_uri()+'?mode=rw',uri=True,timeout=.02)) as database,database:
             database.execute('PRAGMA trusted_schema=OFF')
             if (database.execute('PRAGMA application_id').fetchone()[0]!=APPLICATION_ID
@@ -126,7 +142,7 @@ def record(directory,provider,agent,generation,event,state,at,root):
             deadline=time.monotonic()+.05
             database.set_progress_handler(lambda:time.monotonic()>deadline,100)
             # Recheck after obtaining SQLite authority; a disabled generation cannot be imported later.
-            if read_local_json(folder/'agent-history-consent.json',256)!=consent:return
+            if read_local_json(folder/'agent-history-consent.json',256)!=consent or not valid_consent(consent):return
             database.execute('INSERT INTO agent_events VALUES(?,?,?,?,?,?,?,?,?)',
                 (secrets.token_hex(16),provider,agent,generation,consent['epoch'],event,state,float(at),int(root)))
             database.execute('DELETE FROM agent_events WHERE at<?',(at-30*86400,))
@@ -144,8 +160,9 @@ def summarize(database,provider,start,end,end_exclusive=False):
     empty=dict(sessions=None,activeSeconds=None,completedTurns=None,failedTurns=None)
     if database.execute('PRAGMA user_version').fetchone()[0]!=2:return empty
     rows=database.execute('SELECT agent,generation,epoch,event,state,at,root FROM agent_events '
-        'WHERE provider=? AND at>=? AND at<=? ORDER BY at,rowid LIMIT ?',
-        (provider,start-900,end,MAX_EVENTS+1)).fetchall()
+        'WHERE provider=? AND at<=? AND (at>=? OR (root=1 AND event IN '
+        "('UserPromptSubmit','Stop','StopFailure','Interrupt','SessionEnd'))) ORDER BY at,rowid LIMIT ?",
+        (provider,end,start-900,MAX_EVENTS+1)).fetchall()
     if len(rows)>MAX_EVENTS:raise ValueError('Agent history limit reached')
     previous={};sessions=set();turns={};finished=set();intervals=[];completed=failed=0;observed=False
     for agent,generation,epoch,event,state,at,root in rows:
