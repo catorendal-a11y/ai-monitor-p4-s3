@@ -8,7 +8,8 @@
 - Add confirmed local-history clearing with writer revocation, transactional deletion
   and restoration of a previously running host. Database files stay in place.
 - Export bounded diagnostic metadata with independent provider check/success ages.
-  Reject health and companion activation from another saved board or port.
+  Reject health and companion activation from another saved board or port. Expire
+  cached device receipts independently during USB reconnection.
 - Stop the exact host before upgrades. Uninstall removes only confirmed owned hooks
   and startup tasks, preserving private data and custom integration metadata.
 - Fit history actions within the minimum desktop width and keep save success/failure

@@ -10,7 +10,7 @@ It does not certify every hardware interaction or provider model.
 | Desktop actions | Busy controls, asynchronous completion, stale status epochs, error recovery, close/cancel/tray | Main-thread UI updates and one action worker retained; failure does not complete a pending close |
 | Provider setup | Selected providers, exact-owned hook removal, alternate Claude configuration root, custom metadata | Uninstall preserves unrelated settings and hook metadata |
 | Provider health | Quota versus activity, last check versus last success, expired health | Separate timestamps and bounded states; saving credentials never establishes working quota |
-| Diagnostic export | Dialog cancel, worker execution, whitelist, protected atomic write | Excludes keys, raw errors, account identifiers, arguments and conversations |
+| Diagnostic export | Dialog cancel, worker execution, whitelist, protected atomic write | Excludes keys, raw errors, account identifiers, arguments and conversations; expires device receipts independently during reconnect |
 | Desktop history | Selection generation, quota-window identity, unknown gaps, chart/table/CSV dates | Local calendar boundaries shared across views; UTC observations unchanged |
 | History clearing | Explicit confirmation, stop failure, clear rollback, prior host restoration, pending read | Revoke before transactional deletion; no database unlink; no old results accepted during clear |
 | Companion library | Import/selection, uncertain activation, saved board/port identity, asynchronous status | Activation requires matching fresh device status; custom packages remain data-only |
