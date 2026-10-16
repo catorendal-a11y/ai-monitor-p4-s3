@@ -1645,6 +1645,7 @@ int main(int argc, char** argv) {
     ui_agents_update();lv_obj_update_layout(agents_ui::screen);
     CHECK(!lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"THINKING"));
+    CHECK(strstr(lv_label_get_text(agents_ui::rows[0].provider),"synthet"));
     lv_area_t before{};lv_obj_get_coords(agents_ui::next,&before);
     screenshot(screenshots,"live-agents-page-one");
     auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
@@ -1659,7 +1660,7 @@ int main(int argc, char** argv) {
     liveSample.agents[0].hasElapsed=true;liveSample.agents[0].elapsedSeconds=3723;
     liveSample.agents[0].observedAgeSeconds=45;ui_agents_update();
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"Last: NEEDS ATTENTION"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"1:02:03 / event 45s ago"));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].identity),"Session 1:02:03 / event 45s ago"));
     lv_obj_update_layout(agents_ui::screen);
     lv_point_t phaseSize{};
     lv_text_get_size(&phaseSize,lv_label_get_text(agents_ui::rows[0].state),&lv_font_montserrat_24,
@@ -1703,17 +1704,44 @@ int main(int argc, char** argv) {
     strcpy(sample.viewKeys[0],"codex");strcpy(sample.viewKeys[1],"zcode");
     sample.tokenUsageKnown=true;sample.tokenSourceMask=3;sample.tokenActivityMs=fakeTick;
     ui_agents_update();
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].provider),"CODEX"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"NO RECENT EVENTS"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].provider),"Z CODE"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].state),"NO RECENT EVENTS"));
-    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[1].identity),"Token activity available"));
+    CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
+    CHECK(!lv_obj_is_hidden(agents_ui::empty));
+    CHECK(strstr(lv_label_get_text(agents_ui::summary),"Waiting for host"));
+    liveSample.fresh=true;liveSample.receivedAt=fakeTick;ui_agents_update();
+    CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::empty),"No observed agent sessions"));
+    CHECK(strstr(lv_label_get_text(agents_ui::summary),"0 sessions"));
     CHECK(liveSample.count==0);screenshot(screenshots,"agents-provider-status");
     sample.hostPresent=false;ui_agents_update();CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
     auto* back=find_caption_button(agents_ui::screen,"HOME");CHECK(back);
     lv_obj_send_event(back,LV_EVENT_CLICKED,nullptr);CHECK(ui_nova_is_active());
     lv_indev_delete(pointer);
     sample=savedQuota;
+  }
+  {
+    // The same primary destinations stay at the same coordinates on all three screens.
+    lv_area_t positions[3]{};unsigned screenIndex=0;
+    for(auto* source:{nova_ui::screen,::screen,agents_ui::screen}) {
+      lv_screen_load(source);lv_obj_update_layout(source);
+      unsigned tab=0;
+      for(const auto* caption:{"HOME","USAGE","AGENTS"}) {
+        auto* target=find_caption_button(source,caption);CHECK(target);
+        if(!target)continue;
+        lv_area_t bounds{};lv_obj_get_coords(target,&bounds);
+        CHECK(lv_obj_get_height(target)>=48);check_inside(source,target);
+        if(!screenIndex)positions[tab]=bounds;
+        else CHECK(!memcmp(&bounds,&positions[tab],sizeof(bounds)));
+        ++tab;
+      }
+      ++screenIndex;
+    }
+    ui_nova_show();
+    auto* usage=find_caption_button(nova_ui::screen,"USAGE");
+    if(usage) {lv_obj_send_event(usage,LV_EVENT_CLICKED,nullptr);CHECK(dashboard_is_active());}
+    auto* agents=find_caption_button(::screen,"AGENTS");
+    if(agents) {lv_obj_send_event(agents,LV_EVENT_CLICKED,nullptr);CHECK(lv_screen_active()==agents_ui::screen);}
+    auto* home=find_caption_button(agents_ui::screen,"HOME");
+    if(home) {lv_obj_send_event(home,LV_EVENT_CLICKED,nullptr);CHECK(ui_nova_is_active());}
   }
   {
     event_center_ui::center.clear();liveSample=live_agent::UsbLiveSnapshot{};sample.hostPresent=true;fakeTick=10000;
