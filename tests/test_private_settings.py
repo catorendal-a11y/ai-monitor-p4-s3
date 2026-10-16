@@ -52,6 +52,19 @@ class PrivateSettingsTests(unittest.TestCase):
             self.assertEqual(path.read_bytes(),b'old')
             self.assertEqual(list(path.parent.glob('*.tmp')),[])
 
+    def test_temporary_is_already_private_when_prewrite_validation_runs(self):
+        import private_files
+        original=private_files.protect
+        checked=[]
+        def verify(path):
+            checked.append(True)
+            self.assertTrue(protected(Path(path)),'The temporary must be private from creation')
+            self.assertEqual(Path(path).read_bytes(),b'')
+            return original(path)
+        with tempfile.TemporaryDirectory() as d,patch.object(private_files,'protect',side_effect=verify):
+            private_files.write_json(Path(d)/'settings.json',{'synthetic':'fixture'})
+        self.assertEqual(checked,[True])
+
     def test_stop_revokes_consent_even_without_a_running_host(self):
         import aim_control
         from agent_history import configure
