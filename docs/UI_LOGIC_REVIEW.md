@@ -1,3 +1,18 @@
+# rc11 device navigation follow-up
+
+User feedback exposed a presentation defect missed by the rc10 review: selected
+providers were rendered among real sessions on Agents. Rc11 removes those rows,
+shows a short session ID and distinguishes no observed sessions from no live feed.
+Home, Usage and Agents now share fixed primary destinations at the bottom; the
+current destination is outlined. Usage retains two full-size cards. MENU remains
+fixed and secondary screens retain their return-to-caller behavior.
+
+Native regressions cover direct navigation, identical button geometry across all
+three screens, empty/disconnected feeds, quota-provider independence, multiple
+session identities, paging, expiry, rollover and session/event timing. Synthetic
+screens do not establish physical touch validation. The rc10 review below is
+historical evidence; its passing tests did not establish satisfactory usability.
+
 # rc10 UI logic review
 
 Scope: desktop action/state flows and the firmware UI. Evidence is scoped to source

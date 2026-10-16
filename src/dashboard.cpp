@@ -23,6 +23,7 @@
 #include "ui/token_status.h"
 #include "ui/session_status.h"
 #include "ui/interaction.h"
+#include "ui/navigation.h"
 #include "ui/quota_alert.h"
 #include "ui_usage_details.h"
 #include "ui_nova.h"
@@ -471,14 +472,15 @@ void dashboard_init() {
   lv_obj_set_style_pad_all(footer, 0, 0);
   lv_obj_set_scrollable(footer, false);
   make_line(footer, 0, 0, 800, C_LINE);
-  footDot = make_dot(footer, 21, 20, 8, C_GREEN);
-  footStrong = make_label(footer, 37, 16, 168, &lv_font_montserrat_14, C_FOOTER_STRONG, LV_TEXT_ALIGN_LEFT, "NO HOST");
+  footDot = make_dot(scr, 21, 420, 8, C_GREEN);
+  footStrong = make_label(scr, 37, 415, 150, &lv_font_montserrat_12, C_FOOTER_STRONG, LV_TEXT_ALIGN_LEFT, "NO HOST");
   footFrames = nullptr;  // frame counts remain in the protocol, outside the daily-use footer
-  footSync = make_label(footer, 196, 12, 220, &lv_font_montserrat_18, C_META, LV_TEXT_ALIGN_LEFT, "Updated -");
-  footServices = make_label(footer, 552, 12, 224, &lv_font_montserrat_18, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
+  footSync = make_label(scr, 196, 415, 220, &lv_font_montserrat_12, C_META, LV_TEXT_ALIGN_LEFT, "Updated -");
+  footServices = make_label(scr, 552, 415, 224, &lv_font_montserrat_12, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
+  ui_navigation::create(scr,ui_navigation::Page::usage);
   pageButton = lv_btn_create(footer);
-  lv_obj_set_pos(pageButton, 448, 2);
-  lv_obj_set_size(pageButton, 96, 44);
+  lv_obj_set_pos(pageButton, 628, 0);
+  lv_obj_set_size(pageButton, 148, 48);
   lv_obj_set_style_bg_color(pageButton, lv_color_hex(C_SET_BG), 0);
   lv_obj_set_style_radius(pageButton, 8, 0);
   lv_obj_set_style_shadow_width(pageButton, 0, 0);

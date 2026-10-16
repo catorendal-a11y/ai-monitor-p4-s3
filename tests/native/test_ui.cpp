@@ -1645,7 +1645,8 @@ int main(int argc, char** argv) {
     ui_agents_update();lv_obj_update_layout(agents_ui::screen);
     CHECK(!lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].state),"THINKING"));
-    CHECK(strstr(lv_label_get_text(agents_ui::rows[0].provider),"synthet"));
+    CHECK(strstr(lv_label_get_text(agents_ui::rows[0].provider),"thetic_0"));
+    CHECK(strcmp(lv_label_get_text(agents_ui::rows[0].provider),lv_label_get_text(agents_ui::rows[2].provider)));
     lv_area_t before{};lv_obj_get_coords(agents_ui::next,&before);
     screenshot(screenshots,"live-agents-page-one");
     auto* pointer=lv_indev_create();lv_indev_set_type(pointer,LV_INDEV_TYPE_POINTER);lv_indev_set_read_cb(pointer,read_touch);
@@ -1706,11 +1707,17 @@ int main(int argc, char** argv) {
     ui_agents_update();
     CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!lv_obj_is_hidden(agents_ui::empty));
+    CHECK(!strcmp(lv_label_get_text(agents_ui::empty),"Agent feed unavailable"));
     CHECK(strstr(lv_label_get_text(agents_ui::summary),"Waiting for host"));
     liveSample.fresh=true;liveSample.receivedAt=fakeTick;ui_agents_update();
     CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
     CHECK(!strcmp(lv_label_get_text(agents_ui::empty),"No observed agent sessions"));
     CHECK(strstr(lv_label_get_text(agents_ui::summary),"0 sessions"));
+    liveSample.count=1;strcpy(liveSample.agents[0].provider,"codex");
+    strcpy(liveSample.agents[0].id,"one");ui_agents_update();
+    CHECK(!strcmp(lv_label_get_text(agents_ui::rows[0].provider),"CODEX / one"));
+    CHECK(lv_obj_is_hidden(agents_ui::rows[1].card));
+    liveSample.count=0;ui_agents_update();
     CHECK(liveSample.count==0);screenshot(screenshots,"agents-provider-status");
     sample.hostPresent=false;ui_agents_update();CHECK(lv_obj_is_hidden(agents_ui::rows[0].card));
     auto* back=find_caption_button(agents_ui::screen,"HOME");CHECK(back);
@@ -1721,7 +1728,7 @@ int main(int argc, char** argv) {
   {
     // The same primary destinations stay at the same coordinates on all three screens.
     lv_area_t positions[3]{};unsigned screenIndex=0;
-    for(auto* source:{nova_ui::screen,::screen,agents_ui::screen}) {
+    for(auto* source:{nova_ui::screen,dashboardScreen,agents_ui::screen}) {
       lv_screen_load(source);lv_obj_update_layout(source);
       unsigned tab=0;
       for(const auto* caption:{"HOME","USAGE","AGENTS"}) {
@@ -1738,7 +1745,7 @@ int main(int argc, char** argv) {
     ui_nova_show();
     auto* usage=find_caption_button(nova_ui::screen,"USAGE");
     if(usage) {lv_obj_send_event(usage,LV_EVENT_CLICKED,nullptr);CHECK(dashboard_is_active());}
-    auto* agents=find_caption_button(::screen,"AGENTS");
+    auto* agents=find_caption_button(dashboardScreen,"AGENTS");
     if(agents) {lv_obj_send_event(agents,LV_EVENT_CLICKED,nullptr);CHECK(lv_screen_active()==agents_ui::screen);}
     auto* home=find_caption_button(agents_ui::screen,"HOME");
     if(home) {lv_obj_send_event(home,LV_EVENT_CLICKED,nullptr);CHECK(ui_nova_is_active());}
@@ -1832,8 +1839,8 @@ int main(int argc, char** argv) {
     lv_indev_delete(pointer);
   }
   {
-    // Ordinary home has fixed MENU and REFRESH buttons. Less-used actions remain accessible
-    // through large, fixed menu targets, including return-to-caller and refresh gating.
+    // Primary navigation, MENU and REFRESH remain fixed. Less-used actions retain
+    // large menu targets, including return-to-caller and refresh gating.
     set_sample(2,2);ui_nova_show();lv_obj_update_layout(nova_ui::screen);
     CHECK(lv_obj_is_hidden(nova_ui::nextButton));
     const auto buttonCount=[](const auto& self,lv_obj_t* root)->unsigned {
@@ -1842,7 +1849,7 @@ int main(int argc, char** argv) {
       for(uint32_t i=0;i<lv_obj_get_child_count(root);++i)count+=self(self,lv_obj_get_child(root,i));
       return count;
     };
-    CHECK(buttonCount(buttonCount,nova_ui::screen)==2);
+    CHECK(buttonCount(buttonCount,nova_ui::screen)==5);
     check_inside(nova_ui::screen,nova_ui::refreshButton);
     check_readable_text(nova_ui::refreshLabel);
     lv_area_t refreshBounds;lv_obj_get_coords(nova_ui::refreshButton,&refreshBounds);

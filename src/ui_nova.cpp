@@ -20,6 +20,7 @@
 #include "ui/quota_window.h"
 #include "ui/theme.h"
 #include "ui/interaction.h"
+#include "ui/navigation.h"
 #include "ui_settings.h"
 #include "ui_usage_details.h"
 #include "ui_agents.h"
@@ -175,7 +176,8 @@ void init() {
     item.status = label(item.card, 62, 64, 350, "", &lv_font_montserrat_20, ui_theme::muted);
   }
   pageLabel = label(screen, 364, 408, 412, "", &lv_font_montserrat_18, ui_theme::muted);
-  link = label(screen, 24, 442, 408, "Waiting for PC host", &lv_font_montserrat_20, ui_theme::muted);
+  link = label(screen, 24, 410, 316, "Waiting for PC host", &lv_font_montserrat_14, ui_theme::muted);
+  ui_navigation::create(screen,ui_navigation::Page::home);
   refreshButton = button(screen, 448, 432, 164, "REFRESH", request_refresh, &refreshLabel);
   nextButton = button(screen, 628, 432, 148, "NEXT", next_page);
 }

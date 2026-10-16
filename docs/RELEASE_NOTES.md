@@ -1,3 +1,13 @@
+# AI Monitor v1.19.1-rc11
+
+- Add fixed Home, Usage and Agents destinations to each primary device screen.
+  MENU still opens the secondary destinations and returns to its calling screen.
+- Show only received sessions on Agents. Selected quota providers no longer create
+  placeholder agent rows. Each session has a short local ID, reported session duration
+  and event age; expired observations retain the muted Last state.
+- Distinguish an unavailable live feed from an acknowledged feed with no sessions.
+  Keep token activity and provider quotas on Home/Usage.
+
 # AI Monitor v1.19.1-rc10
 
 - Preserve quota errors and window identity alongside session activity. Token-only

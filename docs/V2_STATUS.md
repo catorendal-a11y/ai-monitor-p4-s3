@@ -1,8 +1,12 @@
-# v2 completion status — v1.19.1-rc10
+# v2 completion status — v1.19.1-rc11
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security
 release gate has passed. Use the version shown by the installed app/device to distinguish it from
-the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc10.
+the older v1.19.0 downloads. Source, PC executables and normal firmware share v1.19.1-rc11.
+
+Rc11 adds fixed primary navigation and separates observed agent sessions from selected
+quota providers. Session rows expose a short ID; an empty acknowledged feed differs
+from an unavailable feed.
 
 Rc10 audits desktop and firmware UI action/state flows. It preserves quota errors
 alongside session signals, expires old agent presentation, aligns daily history on
