@@ -28,7 +28,7 @@ def duration(value):
 
 def agents_text(rows):
     lines=['OBSERVED AGENTS','']
-    if not rows:lines.extend(['No recent observed sessions.','Check event observers in the desktop app.'])
+    if not rows:lines.extend(['No recent observed sessions.','Use Check AI setup and Provider events on this page.'])
     for row in rows:
         lines.extend([f"{row['provider']} / {row['id']}  |  {row['state']}",
                       f"Event {row['age']}s ago  |  Elapsed {duration(row['elapsed'])}",''])

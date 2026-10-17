@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $taskVenvPython)) {
         try { & $taskCandidate -c 'import sys; assert sys.version_info >= (3, 10)' 1>$null 2>$null } catch { continue }
         if ($LASTEXITCODE -eq 0) { $taskSelectedPython = $taskCandidate; break }
     }
-    if (-not $taskSelectedPython) { throw 'Python 3.10+ was not found. Use the portable Windows release, or install Python from https://www.python.org/downloads/windows/ and run again.' }
+    if (-not $taskSelectedPython) { throw 'Python 3.10+ was not found. Install Python from https://www.python.org/downloads/windows/ and run again.' }
     & $taskSelectedPython -m venv $taskVenv
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the local virtual environment.' }
 }
@@ -51,6 +51,6 @@ $taskLocalConfig = Join-Path $taskProjectRoot 'tools\aim_host.json'
 if (-not (Test-Path -LiteralPath $taskLocalConfig)) {
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'tools\aim_host.example.json') -Destination $taskLocalConfig
 }
-Write-Output 'Setup complete. Double-click AI-Monitor.bat to open the graphical AI Monitor app.'
+Write-Output 'Setup complete. Run Install-Nova.ps1 once, then open a new terminal and type nova.'
 Write-Output 'For the terminal dashboard, double-click AI-Monitor-Terminal.bat. See docs/TERMINAL.md.'
 Write-Output 'Local settings and keys were preserved. No hardware was flashed.'

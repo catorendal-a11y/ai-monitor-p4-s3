@@ -67,7 +67,7 @@ foreach ($taskFile in @($taskCmd,$taskPs)) {
         throw 'An unrelated nova command exists. No command or PATH entry was changed.'
     }
 }
-if (-not $RegisterOnly -and -not (Test-Path -LiteralPath (Join-Path $taskRoot 'AI-Monitor-Console.exe'))) {
+if (-not $RegisterOnly) {
     & (Join-Path $taskRoot 'setup.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Terminal dependency setup failed. No command was installed.' }
 }
@@ -82,11 +82,7 @@ exit /b %errorlevel%
 $taskPsText = @"
 # $taskMarker
 `$taskRoot = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$taskOwner'))
-if (Test-Path -LiteralPath (Join-Path `$taskRoot 'AI-Monitor-Console.exe')) {
-    & (Join-Path `$taskRoot 'AI-Monitor-Console.exe') --terminal @args
-} else {
-    & (Join-Path `$taskRoot 'AI-Monitor-Terminal.bat') @args
-}
+& (Join-Path `$taskRoot 'AI-Monitor-Terminal.bat') @args
 exit `$LASTEXITCODE
 "@
 [IO.File]::WriteAllText($taskPs,$taskPsText,[Text.Encoding]::ASCII)

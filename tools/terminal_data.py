@@ -16,7 +16,7 @@ def default_root():
     own=Path(sys.executable).resolve().parent if getattr(sys,'frozen',False) else Path(__file__).resolve().parents[1]
     installed=Path(os.environ.get('LOCALAPPDATA',str(Path.home())))/'Programs/AI Monitor'
     if getattr(sys,'frozen',False) and (own/'tools/aim_host.json').is_file():return own
-    return installed if (installed/'tools/aim_host.json').is_file() else own
+    return own if (own/'tools/aim_host.json').is_file() else installed if (installed/'tools/aim_host.json').is_file() else own
 
 
 def read_dashboard(root,now=None):
@@ -26,7 +26,7 @@ def read_dashboard(root,now=None):
     try:
         config=local_config(root);validate_options(config)
     except (OSError,ValueError,TypeError):
-        result['error']='Local configuration unavailable. Repair it in the desktop app.'
+        result['error']='Local configuration unavailable. Use Settings / Recover invalid settings.'
         return result
     providers=config['providers'];enabled=config.get('usage_history',False)
     result['history_enabled']=enabled
