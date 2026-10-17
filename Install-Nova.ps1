@@ -59,7 +59,7 @@ if ($Uninstall) {
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'AI-Monitor-Terminal.bat'))) {
-    throw 'The complete AI Monitor package is required. Keep Install-Terminal.ps1 beside the launcher.'
+    throw 'The complete AI Monitor package is required. Keep Install-Nova.ps1 beside the launcher.'
 }
 foreach ($taskFile in @($taskCmd,$taskPs)) {
     if ((Test-Path -LiteralPath $taskFile) -and

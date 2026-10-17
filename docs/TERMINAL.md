@@ -1,36 +1,50 @@
-# AI Monitor terminal application
+# NOVA terminal
 
 An interactive Textual application using the same validated operations as the
-desktop app. It runs inside an existing terminal; no separate executable is required.
+desktop app. Install once, then run **`nova`** from any terminal folder.
 
 ## Install on Windows
 
-1. Download the complete **ai-monitor-p4-v1.19.1-rc13-windows.zip** from the
-   [rc12 release](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13).
-   Use **Extract All** into a writable folder. Keep all files together; do not run
-   inside the ZIP. The source checkout also works, with firmware limits below.
-2. Install **Python 3.12 x64** from [python.org](https://www.python.org/downloads/windows/).
-   Python 3.10+ is supported; 3.12 is tested in CI. Python is required for this
-   source-based terminal, even when the graphical app is already installed.
-3. Open PowerShell in the extracted folder and run the setup once:
+1. Download **AI-Monitor-Setup-v1.19.1-rc14-windows.exe** from the
+   [release](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc14).
+2. Run the installer and keep **Add the nova terminal command for this user** selected.
+3. Open a new PowerShell or Windows Terminal window and type:
 
    ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+   nova
    ```
 
-   This creates `.venv`, downloads pinned dependencies and initializes an empty
-   configuration only if none exists. Existing settings are preserved. Initial
-   setup needs internet; it does not install firmware or sign into AI accounts.
-4. Double-click **AI-Monitor-Terminal.bat**, or run:
+The full Windows package includes the runtime: no separate Python, Node.js or
+npm installation is needed. NOVA stays inside the terminal you started it from.
+The installer adds only its terminal command directory to your user PATH; it
+requires no administrator access. Reinstalling/upgrading does not duplicate that
+entry. Uninstall removes this installation's entry and preserves other PATH tools.
 
-   ```powershell
-   .\AI-Monitor-Terminal.bat
-   ```
+Use a monospace font and a window of at least **120 columns x 30 rows** for the
+full dashboard. Smaller windows scroll or stack panels.
 
-For later starts, only step 4 is needed. Use Windows Terminal with a monospace
-font and a window of at least **120 columns x 30 rows** for the full dashboard.
-Smaller windows scroll or stack panels. No terminal EXE is required. The installer
-and graphical EXE remain available separately and do not need Python.
+## Portable ZIP
+
+Extract the complete **ai-monitor-p4-v1.19.1-rc14-windows.zip** into a permanent,
+writable folder. Keep all files together. Open PowerShell in that folder and run once:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1
+```
+
+Open a new terminal and type `nova`. Keep the extracted folder in place; if you
+move it, run Install-Nova.ps1 again from the new folder. The script registers the
+command for your user and uses the package's bundled runtime. It never flashes
+hardware or signs into AI accounts.
+
+## Commands
+
+```powershell
+nova                 # Open the dashboard in this terminal
+nova --version       # Print the installed version
+nova --help          # Show command options
+nova --check         # Synthetic self-test; no provider calls or hardware writes
+```
 
 ## First use
 
@@ -42,9 +56,21 @@ connection. Press **2** for integration checks and explicit observer setup.
 Missing quota is shown as unknown or activity-only; linking observers does not
 create account quota or approve provider tools.
 
-## Source and existing installations
+## Install from source
 
-Or run `.venv\Scripts\python.exe tools/aim_terminal.py` directly. The terminal
+Install Python 3.12 x64 first (3.10+ supported), then run `Install-Nova.ps1` from
+the source folder. Without the bundled console helper, it automatically creates
+`.venv` and installs pinned dependencies, requiring internet for the initial setup.
+Open a new terminal and type `nova`. Existing settings are preserved.
+
+To remove only a portable/source command registration, run the same script with
+`-Uninstall` from that installation. It removes only its owned command files and
+PATH entry; it does not stop the host or delete settings/history.
+
+## Existing installations and direct launch
+
+Developers can also run `AI-Monitor-Terminal.bat` or
+`.venv\Scripts\python.exe tools/aim_terminal.py` directly. The terminal
 uses the existing per-user installation when present, otherwise this source project.
 Use `--root "C:\path\to\AI Monitor"` for an explicit project or package. A complete
 source checkout/package with host tools is required; firmware operations also need

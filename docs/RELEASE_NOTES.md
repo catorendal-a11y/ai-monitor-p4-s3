@@ -1,8 +1,11 @@
-# AI Monitor v1.19.1-rc13
+# AI Monitor v1.19.1-rc14
 
-- Include the graphical terminal application and its source launcher in the complete
-  Windows package. Run setup.ps1 with Python 3.12, then AI-Monitor-Terminal.bat.
-  The five original Windows executables still run without installing Python.
+- Install once and start the terminal by typing `nova` from any folder. The Windows
+  installer registers the per-user command; the portable ZIP includes Install-Nova.ps1.
+  The full package uses its bundled console runtime and needs no separate Python or
+  Node.js. Source installs prepare the Python environment automatically.
+- Add `nova --version`, `nova --help` and a synthetic `nova --check`. Preserve other
+  PATH entries, avoid duplicate registration and remove only the owned command on uninstall.
 - Add full-color quota bars, provider colors, original NOVA pixel artwork, observed
   agent states and daily history graphs. Preserve unknown metrics and recording ages.
 - Correct inherited monochrome terminal settings and fit two observed agent rows
@@ -15,23 +18,24 @@
 - Correct Linux CI test fixtures without weakening the Windows sharing-lock and
   legacy-hook migration checks. Add complete terminal installation/start instructions.
 - The rc11 connected-runtime endurance run passed eight hours with 5,737 samples
-  and zero failed samples; that evidence belongs to rc11, not a new rc12 hardware run.
+  and zero failed samples; that evidence belongs to rc11, not this new hardware version.
 - This is a prerelease candidate. P4 is the production target; S3 remains experimental.
   Physical approval stays disabled. S3 hardware/touch, physical approvals, physical
   unplug/suspend and genuine Windows publisher signing remain separate gates.
 
 ## Install and start the terminal
 
-Extract the complete Windows ZIP into a writable folder. Install Python 3.12 x64,
-open PowerShell in the extracted folder, then run:
+Run the Windows installer with **Add the nova terminal command for this user**
+selected. Open a new terminal and run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
-.\AI-Monitor-Terminal.bat
+nova
 ```
 
-Setup downloads pinned dependencies once and preserves existing settings. No
-PlatformIO, new EXE or hardware flash is needed for terminal monitoring. Keys:
+Portable ZIP users can run `powershell -NoProfile -ExecutionPolicy Bypass -File
+.\Install-Nova.ps1` once from the extracted folder, then type `nova` in a new terminal.
+The full package needs no separate Python or Node.js. Existing settings are preserved.
+No PlatformIO or hardware flash is needed for terminal monitoring. Keys:
 1-5 pages, Tab/Enter controls, R local reload, ? help, Esc cancel, Q quit.
 See docs/TERMINAL.md for board/provider setup and the source-only firmware limits.
 

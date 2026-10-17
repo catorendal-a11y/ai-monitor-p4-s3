@@ -6,7 +6,7 @@ Download the **AI-Monitor-Setup** EXE from [Releases](https://github.com/catoren
 | --- | --- |
 | Windows installer | Windows x64, a USB data cable and display. No separate Python, Node.js, Git, PlatformIO or Arduino IDE setup. |
 | Windows portable ZIP | Same requirements; extract the entire folder and keep `_internal`, firmware and executables together. |
-| Terminal dashboard | Python 3.12 x64 (3.10+ supported), internet for initial pinned dependencies, then `setup.ps1` and `AI-Monitor-Terminal.bat` in the complete extracted package. [Install/start guide](TERMINAL.md#install-on-windows). No terminal EXE or firmware rebuild is needed. |
+| NOVA terminal | Install the complete Windows package with the nova command option, then type `nova` in a new terminal. No separate Python or Node.js. Portable ZIP: run Install-Nova.ps1 once. Source-only installs require Python 3.12 (3.10+ supported). [Install/start guide](TERMINAL.md#install-on-windows). |
 | Source code | Python 3.10+. The source script installs host/GUI dependencies into `.venv`. A source ZIP has no prebuilt firmware; use the release or build it. |
 | Firmware development | Additional tools in [Development](DEVELOPMENT.md); normal Windows-release users do not need them. |
 
