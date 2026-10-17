@@ -1,3 +1,40 @@
+# AI Monitor v1.19.1-rc12
+
+- Include the graphical terminal application and its source launcher in the complete
+  Windows package. Run setup.ps1 with Python 3.12, then AI-Monitor-Terminal.bat.
+  The five original Windows executables still run without installing Python.
+- Add full-color quota bars, provider colors, original NOVA pixel artwork, observed
+  agent states and daily history graphs. Preserve unknown metrics and recording ages.
+- Correct inherited monochrome terminal settings and fit two observed agent rows
+  at 120 x 30 characters, including after resizing the window.
+- Keep invalid settings drafts open with field-specific errors and masked keys.
+  Firmware and history actions retain typed confirmation and shared USB ownership.
+- Include the preceding candidate improvements: direct Home/Usage/Agents device
+  navigation, observed-only sessions, local-day lifecycle history, companion packs,
+  real USB screen capture and private diagnostics. See the detailed entries below.
+- Correct Linux CI test fixtures without weakening the Windows sharing-lock and
+  legacy-hook migration checks. Add complete terminal installation/start instructions.
+- The rc11 connected-runtime endurance run passed eight hours with 5,737 samples
+  and zero failed samples; that evidence belongs to rc11, not a new rc12 hardware run.
+- This is a prerelease candidate. P4 is the production target; S3 remains experimental.
+  Physical approval stays disabled. S3 hardware/touch, physical approvals, physical
+  unplug/suspend and genuine Windows publisher signing remain separate gates.
+
+## Install and start the terminal
+
+Extract the complete Windows ZIP into a writable folder. Install Python 3.12 x64,
+open PowerShell in the extracted folder, then run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+.\AI-Monitor-Terminal.bat
+```
+
+Setup downloads pinned dependencies once and preserves existing settings. No
+PlatformIO, new EXE or hardware flash is needed for terminal monitoring. Keys:
+1-5 pages, Tab/Enter controls, R local reload, ? help, Esc cancel, Q quit.
+See docs/TERMINAL.md for board/provider setup and the source-only firmware limits.
+
 # AI Monitor v1.19.1-rc11
 
 - Add fixed Home, Usage and Agents destinations to each primary device screen.
