@@ -14,6 +14,30 @@ from textual.widgets import TabbedContent,Static
 
 
 class TerminalDataTests(unittest.TestCase):
+    def test_graphical_quota_and_state_keep_textual_meaning(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import provider_table,agent_table,nova_panel
+        stream=StringIO();console=Console(file=stream,width=100,color_system=None)
+        console.print(provider_table([dict(name='Codex',remaining=25,health='ready',quota_note='Recorded 2m ago / 7d window')]))
+        console.print(agent_table([dict(provider='Codex',id='test',state='WAITING',age=4,elapsed=None)]))
+        console.print(nova_panel([dict(state='UNKNOWN')]))
+        output=stream.getvalue()
+        self.assertIn('█',output);self.assertIn('25% left',output)
+        self.assertIn('● WAITING',output);self.assertIn('Unknown',output)
+        self.assertNotIn('Ready',output)
+
+    def test_history_graph_preserves_unknown_gaps_and_disabled_state(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import history_panel
+        stream=StringIO();console=Console(file=stream,width=100,color_system=None)
+        console.print(history_panel([dict(provider='Codex',today=None,daily=[0,None,8,16],agents={})],True))
+        text=stream.getvalue();self.assertIn('·',text);self.assertIn('█',text)
+        self.assertIn('Unknown',text);self.assertIn('gap',text)
+        stream.seek(0);stream.truncate()
+        console.print(history_panel([],False));self.assertIn('disabled',stream.getvalue())
+
     def test_reference_tables_keep_activity_only_and_old_states_truthful(self):
         from rich.console import Console
         from io import StringIO
