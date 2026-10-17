@@ -1,4 +1,4 @@
-# AI Monitor v1.19.1-rc15
+# AI Monitor v1.19.1-rc16
 
 NOVA is now a terminal application distributed as Python source plus verified board firmware.
 The graphical Windows app, PyInstaller build, Inno installer and bundled EXEs are retired.
@@ -10,11 +10,15 @@ The graphical Windows app, PyInstaller build, Inno installer and bundled EXEs ar
   the Python esptool flasher. It never flashes a display or selects an AI provider automatically.
 - Keep full-color quota, original pixel artwork, observed agents, history, firmware confirmation,
   companion packs, USB screen capture and the existing single-owner host backend.
-- Existing rc14 firmware remains usable; flashing rc15 is optional for this PC distribution change.
+- Existing rc14 firmware remains usable; flashing rc16 is optional for this PC distribution change.
 - Packages reject private/runtime data, executables and linked files. GitHub builds source archives
   and both firmware targets, tests clean terminal installation, and attests draft release artifacts.
 - This remains a prerelease. P4 is the production target; S3 hardware/touch remains experimental.
   Physical approvals remain disabled. No new eight-hour or physical unplug/suspend pass is claimed.
+
+The rc15 package was not published: its artifact download merged equal image names
+instead of retaining board directories. rc16 fixes that layout and restores the original
+README presentation while updating the terminal installation instructions.
 
 ## Earlier releases (historical graphical/EXE distribution)
 

@@ -1,6 +1,6 @@
 # Current distribution
 
-rc15 replaces the graphical app and EXE distribution with NOVA Python terminal source.
+rc16 replaces the graphical app and EXE distribution with NOVA Python terminal source.
 See TERMINAL.md and RELEASE_NOTES.md. Physical approval stays disabled.
 
 ## Historical development evidence
