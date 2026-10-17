@@ -10,6 +10,25 @@ sys.path.insert(0,str(ROOT/'tools'))
 
 
 class TerminalGraphicsTests(unittest.TestCase):
+    def test_console_helper_routes_nova_mode_before_host_arguments(self):
+        import aim_control
+        with patch('aim_terminal.main',return_value=0) as terminal:
+            self.assertEqual(aim_control.main(['--terminal','--check']),0)
+            terminal.assert_called_once_with(['--check'])
+
+    def test_frozen_art_reads_extracted_resource_instead_of_source_location(self):
+        import base64,json,tempfile,zlib
+        from terminal_art import pixels
+        raw=bytes([1,2,3])*(40*26)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'assets/terminal').mkdir(parents=True)
+            (root/'assets/terminal/nova.json').write_text(json.dumps(dict(width=40,height=26,
+                frames={'work':base64.b85encode(zlib.compress(raw)).decode('ascii')})))
+            try:
+                with patch.object(sys,'frozen',True,create=True),patch.object(sys,'_MEIPASS',directory,create=True):
+                    pixels.cache_clear();self.assertEqual(pixels('work')[2],raw)
+            finally:pixels.cache_clear()
+
     def test_startup_corrects_inherited_agent_terminal_environment(self):
         import aim_terminal
         with patch.dict(os.environ,{'NO_COLOR':'1','TERM':'dumb','COLORTERM':''}):
