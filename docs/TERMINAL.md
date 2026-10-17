@@ -28,6 +28,12 @@ arrows and **PageUp/PageDown** scroll, **R** reloads metadata, **?** toggles hel
 forms. Narrow windows stack panels vertically. Terminal fonts/window management
 belong to the terminal emulator; tray/minimize settings apply to the desktop app.
 
+The dashboard uses filled quota bars with amber/red low-remaining indicators,
+colored agent status dots and separate device/companion panels. Labels accompany
+colors. History shows daily token sparklines, scaled separately per provider;
+dots mark unknown gaps and the lowest block represents zero/minimum. These are
+recorded observations, not live token streams. Unknown agent phases remain unknown.
+
 Canceling a form runs no action. Saves reuse desktop validation and protected
 storage, preserving keys unless explicitly replaced/cleared. One action worker
 runs at a time; read results predating a mutation are discarded. Quit waits for

@@ -29,7 +29,8 @@ def provider_table(rows,compact=False):
         if known:
             segments=12 if compact else 20
             filled=max(0,min(segments,round(remaining*segments/100)))
-            bar=Text('[');bar.append('#'*filled,style=GREEN);bar.append('-'*(segments-filled),style=MUTED);bar.append(']')
+            color='#ff7777' if remaining<=10 else '#ffcf66' if remaining<=30 else GREEN
+            bar=Text();bar.append('█'*filled,style=color);bar.append('░'*(segments-filled),style='#35434d')
         note=row['quota_note'].replace(' / ','\n')
         if not known and row['health']=='activity_only':note='Quota unavailable'
         label=Text(name,style='bold')
@@ -53,7 +54,7 @@ def agent_table(rows):
         table.add_column(caption,ratio=ratio)
     for row in rows:
         table.add_row(Text(row['provider']),Text(row['id']),Text(f"{row['age']}s ago"),
-                      Text(row['state'],style=state_color(row['state'])))
+                      Text('● '+row['state'],style=state_color(row['state'])))
     if not rows:table.add_row('No observed sessions','—','—','Unknown')
     return heading('OBSERVED AGENTS',table)
 
@@ -63,7 +64,7 @@ def device_panel(device,connection):
     text=Text(board+'\n',style='bold')
     text.append(device.get('port','Unknown')+' / ')
     connected=device.get('connected',False)
-    text.append('Connected' if connected else 'Unconfirmed',style=GREEN if connected else MUTED)
+    text.append('● Connected' if connected else '○ Unconfirmed',style=GREEN if connected else MUTED)
     text.append('\nFirmware : '+device.get('firmware','Unknown'),style=MUTED)
     age=device.get('sync_age')
     text.append('\nLast sync: '+('Unknown' if age is None else f'{age}s ago'),style=MUTED)
@@ -75,10 +76,35 @@ def nova_panel(rows):
     if any(state in ('ERROR','FAILED') for state in current):mood='Needs attention';color='#ff7777'
     elif any(state in ('WORKING','THINKING','READING','SEARCHING','EDITING','WRITING','RUNNING','BUILDING','TESTING') for state in current):mood='Working';color=GREEN
     elif any(state in ('WAITING','NEEDS ATTENTION') for state in current):mood='Waiting';color='#ffcf66'
-    elif current:mood='Ready';color=MUTED
+    elif current and all(state in ('IDLE','DONE','COMPLETED') for state in current):mood='Idle';color=MUTED
+    elif current:mood='Unknown';color=MUTED
     else:mood='No fresh events';color=MUTED
     robot="     o\n   .=|=.\n  .----- .\n (| ^ ^ |)\n  | [_] |\n   /   \\"
     table=Table.grid(expand=True,padding=(0,1));table.add_column(width=13);table.add_column(ratio=1)
     caption=Text('\n\nNOVA / ',style='bold');caption.append(mood,style=color)
     table.add_row(Text(robot,style=GREEN),caption)
     return table
+
+
+def history_panel(rows,enabled):
+    """Daily numeric observations only; dots are unknown, not zero-height bars."""
+    if not enabled:
+        return heading('LOCAL HISTORY / TODAY',Text('History is disabled. Open Settings to collect future observations.',style=MUTED))
+    table=Table(expand=True,box=box.SIMPLE,header_style=MUTED,padding=(1,1))
+    for name in ('Provider','Today / tokens','Daily trend','Sessions','Active time'):
+        table.add_column(name)
+    for row in rows:
+        values=row['daily'];peak=max((n for n in values if n is not None),default=0)
+        graph=Text()
+        for value in values:
+            glyph='·' if value is None else '▁' if not peak else '▁▂▃▄▅▆▇█'[min(7,round(value*7/peak))]
+            graph.append(glyph+' ',style=MUTED if value is None else GREEN)
+        metrics=row.get('agents',{});active=metrics.get('activeSeconds')
+        table.add_row(Text(row['provider'],style='bold'),
+                      'Unknown' if row['today'] is None else f"{row['today']:,}",graph,
+                      'Unknown' if metrics.get('sessions') is None else str(metrics['sessions']),
+                      'Unknown' if active is None else f'{active//3600}:{active//60%60:02}:{active%60:02}')
+    if not rows:table.add_row('No recorded observations','Unknown','·','Unknown','Unknown')
+    return heading('LOCAL HISTORY / TODAY',Group(table,Text(
+        'Daily trend: oldest → today; scaled per provider. · = unknown gap; ▁ = zero/minimum.\n'
+        'Elapsed run time includes waiting and is not active time.',style=MUTED)))

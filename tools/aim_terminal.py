@@ -12,7 +12,7 @@ from host_security import safe_text
 from terminal_data import default_root,read_dashboard
 from terminal_actions import TerminalActions
 from terminal_forms import ActionForm,ResultScreen,settings_form,settings_values
-from terminal_presentation import provider_table,agent_table,device_panel,nova_panel
+from terminal_presentation import provider_table,agent_table,device_panel,nova_panel,history_panel
 
 
 def number(value):
@@ -47,7 +47,15 @@ class TerminalApp(App):
     Underline { display: none; }
     TabPane { padding: 1 2; }
     VerticalScroll { height: 1fr; }
-    .panel { border: solid #87929a; padding: 0 1; height: auto; margin-bottom: 1; }
+    .panel { border: round #526572; background: #151e25; padding: 0 1; height: auto; margin-bottom: 1; }
+    #quota-wrap { border-top: solid #95ffc2; }
+    #overview-device { border-top: solid #76c9ff; }
+    #nova-panel { border: round #95ffc2; background: #13231f; }
+    #overview-agents, #agents-content { border-top: solid #b4a0ff; }
+    #history-content { border-top: solid #76c9ff; }
+    Button { background: #1d2d37; border: tall #526572; }
+    Button:hover { background: #2c414d; }
+    Button:focus { border: tall #95ffc2; text-style: bold; }
     #overview-top { height: 18; margin-bottom: 1; }
     #quota-wrap { width: 2fr; height: 1fr; margin-right: 1; margin-bottom: 0; }
     #quota { height: auto; }
@@ -95,6 +103,7 @@ class TerminalApp(App):
             with TabPane('2 Agents',id='agents'):
                 with VerticalScroll():
                     yield from self.actions(('Check AI setup','setup_report'),('Provider events','events'),('Claude quota link','quota-link'),('Codex sign-in','codex_setup'))
+                    yield Static('',id='agents-table',classes='panel',markup=False)
                     yield Static('',id='agents-content',classes='panel',markup=False)
             with TabPane('3 History',id='history'):
                 with VerticalScroll():
@@ -188,22 +197,17 @@ class TerminalApp(App):
         count=len(value['agents'])
         update('#connection',value['connection']+f"  |  {count} observed session"+('' if count==1 else 's')+'  |  History '+('enabled' if value['history_enabled'] else 'disabled'))
         update('#quota',provider_table(value['providers'],compact=self.size.width<120))
-        agents=agents_text(value['agents']);update('#agents-content',agents);update('#overview-agents',agent_table(value['agents']))
+        agents=agents_text(value['agents'])
+        update('#agents-content',agents)
+        update('#agents-table',agent_table(value['agents']))
+        update('#overview-agents',agent_table(value['agents']))
         device=value['device']
         stamp='Unknown observation age' if device.get('age') is None else f"Observed {device['age']}s ago"
         description='DEVICE\n\n'+f"{device.get('board','Unknown')}\n{device.get('port','Unknown')}\nFirmware {device.get('firmware','Unknown')}\n{stamp}"
         update('#device-content',description+'\n\nStatus comes from the existing host.\nNo second USB connection is opened.')
         update('#overview-device',device_panel(device,value['connection']))
         update('#nova-panel',nova_panel(value['agents']))
-        lines=['LOCAL HISTORY / TODAY','']
-        if not value['history_enabled']:lines.append('History is disabled. Enable it in the desktop app to collect future observations.')
-        for row in value['history']:
-            metrics=row.get('agents',{})
-            lines.extend([row['provider'],f"Tokens: {number(row['today'])}  /  Sessions: {number(metrics.get('sessions'))}",
-                f"Observed active time: {duration(metrics.get('activeSeconds'))}",
-                'Daily tokens, oldest to today: '+' / '.join(number(n) for n in row['daily']),''])
-        lines.append('Unknown gaps remain unknown. Elapsed run time is not active time.')
-        update('#history-content','\n'.join(lines))
+        update('#history-content',history_panel(value['history'],value['history_enabled']))
         settings=['SAVED SETTINGS','']+[f'{key}: {safe_text(item,80)}' for key,item in value['settings'].items()]
         close_policy='Closing this terminal stops the owned host, following the saved preference.' if value['settings'].get('keep_host_on_close') is False else 'Closing this terminal leaves the host running. Use Stop host to stop it.'
         settings+=['','Use Edit settings to configure board, providers, credentials and collection preferences.',close_policy]
