@@ -38,7 +38,7 @@ OpenAI and ZCode names/logos remain their owners' property. The root MIT license
 
 Original NOVA and ORBIT artwork is project-owned and covered by MIT. Generated C++ arrays retain this distinction: robot artwork is MIT; embedded provider marks retain their owners' rights.
 
-## Native desktop runtime
+## Historical native desktop runtime (retired in rc15)
 
 External companion validation uses python-lz4 4.4.5 for LZ4 block decoding.
 Its original BSD license and notices are copied byte-for-byte from the installed
@@ -48,3 +48,11 @@ retains the already pinned LVGL LZ4 decoder and its existing upstream notices.
 The desktop app uses PySide6-Essentials and Shiboken 6.10.2, with Qt 6.10.2 Core/Gui/Widgets/Network, SVG and image-format plugins. These retain their upstream LGPLv3 and third-party terms; they are not relicensed by the project MIT license. License texts are included under licenses/ and in the corresponding-source archives under third-party-source/. Qt/PySide DLLs remain separate and replaceable under _internal/. The included project source and build scripts can rebuild the app against compatible modified libraries; reverse engineering for debugging modifications to those LGPL components is permitted. Windows system libraries and fonts are used from the operating system and are not redistributed as project assets.
 
 The corresponding Qt/PySide source archives are pinned to the upstream 6.10.2 commits and hash-checked during packaging. See scripts/collect_qt_sources.py. Upstream build instructions: https://doc.qt.io/qt-6/build-sources.html and https://doc.qt.io/qtforpython-6/building_from_source/index.html.
+
+## Current terminal distribution
+
+rc15 distributes Python project source and firmware, without the former bundled Windows
+runtimes. Python dependencies, including esptool, are installed separately from their pinned
+upstream distributions with their own notices. Qt is used only by the optional developer
+artwork generator; it is not a NOVA runtime dependency. Historical notices above describe
+older packages and do not imply those binaries are included in the terminal ZIP.

@@ -47,7 +47,7 @@ def main():
     if version!=HOST_VERSION:parser.error('Host and firmware versions must match')
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
     package=output/('nova-'+version+'-terminal')
-    if package.exists() or package.with_suffix('.zip').exists():parser.error('Use a new output directory')
+    if package.exists() or (output/(package.name+'.zip')).exists():parser.error('Use a new output directory')
     package.mkdir()
     try:build_package(output,package,version,args)
     except BaseException:

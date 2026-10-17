@@ -1,3 +1,1 @@
 PyYAML==6.0.3
-# Legacy graphical regression fixtures only; not installed by NOVA.
-PySide6-Essentials==6.10.2

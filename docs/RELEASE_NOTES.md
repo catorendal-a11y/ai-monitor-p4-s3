@@ -1,3 +1,23 @@
+# AI Monitor v1.19.1-rc15
+
+NOVA is now a terminal application distributed as Python source plus verified board firmware.
+The graphical Windows app, PyInstaller build, Inno installer and bundled EXEs are retired.
+
+- Install Python 3.10+ (3.12 recommended), extract the terminal ZIP into a permanent writable folder,
+  and run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1` once.
+- Open a new terminal and type `nova` from any directory. No application EXE, Qt or Node.js is needed.
+- The installer creates an isolated Python environment and installs pinned dependencies, including
+  the Python esptool flasher. It never flashes a display or selects an AI provider automatically.
+- Keep full-color quota, original pixel artwork, observed agents, history, firmware confirmation,
+  companion packs, USB screen capture and the existing single-owner host backend.
+- Existing rc14 firmware remains usable; flashing rc15 is optional for this PC distribution change.
+- Packages reject private/runtime data, executables and linked files. GitHub builds source archives
+  and both firmware targets, tests clean terminal installation, and attests draft release artifacts.
+- This remains a prerelease. P4 is the production target; S3 hardware/touch remains experimental.
+  Physical approvals remain disabled. No new eight-hour or physical unplug/suspend pass is claimed.
+
+## Earlier releases (historical graphical/EXE distribution)
+
 # AI Monitor v1.19.1-rc14
 
 - Install once and start the terminal by typing `nova` from any folder. The Windows

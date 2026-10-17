@@ -8,7 +8,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/'scripts'))
-import build_windows_release as build
+import build_terminal_release as build
 from project_version import HOST_VERSION
 
 
@@ -49,7 +49,7 @@ class PackageAtomicityTests(unittest.TestCase):
                     patch.object(build, 'build_package', side_effect=fail):
                 with self.assertRaises(OSError): build.main()
             self.assertEqual(preserved.read_bytes(), b'keep')
-            package = output/('ai-monitor-p4-'+HOST_VERSION+'-windows')
+            package = output/('nova-'+HOST_VERSION+'-terminal')
             self.assertFalse(package.exists())
             with patch.object(build, 'ROOT', root), patch.object(build.sys, 'argv', arguments), \
                     patch.object(build.sys, 'platform', 'win32'), \

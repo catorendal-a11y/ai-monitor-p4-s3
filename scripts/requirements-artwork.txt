@@ -1,0 +1,2 @@
+# Optional SVG-to-raster developer generator only; not NOVA runtime.
+PySide6-Essentials==6.10.2

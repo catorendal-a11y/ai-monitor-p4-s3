@@ -1,143 +1,81 @@
 # NOVA terminal
 
-An interactive Textual application using the same validated operations as the
-desktop app. Install once, then run **`nova`** from any terminal folder.
+NOVA is the PC application. Start it by typing `nova`; it runs in the current terminal.
+The distribution contains Python source and board firmware, without application EXEs or Qt.
 
 ## Install on Windows
 
-1. Download **AI-Monitor-Setup-v1.19.1-rc14-windows.exe** from the
-   [release](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc14).
-2. Run the installer and keep **Add the nova terminal command for this user** selected.
-3. Open a new PowerShell or Windows Terminal window and type:
-
-   ```powershell
-   nova
-   ```
-
-The full Windows package includes the runtime: no separate Python, Node.js or
-npm installation is needed. NOVA stays inside the terminal you started it from.
-The installer adds only its terminal command directory to your user PATH; it
-requires no administrator access. Reinstalling/upgrading does not duplicate that
-entry. Uninstall removes this installation's entry and preserves other PATH tools.
-
-Use a monospace font and a window of at least **120 columns x 30 rows** for the
-full dashboard. Smaller windows scroll or stack panels.
-
-## Portable ZIP
-
-Extract the complete **ai-monitor-p4-v1.19.1-rc14-windows.zip** into a permanent,
-writable folder. Keep all files together. Open PowerShell in that folder and run once:
+1. Install Python 3.10 or later (3.12 recommended) from https://www.python.org/downloads/windows/.
+   Enable its Python launcher/PATH option. Windows Terminal is recommended for full color.
+2. Download the terminal ZIP from [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases).
+3. Extract it into a permanent, writable folder. Keep this folder after installation.
+4. Open PowerShell in that folder and run:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1
 ```
 
-Open a new terminal and type `nova`. Keep the extracted folder in place; if you
-move it, run Install-Nova.ps1 again from the new folder. The script registers the
-command for your user and uses the package's bundled runtime. It never flashes
-hardware or signs into AI accounts.
-
-## Commands
+This creates `.venv`, installs the pinned requirements, and registers only this user's
+`nova` command. Internet is required for initial dependency installation. No administrator
+access, AI sign-in, automatic provider selection or hardware flash is performed.
+Open a **new terminal**, from any folder:
 
 ```powershell
-nova                 # Open the dashboard in this terminal
-nova --version       # Print the installed version
-nova --help          # Show command options
-nova --check         # Synthetic self-test; no provider calls or hardware writes
+nova
 ```
 
-## First use
+There is no separate NOVA EXE and no npm/Node.js requirement. Python and installed Python
+packages may themselves contain upstream executables; they are dependencies, not bundled
+AI Monitor application binaries. Windows PowerShell is used for the command shim.
 
-Press **5** for Settings, choose **Edit settings**, select your board, USB port and
-providers, then save. No board or provider is chosen automatically for a fresh
-installation. Use **Start host** to begin monitoring. If the graphical app's host
-is already running, the terminal uses that owner instead of opening a second USB
-connection. Press **2** for integration checks and explicit observer setup.
-Missing quota is shown as unknown or activity-only; linking observers does not
-create account quota or approve provider tools.
+## Commands and navigation
 
-## Install from source
+```powershell
+nova --version
+nova --help
+nova --check
+```
 
-Install Python 3.12 x64 first (3.10+ supported), then run `Install-Nova.ps1` from
-the source folder. Without the bundled console helper, it automatically creates
-`.venv` and installs pinned dependencies, requiring internet for the initial setup.
-Open a new terminal and type `nova`. Existing settings are preserved.
+`--check` renders synthetic data; it does not establish a real USB/provider connection.
+Use Overview and Device / Check USB for live connection status. In Settings, choose and save
+your board, USB port and providers, then Start host. Keys: 1�5 pages, Tab/Enter controls,
+R reload local metadata, ? help, Escape cancel forms, Q quit. Source launcher:
+`AI-Monitor-Terminal.bat`. `AI-Monitor.bat` is a compatibility alias for the same terminal.
 
-To remove only a portable/source command registration, run the same script with
-`-Uninstall` from that installation. It removes only its owned command files and
-PATH entry; it does not stop the host or delete settings/history.
+Quota, observed sessions and USB connection are separate signals. Unknown quota remains
+unknown. Claude may report activity only. Stale agent events show Last rather than current
+work. Opening and refreshing the dashboard never starts a model request or a second USB owner.
+Invalid settings stay in the form. Secret fields are masked and unchanged keys are preserved.
 
-## Existing installations and direct launch
+Firmware / Update writes only the application partition after exact board identification and
+confirmation. First installation resets display settings. Source-only Git downloads contain
+no firmware: use the terminal release ZIP with both images, or build and collect them as
+explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experimental.
 
-Developers can also run `AI-Monitor-Terminal.bat` or
-`.venv\Scripts\python.exe tools/aim_terminal.py` directly. The terminal
-uses the existing per-user installation when present, otherwise this source project.
-Use `--root "C:\path\to\AI Monitor"` for an explicit project or package. A complete
-source checkout/package with host tools is required; firmware operations also need
-its verified board images and flasher. Missing components are errors, not downloads.
-The GitHub **Source code** ZIP has no firmware or compiled flasher. Use the full
-Windows package for firmware installation, or build/collect both images following
-[Development](DEVELOPMENT.md). A normal terminal setup does not need BuildTools
-or FlashTools.
+## Upgrade and migrate
 
-| Page | Functions |
-| --- | --- |
-| Overview | Reference-style provider table, recorded quota, device/NOVA panels and observed-agent table |
-| Agents | State/age/elapsed time, AI setup report, event hooks, Claude quota bridge, official Codex setup/sign-in |
-| History | Daily metrics, 7/30 day report with quota windows and forecasts, CSV, confirmed clearing, diagnostic export |
-| Device | Port scan, selected-board check, firmware preparation/write, real device pixels as terminal cells, companion library/import/selection/removal, physical PC enrollment |
-| Settings | Start/Stop host, board/port/providers, quota interval, masked optional key, key removal, history and shared preferences, redacted log, invalid-settings recovery |
+Extract a new release to a new permanent folder, install its dependencies, then stop the old
+host before moving private settings/history. Keep the original folder until the new host,
+USB connection and observational hooks have been checked. Re-run Install-Nova.ps1 from the new
+folder to retarget the owned command. Re-link only previously opted-in provider integrations
+from Agents; provider selection alone is not permission to install hooks. An old EXE installation
+must be migrated before uninstalling it because its host/hooks use the old runtime paths.
 
-Keys: **1–5** change page, **Tab** moves focus, **Enter** activates controls,
-arrows and **PageUp/PageDown** scroll, **R** reloads metadata, **?** toggles help,
-**Esc** cancels/closes forms and **Q** exits. Shortcuts do not steal text typed in
-forms. Narrow windows stack panels vertically. Terminal fonts/window management
-belong to the terminal emulator; tray/minimize settings apply to the desktop app.
-Wide windows also adapt to height: the quota rows become denser and the NOVA
-panel shrinks to keep the observed-agent table visible at 120 × 30 characters.
-Additional provider rows remain scrollable. NOVA uses original artwork drawn
-with colored terminal cells, with poses selected only from observed agent states.
+## Remove the command
 
-The Windows launcher explicitly enables true color in its own environment. This
-prevents inherited `NO_COLOR=1` / `TERM=dumb` values from a coding runner turning
-the app monochrome; no global Windows or terminal profile settings are changed.
+From the installed folder:
 
-The dashboard uses filled quota bars with amber/red low-remaining indicators,
-colored agent status dots and separate device/companion panels. Labels accompany
-colors. History shows daily token sparklines, scaled separately per provider;
-dots mark unknown gaps and the lowest block represents zero/minimum. These are
-recorded observations, not live token streams. Unknown agent phases remain unknown.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1 -Uninstall
+```
 
-Canceling a form runs no action. Saves reuse desktop validation and protected
-storage, preserving keys unless explicitly replaced/cleared. One action worker
-runs at a time. Invalid settings keep the draft open, focus the affected field
-and show a fixed error above the buttons; numeric limits, board, port and provider
-selection are checked before submission. Draft keys stay masked and are cleared
-when the form is submitted or canceled. Read results predating a mutation are discarded.
-Quit waits for an active operation. Saved auto-start and keep-host-on-close
-policies are honored.
-Navigating does not save settings. Export files are published exclusively: existing
-or concurrently created files are never overwritten.
+This removes only the owned shim and its PATH entry. It retains settings, history and the
+folder, and does not stop the host. Stop the host and unlink this installation's integrations
+before deleting its folder. Other users' PATH and unrelated `nova` commands are preserved.
 
-Firmware preparation shows the exact board/port/operation before typed **FLASH**
-confirmation. The shared writer revalidates selection/files, stops the owned host
-and verifies device identity. Writes are never retried automatically. Clearing
-requires **CLEAR** and reuses consent revocation, transactional deletion and prior
-host restoration. Provider links/removal and invalid-settings recovery also have
-explicit confirmations.
+## Development and Linux/macOS
 
-Monitoring uses metadata and numeric history without provider requests or model
-turns. Quota is labeled **Recorded** with age/window; missing or disabled history
-means unknown percentages. Selecting a provider creates no agent row. Observer
-states older than 30 seconds say **Last**. Elapsed run time includes waiting and
-is not active time. Unknown metrics/gaps remain unknown. Device facts show age.
-Credentials and conversations are never displayed or exported.
-
-Pixels and companion transfers use the existing host owner. Protected screens and
-virtual touch stay excluded. Enrollment retains physical comparison, timeout and
-hold requirements. Production AI approval remains disabled. Terminal tests do not
-establish physical touch/approval or S3 hardware validation.
-
-`python tools/aim_terminal.py --check` runs a headless synthetic smoke check without
-private settings/hardware. `tests/test_terminal*.py` cover keyboard, resizing,
-cancellation, privacy and the shared action guards.
+Run `setup.ps1 -BuildTools` for development on Windows. No graphical runtime is installed.
+Optional SVG artwork regeneration alone uses scripts/requirements-artwork.txt.
+Linux/macOS: `./setup.sh`, then `.venv/bin/python tools/aim_terminal.py` (USB access rules may
+require OS-specific setup). Windows is the tested command-registration platform.

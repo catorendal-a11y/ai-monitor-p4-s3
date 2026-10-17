@@ -1,4 +1,4 @@
-name: Portable Windows release
+name: NOVA terminal release
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
   windows:
     needs: firmware
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -87,72 +87,32 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-          architecture: x64
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: firmware-guition-p4
-          path: work/prebuilt/guition-p4
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: firmware-waveshare-s3-43
-          path: work/prebuilt/waveshare-s3-43
-      - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-release.txt -r scripts/requirements-test.txt
-      - name: Test official Codex install without a pre-existing CLI
-        run: python scripts/test_codex_windows_install.py --disposable-ci
+          pattern: firmware-*
+          merge-multiple: true
+          path: work/prebuilt
+      - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-test.txt
       - run: python -m unittest discover -s tests -p 'test_*.py'
-      - run: python scripts/build_windows_release.py --firmware-dir work/prebuilt
-      - name: Test fresh Codex setup through the compiled console helper
+      - run: python scripts/build_terminal_release.py --firmware-dir work/prebuilt
+      - name: Test clean source terminal installation without Qt or packaged executables
         shell: pwsh
         run: |
-          $package = Get-ChildItem work/windows-release -Directory | Select-Object -First 1
-          python scripts/test_codex_windows_install.py --disposable-ci --helper (Join-Path $package.FullName 'AI-Monitor-Console.exe')
-          if ($LASTEXITCODE -ne 0) { throw 'Compiled Codex onboarding failed.' }
-      - name: Install authenticated pinned installer compiler
-        shell: pwsh
-        run: ./scripts/install_inno_builder.ps1 -Destination work/inno-builder
-      - name: Build and test per-user installer
+          $package = Get-ChildItem work/terminal-release -Directory | Select-Object -First 1
+          python scripts/test_terminal_package.py --package $package.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Terminal installation test failed.' }
+      - name: Collect terminal release metadata
         shell: pwsh
         run: |
-          $package = Get-ChildItem work/windows-release -Directory | Select-Object -First 1
-          python scripts/build_windows_installer.py --package $package.FullName --compiler work/inno-builder/compiler/ISCC.exe --output work/windows-release
-          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
-          $installer = Get-ChildItem work/windows-release -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
-          python scripts/test_windows_install.py --installer $installer.FullName
-          if ($LASTEXITCODE -ne 0) { throw 'Installer smoke tests failed.' }
-      - name: Smoke test portable executables
-        shell: pwsh
-        run: |
-          $package = Get-ChildItem work/windows-release -Directory | Select-Object -First 1
-          & (Join-Path $package.FullName 'AI-Monitor-Console.exe') --check
-          if ($LASTEXITCODE -ne 0) { throw 'Portable host failed.' }
-          & (Join-Path $package.FullName 'AI-Monitor-Events.exe') --check
-          if ($LASTEXITCODE -ne 0) { throw 'Portable event observer failed.' }
-          $gui = Start-Process -FilePath (Join-Path $package.FullName 'AI-Monitor.exe') -ArgumentList '--gui-check' -WindowStyle Hidden -Wait -PassThru
-          if ($gui.ExitCode -ne 0) { throw 'Portable GUI assets or runtime failed.' }
-          python (Join-Path $package.FullName 'tools/aim_terminal.py') --check
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged terminal UI or artwork failed.' }
-          & (Join-Path $package.FullName 'AI-Monitor-Console.exe') --terminal --check
-          if ($LASTEXITCODE -ne 0) { throw 'Bundled NOVA terminal runtime failed.' }
-          & (Join-Path $package.FullName 'firmware-flasher.exe') --chip esp32p4 image-info (Join-Path $package.FullName 'firmware/guition-p4/application.bin')
-          if ($LASTEXITCODE -ne 0) { throw 'Portable flasher failed.' }
-          & (Join-Path $package.FullName 'firmware-flasher.exe') --chip esp32s3 image-info (Join-Path $package.FullName 'firmware/waveshare-s3-43/application.bin')
-          if ($LASTEXITCODE -ne 0) { throw 'Portable S3 flasher failed.' }
-      - name: Collect release metadata
-        shell: pwsh
-        run: |
-          $archive = Get-ChildItem work/windows-release -Filter '*.zip' | Select-Object -First 1
-          $installer = Get-ChildItem work/windows-release -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
+          $archive = Get-ChildItem work/terminal-release -Filter '*.zip' | Select-Object -First 1
           $sum = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
-          $sum += [Environment]::NewLine + (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $installer.Name
-          $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
-          [IO.File]::WriteAllText($sums, $sum + [Environment]::NewLine)
+          [IO.File]::WriteAllText((Join-Path $archive.DirectoryName 'SHA256SUMS.txt'), $sum + [Environment]::NewLine)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-package
           path: |
-            work/windows-release/*.zip
-            work/windows-release/AI-Monitor-Setup-*
-            work/windows-release/SHA256SUMS.txt
+            work/terminal-release/*.zip
+            work/terminal-release/SHA256SUMS.txt
             docs/RELEASE_NOTES.md
           if-no-files-found: error
           retention-days: 7
@@ -171,45 +131,30 @@ jobs:
         with:
           name: release-package
           path: work/publish
-      - name: Verify downloaded artifacts before attesting
+      - name: Verify downloaded terminal archive before attesting
         shell: pwsh
         run: |
-          $taskFolder = 'work/publish/work/windows-release'
-          $taskArchive = Get-ChildItem $taskFolder -Filter '*.zip' | Select-Object -First 1
-          $taskInstaller = Get-ChildItem $taskFolder -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
-          if (-not $taskArchive -or -not $taskInstaller) { throw 'Release artifacts missing.' }
-          $taskExpected = @(
-            (Get-FileHash -LiteralPath $taskArchive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $taskArchive.Name
-            (Get-FileHash -LiteralPath $taskInstaller.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $taskInstaller.Name
-          )
-          $taskRecorded = @(Get-Content -LiteralPath (Join-Path $taskFolder 'SHA256SUMS.txt') -Encoding utf8)
-          if ($taskRecorded.Count -ne 2 -or $taskRecorded[0] -cne $taskExpected[0] -or $taskRecorded[1] -cne $taskExpected[1]) { throw 'Release artifact checksum mismatch.' }
-      - name: Attest verified release artifacts
+          $taskFolder = 'work/publish/work/terminal-release'
+          $archive = Get-ChildItem $taskFolder -Filter '*.zip' | Select-Object -First 1
+          if (-not $archive) { throw 'Terminal archive missing.' }
+          $recorded = @(Get-Content -LiteralPath (Join-Path $taskFolder 'SHA256SUMS.txt'))
+          $expected = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
+          if ($recorded.Count -ne 1 -or $recorded[0] -cne $expected) { throw 'Terminal archive checksum mismatch.' }
+      - name: Attest verified terminal artifacts
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: |
-            work/publish/work/windows-release/*.zip
-            work/publish/work/windows-release/AI-Monitor-Setup-*.exe
-            work/publish/work/windows-release/SHA256SUMS.txt
-      - name: Create reviewed draft release
+            work/publish/work/terminal-release/*.zip
+            work/publish/work/terminal-release/SHA256SUMS.txt
+      - name: Create reviewed draft terminal release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         shell: pwsh
         run: |
           gh release view $env:GITHUB_REF_NAME --json tagName,isDraft *> $null
-          if ($LASTEXITCODE -eq 0) {
-            Write-Output 'An existing draft or published release was preserved. Review it before publishing; this rerun replaces no assets.'
-            exit 0
-          }
-          $archive = Get-ChildItem work/publish/work/windows-release -Filter '*.zip' | Select-Object -First 1
-          if (-not $archive) { throw 'Release archive missing.' }
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+          $archive = Get-ChildItem work/publish/work/terminal-release -Filter '*.zip' | Select-Object -First 1
           $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
-          $installer = Get-ChildItem $archive.DirectoryName -Filter 'AI-Monitor-Setup-*' | Select-Object -First 1
-          if (-not $installer) { throw 'Installer asset missing.' }
-          $taskLines = @(Get-Content -LiteralPath $sums -Encoding utf8)
-          $taskArchiveSum = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
-          $taskInstallerSum = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $installer.Name
-          if ($taskLines.Count -ne 2 -or $taskLines[0] -cne $taskArchiveSum -or $taskLines[1] -cne $taskInstallerSum) { throw 'Downloaded release checksums do not match the build artifacts.' }
-          gh release create $env:GITHUB_REF_NAME $archive.FullName $installer.FullName $sums --verify-tag --draft --title "AI Monitor $env:GITHUB_REF_NAME" --notes-file work/publish/docs/RELEASE_NOTES.md
+          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "NOVA $env:GITHUB_REF_NAME" --notes-file work/publish/docs/RELEASE_NOTES.md
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }

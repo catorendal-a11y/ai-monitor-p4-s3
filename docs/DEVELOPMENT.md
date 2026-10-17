@@ -1,3 +1,9 @@
+# Current distribution: NOVA terminal
+
+Run `Install-Nova.ps1` once, then `nova`. The graphical app and EXE build are retired.
+Build source/firmware ZIPs using `scripts/build_terminal_release.py`; see RELEASING.md.
+The older architectural notes below include historical desktop details and are not install instructions.
+
 # Developer guide
 
 A USB desk display for AI usage limits and locally observed token activity, built for the **GUITION JC4880P433 ESP32-P4** and an experimental **original Waveshare ESP32-S3-Touch-LCD-4.3** target. [Board compatibility](BOARDS.md). A Python companion reads Codex and optional Z.AI coding-plan usage; the firmware displays it without storing cloud credentials.

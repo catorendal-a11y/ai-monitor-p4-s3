@@ -107,10 +107,5 @@ class LifecycleTests(unittest.TestCase):
                 self.assertEqual(result.returncode,1 if mode=='unavailable' else 0)
                 self.assertEqual('fixture-removed' in result.stdout,mode=='owned')
 
-    def test_installer_runs_preflight_before_deleting_executables(self):
-        script=(Path(__file__).resolve().parents[1]/'scripts/windows_installer.iss').read_text()
-        self.assertIn('InitializeUninstall',script); self.assertIn('--prepare-uninstall',script)
-        self.assertIn('PrepareToInstall',script); self.assertIn('--prepare-upgrade',script)
-
 if __name__=='__main__': unittest.main()
 

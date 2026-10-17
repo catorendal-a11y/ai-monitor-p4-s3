@@ -47,8 +47,6 @@ class ProjectVersionTests(unittest.TestCase):
         # constant and the top release-notes heading must name the same version.
         version = fw_version(ROOT)
         self.assertEqual(HOST_VERSION, version)
-        from desktop_window import APP_VERSION
-        self.assertEqual(APP_VERSION, version)
         heading = next((line.strip() for line in (ROOT / 'docs/RELEASE_NOTES.md').read_text(encoding='utf-8').splitlines()
                         if line.startswith('# AI Monitor v')), None)
         self.assertIsNotNone(heading, 'docs/RELEASE_NOTES.md must start with an "# AI Monitor vX.Y.Z" heading')
@@ -65,9 +63,9 @@ class ProjectVersionTests(unittest.TestCase):
         self.assertIn("'FileVersion', '2.0.0-rc1'", windows_version_resource('v2.0.0-rc1'))
 
     def test_release_builder_declares_the_shared_parser_and_generated_resource(self):
-        script = (ROOT / 'scripts/build_windows_release.py').read_text(encoding='utf-8')
-        self.assertIn('from project_version import HOST_VERSION, fw_version, windows_version_resource', script)
-        self.assertIn('windows_version_resource(version)', script)
+        script = (ROOT / 'scripts/build_terminal_release.py').read_text(encoding='utf-8')
+        self.assertIn('from project_version import HOST_VERSION, fw_version', script)
+        self.assertNotIn('PyInstaller', script)
         self.assertNotIn("ROOT/'scripts/windows_version.txt'", script)
         self.assertFalse((ROOT / 'scripts/windows_version.txt').exists(),
                          'the hand-maintained version resource must stay deleted; it is generated now')

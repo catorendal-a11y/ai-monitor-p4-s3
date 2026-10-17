@@ -254,8 +254,11 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
         async with app.run_test(size=(120,45)) as pilot:
             await pilot.pause(.1);await pilot.press('5');await pilot.click('Button#settings');await pilot.pause(.1)
             self.assertIsInstance(app.screen,ActionForm)
-            port=app.screen.query_one('#field-port',Input);port.value='';port.focus()
-            # Textual schedules focus after refresh; wait before simulating typing.
+            port=await mounted_widget(pilot,'#field-port')
+            # Settle modal mount before moving focus with a real click.
+            await pilot.pause()
+            port.value='';port.scroll_visible(immediate=True)
+            await pilot.pause();await pilot.click('#field-port')
             await pilot.pause();self.assertIs(app.screen.focused,port)
             await pilot.press('q','r','1','2','3');self.assertEqual(port.value,'qr123')
             await pilot.press('escape');self.assertEqual(service.execute.call_count,1)

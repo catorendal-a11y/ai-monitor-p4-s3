@@ -101,17 +101,6 @@ class MirrorTests(unittest.TestCase):
                     aim_host.wait_connected(panel,1.1)
                 self.assertLessEqual(max(sleeps),.05 if active else 1)
                 fetch.assert_not_called()
-    def test_gui_does_not_capture_on_open(self):
-        import os
-        os.environ['QT_QPA_PLATFORM']='offscreen'
-        from PySide6.QtWidgets import QApplication
-        from desktop_mirror import MirrorDialog
-        app=QApplication.instance() or QApplication([])
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);(root/'tools').mkdir();dialog=MirrorDialog(root)
-            self.assertIsNone(dialog.nonce)
-            self.assertFalse((root/'tools/screen-capture/request.json').exists())
-            dialog.reject();app.processEvents()
 
     def test_old_viewer_does_not_consume_new_viewers_response(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -133,26 +122,4 @@ class MirrorTests(unittest.TestCase):
                     with self.assertRaises(ValueError):mirror_service.receive(root,nonce)
                     self.assertFalse(path.exists())
 
-    def test_gui_refresh_failure_remains_visible_until_successful_retry(self):
-        import os
-        from unittest.mock import patch
-        os.environ['QT_QPA_PLATFORM']='offscreen'
-        from PySide6.QtWidgets import QApplication
-        from desktop_mirror import MirrorDialog
-        app=QApplication.instance() or QApplication([])
-        with tempfile.TemporaryDirectory() as folder:
-            root=Path(folder);(root/'tools').mkdir();dialog=MirrorDialog(root)
-            dialog.timer.stop();dialog.stamp=time.time()-20
-            with patch.object(mirror_service,'request',return_value='a'*32), patch.object(mirror_service,'receive',side_effect=RuntimeError):
-                dialog.capture();dialog.poll()
-            message=dialog.status.text()
-            self.assertIn('Capture unavailable',message)
-            dialog.poll();self.assertEqual(dialog.status.text(),message)
-            with patch.object(mirror_service,'request',side_effect=OSError):dialog.capture()
-            message=dialog.status.text();dialog.poll();self.assertEqual(dialog.status.text(),message)
-            with patch.object(mirror_service,'request',return_value='b'*32), patch.object(mirror_service,'receive',return_value=(bytes(BYTES),time.time())):
-                dialog.capture();dialog.poll()
-            self.assertIn('Real device capture',dialog.status.text())
-            self.assertTrue(dialog.capture_button.isEnabled())
-            dialog.reject();app.processEvents()
 if __name__=='__main__':unittest.main()

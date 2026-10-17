@@ -1,3 +1,10 @@
+# Current distribution
+
+rc15 replaces the graphical app and EXE distribution with NOVA Python terminal source.
+See TERMINAL.md and RELEASE_NOTES.md. Physical approval stays disabled.
+
+## Historical development evidence
+
 # v2 completion status — v1.19.1-rc14
 
 This candidate continues the USB-only v2 foundation. It is not a claim that every physical/security

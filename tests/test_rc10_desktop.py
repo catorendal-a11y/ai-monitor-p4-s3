@@ -16,8 +16,6 @@ import aim_control as control
 import desktop_support as desktop
 import host_status
 os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
-from PySide6.QtWidgets import QApplication, QFileDialog
-from desktop_window import MonitorWindow
 
 
 class Rc10Tests(unittest.TestCase):
@@ -119,42 +117,5 @@ class Rc10Tests(unittest.TestCase):
                 self.assertIsNone(host_status.read_status(root,{os.getpid()}))
 
 
-class Rc10UiTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):cls.app=QApplication.instance() or QApplication([])
-
-    def setUp(self):
-        self.directory=tempfile.TemporaryDirectory();self.addCleanup(self.directory.cleanup)
-        self.root=Path(self.directory.name);self.window=MonitorWindow(self.root,monitor=False)
-        self.addCleanup(self.finish)
-
-    def finish(self):
-        self.window.unsaved=False;self.window.config['keep_host_on_close']=True
-        self.window.close();self.window.deleteLater();self.app.processEvents()
-
-    def test_diagnostic_cancel_and_busy_do_not_export(self):
-        with patch.object(QFileDialog,'getSaveFileName',return_value=('','')) as dialog,patch.object(self.window,'_run') as run:
-            self.window.export_diagnostics();run.assert_not_called()
-            self.window.busy=True;self.window.export_diagnostics()
-            self.assertEqual(dialog.call_count,1)
-            self.window.busy=False
-
-    def test_diagnostic_action_writes_only_safe_metadata(self):
-        target=self.root/'report.json'
-        self.window.config['zai_key']='fixture-secret'
-        with patch.object(QFileDialog,'getSaveFileName',return_value=(str(target),'')),patch.object(self.window,'_run') as run,patch.object(control,'owned_hosts',return_value=[]),patch('desktop_window.read_status',return_value=None):
-            self.window.export_diagnostics()
-            run.call_args.args[1](Mock())
-        self.assertNotIn('fixture-secret',target.read_text())
-        self.assertEqual(json.loads(target.read_text())['schema'],1)
-
-    def test_clear_invalidates_existing_result_and_uses_worker(self):
-        view=self.window.history_view;view.data={'old':True};generation=view.generation
-        with patch.object(self.window,'_run') as run,patch.object(desktop,'clear_local_history') as clear:
-            self.window.clear_history()
-            self.assertGreater(view.generation,generation);self.assertIsNone(view.data)
-            self.assertFalse(view.export_button.isEnabled())
-            clear.assert_not_called()
-            run.call_args.args[1](Mock());clear.assert_called_once()
 
 if __name__=='__main__':unittest.main()

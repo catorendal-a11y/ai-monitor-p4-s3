@@ -81,11 +81,11 @@
 - `tools/aim_events.py`, `tools/live_events.py`: explicitly enabled Codex/Claude state observers;
   no model, host or serial control, transcripts or tool decisions. Codex's wrapper emits only neutral JSON.
 - `tools/usb_live.py`: read-only live metadata through the existing serial owner, separate from quota.
-- `tools/aim_desktop.py`, `tools/desktop_window.py`, `tools/desktop_support.py`: graphical NOVA control panel and validated actions. Qt mutations stay on the main thread; blocking actions use one worker.
+- `tools/desktop_support.py`: shared validated settings/USB/firmware operations used by NOVA terminal. The graphical frontend was retired in rc15.
 - `tools/aim_terminal.py`, `terminal_forms.py`, `terminal_data.py`, `terminal_actions.py`: terminal UI using shared desktop operations. Preserve one action worker, epoch-bound reads, masked draft secrets, cancel-without-effects, typed firmware/history confirmations and existing serial ownership. Never infer agents from providers or enable production approvals.
 - `tools/terminal_presentation.py`: reference dashboard tables and NOVA presentation. Keep recorded quota age, unknown values and stale-event states truthful. Extra provider rows must remain scrollable; device-sync age is separate from last-observed hardware age.
-- Desktop tests use an offscreen Qt window with synthetic configuration, without provider requests or hardware writes.
-- `scripts/build_windows_release.py`: portable executables, source/notice export and release ZIP.
+- Tests use synthetic configuration without provider requests or hardware writes.
+- `scripts/build_terminal_release.py`: reviewed source/notice and firmware ZIP; never bundle application EXEs, Qt or private runtime data.
 - `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.
 - `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.

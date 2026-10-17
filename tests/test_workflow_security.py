@@ -42,7 +42,7 @@ class WorkflowSecurityTests(unittest.TestCase):
                         if step['uses'].startswith('actions/attest-build-provenance@'):
                             self.assertNotIn('run', step)
                             subjects = step['with']['subject-path']
-                            self.assertIn('work/publish/work/windows-release/', subjects)
+                            self.assertIn('work/publish/work/terminal-release/', subjects)
                             self.assertNotIn('${{', subjects)
                     script = step.get('run', '')
                     self.assertNotRegex(script, r'(?i)python|pip install|\.exe|checkout|Invoke-Expression')

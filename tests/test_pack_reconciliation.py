@@ -9,7 +9,6 @@ sys.path[:0]=[str(Path(__file__).resolve().parents[1]/'tools'),str(Path(__file__
 from test_companion_packages import archive
 import companion_packages as packages
 from companion_service import CompanionService
-from companion_ui import CompanionView
 
 class PackReconciliationTests(unittest.TestCase):
     def exercise(self,activate):
@@ -35,16 +34,6 @@ class PackReconciliationTests(unittest.TestCase):
                 while service.state not in ('error','unconfirmed') and time.monotonic()<deadline:
                     service.pump(panel);time.sleep(.005)
                 self.assertEqual(service.state,'unconfirmed')
-                class View:pass
-                class Label:
-                    def setText(self,text):self.text=text
-                view=View();view.owner=View()
-                view.owner.config={'board':'guition-p4','port':'COM9999'}
-                view.owner.cached_health={'state':'connected','updated_at':time.time(),
-                    'board':'guition-p4','port':'COM9999','companion':service.snapshot()}
-                view.selected_id=mypack.id;view.device_status=Label()
-                CompanionView.refresh_device(view)
-                self.assertNotIn('previous companion retained',view.device_status.text)
                 service.next_status=0;service.pump(panel)
                 self.assertEqual(service.state,'active' if activate else 'different')
                 self.assertEqual(panel.finishes,1,'Never repeat an ambiguous activation')
