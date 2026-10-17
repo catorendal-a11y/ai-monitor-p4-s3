@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "boardId": "guition-p4",
+  "firmwareVersion": "v1.19.0",
+  "source": "normal production UI over USB",
+  "previousApplicationBytes": 4611328,
+  "applicationBytes": 2347328,
+  "savedBytes": 2264000,
+  "flash": {
+    "bytes": 16777216,
+    "frequencyHz": 80000000,
+    "applicationBytes": 2347328,
+    "partitionBytes": 6553600,
+    "partitionOffset": 65536,
+    "freeApplicationBytes": 4206272
+  },
+  "companionCache": {
+    "allocatedBytes": 630528,
+    "decodedFrames": 1,
+    "failures": 0,
+    "lastSwitchUs": 20513,
+    "maxSwitchUs": 20513,
+    "enabled": true,
+    "active": true
+  },
+  "internalHeap": {
+    "total": 503648,
+    "free": 214436,
+    "minimumFree": 167276,
+    "largestFreeBlock": 90100
+  },
+  "psram": {
+    "sizeBytes": 33554432,
+    "heapTotal": 33554432,
+    "free": 29079616,
+    "minimumFree": 0,
+    "largestFreeBlock": 28835828
+  },
+  "startupMemory": [
+    {
+      "stage": "before-display",
+      "captured": true,
+      "uptimeMs": 109,
+      "internalHeap": {
+        "total": 497684,
+        "free": 432336,
+        "minimumFree": 427068,
+        "largestFreeBlock": 286708
+      },
+      "psram": {
+        "total": 33551856,
+        "free": 33551856,
+        "minimumFree": 0,
+        "largestFreeBlock": 33030132
+      }
+    },
+    {
+      "stage": "after-display",
+      "captured": true,
+      "uptimeMs": 839,
+      "internalHeap": {
+        "total": 497396,
+        "free": 431204,
+        "minimumFree": 329920,
+        "largestFreeBlock": 286708
+      },
+      "psram": {
+        "total": 33551616,
+        "free": 32014208,
+        "minimumFree": 0,
+        "largestFreeBlock": 31981556
+      }
+    },
+    {
+      "stage": "after-lvgl",
+      "captured": true,
+      "uptimeMs": 871,
+      "internalHeap": {
+        "total": 496292,
+        "free": 426528,
+        "minimumFree": 325244,
+        "largestFreeBlock": 286708
+      },
+      "psram": {
+        "total": 33551568,
+        "free": 29710160,
+        "minimumFree": 0,
+        "largestFreeBlock": 29360116
+      }
+    },
+    {
+      "stage": "after-companion",
+      "captured": true,
+      "uptimeMs": 1411,
+      "internalHeap": {
+        "total": 442852,
+        "free": 172612,
+        "minimumFree": 167276,
+        "largestFreeBlock": 90100
+      },
+      "psram": {
+        "total": 33551552,
+        "free": 29079616,
+        "minimumFree": 0,
+        "largestFreeBlock": 28835828
+      }
+    }
+  ],
+  "scope": "First boot frame in normal P4 UI. Native tests verify all 12 poses. No physical touch/soak or S3 hardware claim."
+}

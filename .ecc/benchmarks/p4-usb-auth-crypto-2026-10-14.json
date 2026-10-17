@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "date": "2026-10-14",
+  "board": "JC4880P443C_I_W_Y",
+  "target": "esp32p4-auth-benchmark",
+  "measurement": {
+    "type": "crypto_benchmark",
+    "schema": 1,
+    "ready": true,
+    "ecdhGenerated": true,
+    "ecdhAgreed": true,
+    "hkdfDerived": true,
+    "hmacVerified": true,
+    "twoKeygensUs": 11114,
+    "twoAgreementsUs": 10080,
+    "hmacUs": 81,
+    "internalFreeBytes": 237456,
+    "psramFreeBytes": 29079616
+  },
+  "limits": [
+    "Isolated ephemeral-key crypto benchmark; no enrollment, NVS write or provider approval.",
+    "Original production UI application restored with digest/boot validation.",
+    "No physical S3 or end-to-end permission latency measurement."
+  ]
+}
