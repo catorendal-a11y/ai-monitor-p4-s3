@@ -130,6 +130,38 @@ async def mounted_widget(pilot,selector):
 
 
 class TerminalUITests(unittest.IsolatedAsyncioTestCase):
+    async def test_invalid_settings_keep_draft_and_focus_field_until_corrected(self):
+        from terminal_forms import settings_form,ResultScreen
+        from textual.widgets import Input,Select,Switch
+        app=TerminalApp(ROOT,reader=lambda _:fixture())
+        submitted=[]
+        async with app.run_test(size=(100,38)) as pilot:
+            await pilot.pause(.1)
+            form=settings_form(dict(board='guition-p4',port='COM6',interval_s=30,providers=['codex']))
+            app.push_screen(form,submitted.append);await pilot.pause(.1)
+            key=form.query_one('#field-key',Input);key.value='DRAFT_SECRET'
+            cases=[('interval','abc','15'),('interval','241','15'),
+                   ('option-reconnect_s','1','2'),('port','bad port','auto')]
+            for name,bad,good in cases:
+                field=form.query_one('#field-'+name,Input);field.value=bad
+                form.query_one('#submit').press();await pilot.pause(.1)
+                self.assertIs(app.screen,form);self.assertEqual(submitted,[])
+                self.assertIs(form.focused,field);self.assertEqual(key.value,'DRAFT_SECRET')
+                self.assertIn('Nothing was saved',str(form.query_one('#form-error').render()))
+                self.assertNotIn('DRAFT_SECRET',str(form.query_one('#form-error').render()))
+                field.value=good
+            form.query_one('#field-board',Select).value=Select.NULL
+            form.query_one('#submit').press();await pilot.pause(.1)
+            self.assertIs(app.screen,form);self.assertIs(form.focused,form.query_one('#field-board'))
+            form.query_one('#field-board',Select).value='guition-p4'
+            form.query_one('#field-provider-codex',Switch).value=False
+            form.query_one('#submit').press();await pilot.pause(.1)
+            self.assertIs(app.screen,form);self.assertEqual(submitted,[])
+            form.query_one('#field-provider-codex',Switch).value=True
+            form.query_one('#submit').press();await pilot.pause(.1)
+            self.assertEqual(len(submitted),1);self.assertEqual(submitted[0]['key'],'DRAFT_SECRET')
+            self.assertEqual(key.value,'')
+
     async def test_reference_layout_has_separate_device_robot_tables_and_bottom_status(self):
         from textual.widgets import Static
         app=TerminalApp(ROOT,reader=lambda _:fixture())
