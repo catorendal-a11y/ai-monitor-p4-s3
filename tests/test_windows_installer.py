@@ -22,7 +22,11 @@ class InstallerTests(unittest.TestCase):
                  'AI-Monitor-Events.exe':'events', 'event-runtime/base_library.zip':'event runtime',
                  'AI-Monitor-Permission.exe': 'permission', 'permission-runtime/base_library.zip': 'permission runtime',
                  '_internal/base_library.zip': 'gui runtime',
-                 'firmware-flasher.exe': 'flasher', '_internal/PySide6/Qt6Core.dll': 'runtime'}
+                 'firmware-flasher.exe': 'flasher', '_internal/PySide6/Qt6Core.dll': 'runtime',
+                 'AI-Monitor-Terminal.bat':'terminal launcher', 'setup.ps1':'setup',
+                 'tools/aim_terminal.py':'terminal', 'tools/terminal_art.py':'art',
+                 'tools/requirements.txt':'dependencies', 'assets/terminal/nova.json':'pixels',
+                 'docs/TERMINAL.md':'terminal guide'}
         for name, text in files.items():
             path = self.package/name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(text)
         self.records = {key: images(self.package, key) for key in BOARDS}
@@ -58,6 +62,8 @@ class InstallerTests(unittest.TestCase):
         names = ['AI-Monitor-Permission.exe', 'permission-runtime/base_library.zip',
                  '_internal/base_library.zip', 'event-runtime/base_library.zip', 'firmware/manifest.json']
         names += ['firmware/'+key+'/'+name for key in BOARDS for name in ('application.bin', 'factory.bin')]
+        names += ['AI-Monitor-Terminal.bat','setup.ps1','tools/aim_terminal.py','tools/terminal_art.py',
+                  'tools/requirements.txt','assets/terminal/nova.json','docs/TERMINAL.md']
         for name in names:
             with self.subTest(component=name):
                 path = self.package/name; data = path.read_bytes(); path.unlink(); self.hashes()
