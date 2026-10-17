@@ -28,7 +28,7 @@ Use `nova --version` or `nova --help` for command information.
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
 
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/ai-monitor-p4-s3/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
