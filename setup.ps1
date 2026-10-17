@@ -1,6 +1,17 @@
 param([string]$Python = '', [switch]$BuildTools, [switch]$FlashTools)
 $ErrorActionPreference = 'Stop'
 $taskProjectRoot = $PSScriptRoot
+if ((Test-Path -LiteralPath (Join-Path $taskProjectRoot 'runtime')) -and -not $BuildTools) {
+    $taskBundledPython = & (Join-Path $taskProjectRoot 'scripts\verify_terminal_runtime.ps1') -Root $taskProjectRoot
+    & $taskBundledPython -B -c 'import serial, psutil, textual, cryptography, lz4, esptool'
+    if ($LASTEXITCODE -ne 0) { throw 'Bundled dependencies could not load. Extract the complete Windows x64 release again.' }
+    $taskBundledConfig = Join-Path $taskProjectRoot 'tools\aim_host.json'
+    if (-not (Test-Path -LiteralPath $taskBundledConfig)) {
+        Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'tools\aim_host.example.json') -Destination $taskBundledConfig
+    }
+    Write-Output 'Bundled Python and dependencies verified. No downloads or separate Python installation are required.'
+    return
+}
 $taskVenv = Join-Path $taskProjectRoot '.venv'
 $taskVenvPython = Join-Path $taskVenv 'Scripts\python.exe'
 if (Test-Path -LiteralPath $taskVenvPython) {

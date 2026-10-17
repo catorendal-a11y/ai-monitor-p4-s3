@@ -26,7 +26,11 @@ def main():
             env.update(PATH=str(Path(os.environ['SystemRoot'])/'System32'),USERPROFILE=directory,
                        PIP_NO_INDEX='1',HTTP_PROXY='http://127.0.0.1:9',HTTPS_PROXY='http://127.0.0.1:9')
         env.pop('AI_MONITOR_PYTHON',None)
-        subprocess.run(install,cwd=root,env=env,check=True,timeout=300)
+        if bundled:
+            click=[os.environ['COMSPEC'],'/d','/c','call',str(root/'Install-Nova.cmd'),'-CommandDirectory',str(command),'-EnvironmentScope','Process']
+            result=subprocess.run(click,cwd=root,env=env,input='\n',capture_output=True,text=True,timeout=60)
+            if result.returncode or 'NOVA is ready' not in result.stdout:raise RuntimeError('One-click installer failed: '+result.stdout[-1500:]+result.stderr[-1500:])
+        else:subprocess.run(install,cwd=root,env=env,check=True,timeout=300)
         python=bundled or root/'.venv/Scripts/python.exe'
         if bundled:assert not (root/'.venv').exists(),'Bundled install must not need a separate Python environment'
         subprocess.run([str(python),'-c',"import importlib.util; assert importlib.util.find_spec('PySide6') is None; assert importlib.util.find_spec('PyInstaller') is None"],check=True,timeout=20)

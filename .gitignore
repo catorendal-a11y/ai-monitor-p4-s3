@@ -1,6 +1,7 @@
 # Build products, dependencies, and local test output
 .pio/
 .venv/
+runtime/
 venv/
 node_modules/
 __pycache__/

@@ -40,6 +40,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--firmware-dir',type=Path,required=True)
     parser.add_argument('--output',type=Path,default=ROOT/'work/terminal-release')
+    parser.add_argument('--windows-runtime',action='store_true',help='Include verified upstream Python and dependencies for offline Windows installation')
     args=parser.parse_args()
     git_root=Path(subprocess.check_output(['git','-C',str(ROOT),'rev-parse','--show-toplevel'],text=True).strip())
     if git_root.resolve()!=ROOT.resolve():parser.error('This project must be its own Git root')
@@ -81,6 +82,9 @@ def build_package(output,package,version,args):
         firmware_file('update', package, board.id)
     from build_companion_packages import build as build_companion
     for robot in ('nova','orbit'):build_companion(robot,package/'companion-packs')
+    if getattr(args,'windows_runtime',False):
+        from bundle_terminal_runtime import bundle_runtime
+        bundle_runtime(package)
     hashes=[]
     for path in sorted(package.rglob('*')):
         if path.is_file():hashes.append(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.relative_to(package).as_posix())

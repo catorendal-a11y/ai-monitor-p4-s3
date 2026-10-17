@@ -97,7 +97,7 @@ jobs:
           path: work/prebuilt/waveshare-s3-43
       - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-test.txt
       - run: python -m unittest discover -s tests -p 'test_*.py'
-      - run: python scripts/build_terminal_release.py --firmware-dir work/prebuilt
+      - run: python scripts/build_terminal_release.py --firmware-dir work/prebuilt --windows-runtime
       - name: Test clean source terminal installation without Qt or packaged executables
         shell: pwsh
         run: |
