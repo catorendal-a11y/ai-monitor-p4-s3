@@ -53,9 +53,9 @@ class TerminalApp(App):
     #nova-panel { border: round #95ffc2; background: #13231f; }
     #overview-agents, #agents-content { border-top: solid #b4a0ff; }
     #history-content { border-top: solid #76c9ff; }
-    Button { background: #1d2d37; border: tall #526572; }
+    Button { background: #1d2d37; border: round #526572; }
     Button:hover { background: #2c414d; }
-    Button:focus { border: tall #95ffc2; text-style: bold; }
+    Button:focus { border: round #95ffc2; text-style: bold; }
     #overview-top { height: 18; margin-bottom: 1; }
     #quota-wrap { width: 2fr; height: 1fr; margin-right: 1; margin-bottom: 0; }
     #quota { height: auto; }
