@@ -18,7 +18,7 @@ class TerminalExportTests(unittest.TestCase):
 
     def test_private_generated_and_path_escape_exports_are_refused(self):
         import build_terminal_release as build
-        for name in ('tools/aim_host.json','tools/activity/state.json','work/private.txt','private.exe','escape/../../private.txt','.env','auth.json','link.lnk'):
+        for name in ('tools/aim_host.json','tools/activity/state.json','work/private.txt','runtime/unreviewed.dll','private.exe','escape/../../private.txt','.env','auth.json','link.lnk'):
             with self.subTest(name=name),tempfile.TemporaryDirectory() as directory:
                 root=Path(directory);target=root/'package';target.mkdir()
                 with patch.object(build.subprocess,'check_output',return_value=name+'\n'):
