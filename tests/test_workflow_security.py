@@ -50,6 +50,13 @@ class WorkflowSecurityTests(unittest.TestCase):
                         self.assertIn('--draft', script)
                         self.assertIn('--verify-tag', script)
 
+    def test_firmware_downloads_preserve_board_directories(self):
+        document=yaml.safe_load((ROOT/'.github/workflows/release.yml').read_text())
+        downloads=[step['with'] for step in document['jobs']['windows']['steps'] if step.get('uses','').startswith('actions/download-artifact@')]
+        for board in ('guition-p4','waveshare-s3-43'):
+            self.assertIn({'name':'firmware-'+board,'path':'work/prebuilt/'+board},downloads,
+                          'Equal firmware filenames from different boards must never be merged')
+
     def test_external_events_do_not_get_privileged_context_or_named_secrets(self):
         for path, document in self.workflows():
             raw = path.read_text()
