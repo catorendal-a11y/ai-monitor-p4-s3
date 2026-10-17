@@ -142,6 +142,8 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
             self.assertGreaterEqual(agents.region.height,7)
             await pilot.resize_terminal(120,40);await pilot.pause(.1)
             self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
+            await pilot.resize_terminal(120,30);await pilot.pause(.1)
+            self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
 
     async def test_invalid_settings_keep_draft_and_focus_field_until_corrected(self):
         from terminal_forms import settings_form
