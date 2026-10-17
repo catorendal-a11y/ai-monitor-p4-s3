@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
 $taskBin = [IO.Path]::GetFullPath($CommandDirectory).TrimEnd('\')
 $taskCmd = Join-Path $taskBin 'nova.cmd'
-$taskPs = Join-Path $taskBin 'nova.ps1'
+$taskPs = Join-Path $taskBin 'nova-launcher.ps1'
 $taskOwner = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($taskRoot))
 $taskMarker = 'AI_MONITOR_TERMINAL_OWNER=' + $taskOwner
 
@@ -76,7 +76,7 @@ $taskCmdText = @"
 @echo off
 rem $taskMarker
 setlocal DisableDelayedExpansion
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0nova.ps1" %*
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0nova-launcher.ps1" %*
 exit /b %errorlevel%
 "@
 $taskPsText = @"

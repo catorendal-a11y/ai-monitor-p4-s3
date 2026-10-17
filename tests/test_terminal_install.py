@@ -40,7 +40,7 @@ class TerminalInstallTests(unittest.TestCase):
         self.assertIn('Terminal UI check passed.',result.stdout)
         result=self.install('-Uninstall');self.assertEqual(result.returncode,0,result.stderr)
         self.assertFalse((self.bin/'nova.cmd').exists())
-        self.assertFalse((self.bin/'nova.ps1').exists())
+        self.assertFalse((self.bin/'nova-launcher.ps1').exists())
 
     def test_unrelated_command_is_never_overwritten_or_removed(self):
         self.bin.mkdir();file=self.bin/'nova.cmd';file.write_text('@echo user command')
@@ -48,4 +48,4 @@ class TerminalInstallTests(unittest.TestCase):
         self.assertEqual(file.read_text(),'@echo user command')
         self.assertEqual(self.install('-Uninstall').returncode,0)
         self.assertEqual(file.read_text(),'@echo user command')
-        self.assertFalse((self.bin/'nova.ps1').exists())
+        self.assertFalse((self.bin/'nova-launcher.ps1').exists())
