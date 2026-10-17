@@ -31,6 +31,13 @@ class TerminalInstallTests(unittest.TestCase):
                               env=dict(os.environ,AI_MONITOR_PYTHON=sys.executable))
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('Terminal UI check passed. Color: truecolor',result.stdout)
+        # Resolve the bare command with normal PowerShell policy, from an unrelated folder.
+        result=subprocess.run(['powershell','-NoProfile','-ExecutionPolicy','Restricted','-Command','nova --check'],
+                              cwd=self.directory.name,capture_output=True,text=True,timeout=20,
+                              env=dict(os.environ,AI_MONITOR_PYTHON=sys.executable,
+                                       PATH=os.environ['PATH']+';'+str(self.bin)))
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('Terminal UI check passed.',result.stdout)
         result=self.install('-Uninstall');self.assertEqual(result.returncode,0,result.stderr)
         self.assertFalse((self.bin/'nova.cmd').exists())
         self.assertFalse((self.bin/'nova.ps1').exists())
