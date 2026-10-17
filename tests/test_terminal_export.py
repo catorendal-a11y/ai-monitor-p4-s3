@@ -21,6 +21,8 @@ class TerminalExportTests(unittest.TestCase):
         for name in ('tools/aim_host.json','tools/activity/state.json','work/private.txt','runtime/unreviewed.dll','private.exe','escape/../../private.txt','.env','auth.json','link.lnk'):
             with self.subTest(name=name),tempfile.TemporaryDirectory() as directory:
                 root=Path(directory);target=root/'package';target.mkdir()
+                if name.startswith('runtime/'):
+                    (root/name).parent.mkdir();(root/name).write_bytes(b'unreviewed runtime binary')
                 with patch.object(build.subprocess,'check_output',return_value=name+'\n'):
                     with self.assertRaises(ValueError):build.export_source(root,target)
 
