@@ -1616,16 +1616,18 @@ int main(int argc, char** argv) {
         CHECK(!session_status(quota,received+28000u,255u,counts,live).running);
       }
       aim::Snapshot token{};token.hostPresent=token.tokenUsageKnown=token.tokenUsageSeen=true;
+      const agent::Snapshot noSessions{};
+      const live_agent::UsbLiveSnapshot noLive{};
       token.tokenIdleSeconds=89;token.tokenActivityMs=1000;
-      CHECK(companion.evaluate(token,1999,false,warning,{},{} )==NovaMood::working);
-      CHECK(companion.evaluate(token,2000,false,warning,{},{} )!=NovaMood::working);
+      CHECK(companion.evaluate(token,1999,false,warning,noSessions,noLive)==NovaMood::working);
+      CHECK(companion.evaluate(token,2000,false,warning,noSessions,noLive)!=NovaMood::working);
       token.views[0].valid=token.views[0].hasUsage=true;token.views[0].rowCount=1;
       token.views[0].rows[0].valid=true;token.views[0].rows[0].usedPercent=5;
-      CHECK(companion.evaluate(token,2000,false,warning,{},{} )==NovaMood::updated);
-      CHECK(companion.evaluate(token,7000,false,warning,{},{} )==NovaMood::ready);
+      CHECK(companion.evaluate(token,2000,false,warning,noSessions,noLive)==NovaMood::updated);
+      CHECK(companion.evaluate(token,7000,false,warning,noSessions,noLive)==NovaMood::ready);
       token.tokenIdleSeconds=299;token.tokenActivityMs=0xfffffff0u;
       token.views[0].quotaReceivedMs=token.tokenActivityMs;
-      CHECK(companion.evaluate(token,token.tokenActivityMs+1000u,false,warning,{},{} )==NovaMood::resting);
+      CHECK(companion.evaluate(token,token.tokenActivityMs+1000u,false,warning,noSessions,noLive)==NovaMood::resting);
     }
     ui_menu_show(); auto* entry=find_caption_button(lv_screen_active(),"AGENTS");CHECK(entry);
     const auto savedQuota=sample;sample.hostPresent=false;
