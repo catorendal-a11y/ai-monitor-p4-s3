@@ -1,4 +1,4 @@
-# AI Monitor v1.19.1-rc12
+# AI Monitor v1.19.1-rc13
 
 - Include the graphical terminal application and its source launcher in the complete
   Windows package. Run setup.ps1 with Python 3.12, then AI-Monitor-Terminal.bat.

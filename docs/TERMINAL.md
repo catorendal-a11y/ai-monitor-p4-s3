@@ -5,8 +5,8 @@ desktop app. It runs inside an existing terminal; no separate executable is requ
 
 ## Install on Windows
 
-1. Download the complete **ai-monitor-p4-v1.19.1-rc12-windows.zip** from the
-   [rc12 release](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12).
+1. Download the complete **ai-monitor-p4-v1.19.1-rc13-windows.zip** from the
+   [rc12 release](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13).
    Use **Extract All** into a writable folder. Keep all files together; do not run
    inside the ZIP. The source checkout also works, with firmware limits below.
 2. Install **Python 3.12 x64** from [python.org](https://www.python.org/downloads/windows/).

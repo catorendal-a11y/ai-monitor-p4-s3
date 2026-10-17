@@ -718,10 +718,11 @@ int main(int argc, char** argv) {
   CHECK(std::strcmp(lv_label_get_text(footServices), "1 / 1 services online") == 0);
   CHECK(std::strcmp(lv_label_get_text(big[0].remaining), "LOCAL") == 0);
   std::strcpy(sample.viewKeys[0], "external"); std::strcpy(sample.views[0].providerKey, "external");
-  std::strcpy(sample.views[0].providerLabel, "ABCDEFGHIJKLMNOP");
+  // The protocol label buffer includes its NUL: exercise the maximum 15 characters.
+  std::strcpy(sample.views[0].providerLabel, "ABCDEFGHIJKLMNO");
   dashboard_update();
-  CHECK(std::strcmp(lv_label_get_text(big[0].vendor), "ABCDEFGHIJKLMNOP - ACTIVITY / SETUP") == 0);
-  CHECK(std::strcmp(bigCache[0].vendor, "ABCDEFGHIJKLMNOP - ACTIVITY / SETUP") == 0);
+  CHECK(std::strcmp(lv_label_get_text(big[0].vendor), "ABCDEFGHIJKLMNO - ACTIVITY / SETUP") == 0);
+  CHECK(std::strcmp(bigCache[0].vendor, "ABCDEFGHIJKLMNO - ACTIVITY / SETUP") == 0);
   // Preserve readable font size and let overflow scroll instead of permanently
   // clipping away the status at the end of a long provider label.
   CHECK(lv_label_get_long_mode(big[0].vendor) == LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);

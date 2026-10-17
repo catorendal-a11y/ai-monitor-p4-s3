@@ -2,7 +2,7 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
-New candidate package: **[v1.19.1-rc12](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12)**,
+New candidate package: **[v1.19.1-rc13](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13)**,
 with a full-color terminal dashboard, direct device navigation, observed agent sessions,
 local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
@@ -27,7 +27,7 @@ The graphical Windows app still runs without Python.
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
 
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/ai-monitor-p4-s3/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
@@ -58,7 +58,7 @@ The graphical Windows app still runs without Python.
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12"><img alt="Windows x64 installer" src="https://img.shields.io/badge/Windows%20x64-single%20installer-54c4f2?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13"><img alt="Windows x64 installer" src="https://img.shields.io/badge/Windows%20x64-single%20installer-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
   <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
@@ -73,7 +73,7 @@ The graphical Windows app still runs without Python.
 
 [![Support AI Monitor — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
 
-**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
+**[Download for Windows](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
@@ -138,7 +138,7 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 ## Get running on Windows
 
-1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc12) and run **AI-Monitor-Setup-v1.19.1-rc12-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.19.1-rc12-windows.zip** into a writable folder and keep its contents together.
+1. **Download and install.** Open [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc13) and run **AI-Monitor-Setup-v1.19.1-rc13-windows.exe**. It installs the complete app for your user and opens setup; no Python or administrator rights are required. Alternatively, extract the complete **ai-monitor-p4-v1.19.1-rc13-windows.zip** into a writable folder and keep its contents together.
 2. **Connect and open.** Connect the display and double-click **AI-Monitor.exe**.
 3. **Choose your board and AI tools.** In **Setup**, choose P4 or S3, check your providers, select the USB port and click **Save settings**. With multiple USB boards connected, choose the display's explicit COM port instead of `auto`; the host deliberately refuses to guess. No AI is preselected. If you choose Codex, setup offers the official CLI installation and sign-in when needed. ZCode's quota key is optional and requested only if selected.
 4. **Prepare the display.** On a new board, open **Firmware > Install / update firmware**, then select **First installation**. Check the board and port and type `FLASH`. This resets display settings. For an older AI Monitor installation, use the application update; firmware from another project needs First installation.
@@ -146,7 +146,7 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc12/AI-Monitor-Setup-v1.19.1-rc12-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc12/ai-monitor-p4-v1.19.1-rc12-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc12/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
+**[Windows installer](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc13/AI-Monitor-Setup-v1.19.1-rc13-windows.exe)** · [Portable ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc13/ai-monitor-p4-v1.19.1-rc13-windows.zip) · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc13/SHA256SUMS.txt) · [Setup guide](docs/QUICK_START.md)
 
 The release is currently **unsigned**; Windows may show an unknown-publisher/SmartScreen warning. The installer does not disable Windows protection. [App trust, verification and tested installation paths](docs/WINDOWS_TRUST.md).
 
