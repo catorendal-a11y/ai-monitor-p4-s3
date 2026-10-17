@@ -71,7 +71,7 @@ class TerminalApp(App):
     #overview-side { width: 1fr; height: 1fr; }
     #overview-device { height: 9; }
     #nova-panel { height: 8; margin-bottom: 0; }
-    #overview-agents { min-height: 8; }
+    #overview-agents { min-height: 8; margin-bottom: 0; }
     #notice { height: auto; max-height: 3; color: #ffcf66; padding: 0 2; }
     #help { display: none; height: auto; padding: 1 2; border: round #35d07f; }
     .actions { layout: horizontal; height: auto; margin-bottom: 1; }
@@ -145,15 +145,17 @@ class TerminalApp(App):
 
     def on_resize(self,event):
         if not self.ready():return
-        self.apply_width(event.size.width)
+        self.apply_width(event.size.width,event.size.height)
 
-    def apply_width(self,width):
+    def apply_width(self,width,height=None):
         main=self.screen_stack[0]
-        top_height=max(10,min(18,self.size.height-15))
+        top_height=max(10,min(18,(self.size.height if height is None else height)-17))
         main.query_one('#overview-top').styles.layout='vertical' if width<90 else 'horizontal'
         main.query_one('#overview-top').styles.height=top_height if width>=90 else 'auto'
-        main.query_one('#overview-device').styles.height=6
-        main.query_one('#nova-panel').styles.height=top_height-7
+        main.query_one('#overview-device').border_title='USB DEVICE'
+        main.query_one('#overview-device').styles.height=5
+        main.query_one('#overview-device').styles.margin=0
+        main.query_one('#nova-panel').styles.height=top_height-5
         main.query_one('#overview-side').styles.width='1fr' if width>=90 else '100%'
         main.query_one('#overview-side').styles.height='1fr' if width>=90 else 'auto'
         main.query_one('#quota-wrap').styles.width='2fr' if width>=90 else '100%'
@@ -162,7 +164,7 @@ class TerminalApp(App):
         main.query_one('#shortcuts').display=width>=100
         if self.latest:
             main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120,dense=top_height<18))
-            main.query_one('#nova-panel',Static).update(nova_panel(self.latest['agents'],image_rows=max(2,top_height-10)))
+            main.query_one('#nova-panel',Static).update(nova_panel(self.latest['agents'],image_rows=max(2,top_height-8)))
 
     def check_action(self,action,parameters):
         # Global shortcuts must never steal digits, q, r or ? from form inputs.
@@ -212,7 +214,7 @@ class TerminalApp(App):
             self.screen_stack[0].query_one('Button#stop').disabled=not value.get('running',False)
         count=len(value['agents'])
         update('#connection',value['connection']+f"  |  {count} observed session"+('' if count==1 else 's')+'  |  History '+('enabled' if value['history_enabled'] else 'disabled'))
-        top_height=max(10,min(18,self.size.height-15))
+        top_height=max(10,min(18,self.size.height-17))
         update('#quota',provider_table(value['providers'],compact=self.size.width<120,dense=top_height<18))
         agents=agents_text(value['agents'])
         update('#agents-content',agents)
@@ -223,7 +225,7 @@ class TerminalApp(App):
         description='DEVICE\n\n'+f"{device.get('board','Unknown')}\n{device.get('port','Unknown')}\nFirmware {device.get('firmware','Unknown')}\n{stamp}"
         update('#device-content',description+'\n\nStatus comes from the existing host.\nNo second USB connection is opened.')
         update('#overview-device',device_panel(device,value['connection']))
-        update('#nova-panel',nova_panel(value['agents'],image_rows=max(2,top_height-10)))
+        update('#nova-panel',nova_panel(value['agents'],image_rows=max(2,top_height-8)))
         update('#history-content',history_panel(value['history'],value['history_enabled']))
         settings=['SAVED SETTINGS','']+[f'{key}: {safe_text(item,80)}' for key,item in value['settings'].items()]
         close_policy='Closing this terminal stops the owned host, following the saved preference.' if value['settings'].get('keep_host_on_close') is False else 'Closing this terminal leaves the host running. Use Stop host to stop it.'

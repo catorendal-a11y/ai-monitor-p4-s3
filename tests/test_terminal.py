@@ -133,6 +133,7 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
     async def test_overview_agents_fit_common_window_height(self):
         value=fixture()
         value['providers']*=3
+        value['agents'].append(dict(provider='Z Code',id='second-agent',state='WAITING',age=2,elapsed=10))
         app=TerminalApp(ROOT,reader=lambda _:value)
         async with app.run_test(size=(120,30)) as pilot:
             await pilot.pause(.2)
@@ -140,10 +141,12 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
             agents=main.query_one('#overview-agents')
             self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
             self.assertGreaterEqual(agents.region.height,7)
+            self.assertIn('second-agent',app.export_screenshot())
             await pilot.resize_terminal(120,40);await pilot.pause(.1)
             self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
             await pilot.resize_terminal(120,30);await pilot.pause(.1)
             self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
+            self.assertIn('second-agent',app.export_screenshot())
 
     async def test_invalid_settings_keep_draft_and_focus_field_until_corrected(self):
         from terminal_forms import settings_form

@@ -70,7 +70,7 @@ def device_panel(device,connection):
     text.append('\nFirmware : '+device.get('firmware','Unknown'),style=MUTED)
     age=device.get('sync_age')
     text.append('\nLast sync: '+('Unknown' if age is None else f'{age}s ago'),style=MUTED)
-    return Group(Text('USB DEVICE',style='bold #76c9ff'),text)
+    return text
 
 
 def nova_panel(rows,image_rows=6):
