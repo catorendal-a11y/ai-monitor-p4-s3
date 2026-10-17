@@ -4,13 +4,15 @@ from functools import lru_cache
 import json
 from pathlib import Path
 import zlib
+import sys
 from rich.style import Style
 from rich.text import Text
 
 
 @lru_cache(maxsize=4)
 def pixels(pose):
-    path=Path(__file__).resolve().parents[1]/'assets/terminal/nova.json'
+    root=Path(sys._MEIPASS) if getattr(sys,'frozen',False) else Path(__file__).resolve().parents[1]
+    path=root/'assets/terminal/nova.json'
     data=json.loads(path.read_text(encoding='utf-8'))
     width,height=data['width'],data['height']
     if (width,height)!=(40,26):raise ValueError('Unexpected terminal artwork dimensions')

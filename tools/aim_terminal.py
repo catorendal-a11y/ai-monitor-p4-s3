@@ -6,6 +6,7 @@ import sys
 import json
 import os
 from rich.text import Text
+from project_version import HOST_VERSION
 from textual.app import App,ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal,Vertical,VerticalScroll
@@ -354,7 +355,8 @@ def screen_text(pixels,width,height):
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(description=__doc__)
+    parser=argparse.ArgumentParser(prog='nova',description=__doc__)
+    parser.add_argument('--version',action='version',version=HOST_VERSION)
     parser.add_argument('--root',type=Path,help='Existing AI Monitor application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
     args=parser.parse_args(argv)

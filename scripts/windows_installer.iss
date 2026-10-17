@@ -37,9 +37,11 @@ OutputBaseFilename=AI-Monitor-Setup-v{#AppVersion}-windows
 CloseApplications=yes
 RestartApplications=no
 Uninstallable=yes
+ChangesEnvironment=yes
 
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
+Name: terminalcommand; Description: "Add the nova terminal command for this user"; Flags: checkedonce
 
 [Files]
 Source: "{#PackageDir}\*"; DestDir: "{app}"; Excludes: "tools\aim_host.json,tools\aim_host.status.json,tools\aim_host.log,tools\activity\*"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -54,6 +56,64 @@ Name: "{userdesktop}\AI Monitor"; Filename: "{app}\AI-Monitor.exe"; WorkingDir: 
 Filename: "{app}\AI-Monitor.exe"; Description: "Open AI Monitor setup"; Flags: nowait postinstall skipifsilent
 
 [Code]
+function WithoutTerminalPath(const Value, Entry: String): String;
+var
+  Rest, Part, Normalized: String;
+  Separator: Integer;
+  More, HavePart: Boolean;
+begin
+  Rest := Value;
+  Result := '';
+  HavePart := False;
+  repeat
+    Separator := Pos(';', Rest);
+    More := Separator > 0;
+    if More then begin
+      Part := Copy(Rest, 1, Separator - 1);
+      Delete(Rest, 1, Separator);
+    end else begin
+      Part := Rest;
+      Rest := '';
+    end;
+    Normalized := Trim(Part);
+    if (Length(Normalized) >= 2) and (Normalized[1] = '"') and
+       (Normalized[Length(Normalized)] = '"') then
+      Normalized := Copy(Normalized, 2, Length(Normalized) - 2);
+    if CompareText(RemoveBackslashUnlessRoot(Normalized), Entry) <> 0 then begin
+      if HavePart then Result := Result + ';';
+      Result := Result + Part;
+      HavePart := True;
+    end;
+  until not More;
+end;
+
+procedure UpdateTerminalPath(Add: Boolean);
+var
+  OldPath, NewPath, Entry: String;
+begin
+  Entry := ExpandConstant('{app}\terminal-bin');
+  if not RegQueryStringValue(HKCU, 'Environment', 'Path', OldPath) then OldPath := '';
+  NewPath := WithoutTerminalPath(OldPath, Entry);
+  if Add then begin
+    if NewPath <> '' then NewPath := NewPath + ';';
+    NewPath := NewPath + Entry;
+  end;
+  if NewPath <> OldPath then
+    if not RegWriteExpandStringValue(HKCU, 'Environment', 'Path', NewPath) then
+      RaiseException('Could not update this user''s terminal command PATH.');
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then
+    UpdateTerminalPath(WizardIsTaskSelected('terminalcommand'));
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then UpdateTerminalPath(False);
+end;
+
 function RunLifecycle(const Option: String): Boolean;
 var
   Helper: String;

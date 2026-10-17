@@ -100,6 +100,8 @@ def build_package(output, package, version, args):
         shutil.copytree(permission_dist/'AI-Monitor-Permission',package,dirs_exist_ok=True)
         run(*common, '--onefile', '--console', '--name', 'AI-Monitor-Console', '--paths', str(ROOT / 'tools'),
             '--exclude-module', 'esptool', '--exclude-module', 'PySide6',
+            '--collect-all', 'textual',
+            '--add-data', str(ROOT / 'assets/terminal') + os.pathsep + 'assets/terminal',
             str(ROOT / 'tools/aim_control.py'))
         run(*common, '--onefile', '--console', '--name', 'firmware-flasher', '--exclude-module', 'PySide6',
             '--collect-all', 'esptool', '--collect-all', 'esp_pylib',

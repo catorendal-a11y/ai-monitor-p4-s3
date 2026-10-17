@@ -38,7 +38,8 @@ def verify_package(package: Path) -> str:
                  'event-runtime/base_library.zip', '_internal/base_library.zip',
                  'firmware-flasher.exe', '_internal/PySide6/Qt6Core.dll',
                  'AI-Monitor-Terminal.bat','setup.ps1','tools/aim_terminal.py','tools/terminal_art.py',
-                 'tools/requirements.txt','assets/terminal/nova.json','docs/TERMINAL.md'):
+                 'tools/requirements.txt','assets/terminal/nova.json','docs/TERMINAL.md',
+                 'Install-Nova.ps1','terminal-bin/nova.cmd'):
         if not (package/name).is_file():
             raise ValueError('Incomplete application runtime')
     manifest = read_local_json(package/'firmware/manifest.json')

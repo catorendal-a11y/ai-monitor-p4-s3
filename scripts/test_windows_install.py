@@ -47,7 +47,7 @@ def main():
             terminal_bin = str(target/'terminal-bin')
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as environment:
                 user_path = winreg.QueryValueEx(environment, 'Path')[0]
-            assert user_path.split(';').count(terminal_bin) == 1, 'nova command PATH missing or duplicated'
+            assert [part.rstrip('\\').casefold() for part in user_path.split(';')].count(terminal_bin.casefold()) == 1, 'nova command PATH missing or duplicated'
             assert (target/'terminal-bin/nova.cmd').is_file(), 'nova command missing'
             for arguments_check in ([str(target/'AI-Monitor.exe'), '--gui-check'],
                                     [str(target/'firmware-flasher.exe'), '--help']):
@@ -102,7 +102,7 @@ def main():
             assert not json.loads(profile_files[2].read_text()).get('hooks',{}).get('events')
         assert not (target/'AI-Monitor.exe').exists(), 'Uninstaller left application files'
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment') as environment:
-            assert terminal_bin not in winreg.QueryValueEx(environment,'Path')[0].split(';'), 'Uninstaller retained nova PATH'
+            assert terminal_bin.casefold() not in [part.rstrip('\\').casefold() for part in winreg.QueryValueEx(environment,'Path')[0].split(';')], 'Uninstaller retained nova PATH'
     print('PASS: clean per-user installation, EXE/Qt startup, running-host upgrade/uninstall, exact-owned integration cleanup and private-settings preservation.')
 
 

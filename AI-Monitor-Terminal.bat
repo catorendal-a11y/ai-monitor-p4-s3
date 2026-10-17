@@ -7,16 +7,18 @@ set COLORTERM=truecolor
 set TEXTUAL_COLOR_SYSTEM=truecolor
 title AI Monitor Terminal
 cd /d "%~dp0"
-if not exist "%~dp0.venv\Scripts\python.exe" (
-  echo Run setup.ps1 from this directory first.
-  pause
-  exit /b 1
+set "NOVA_PYTHON=%AI_MONITOR_PYTHON%"
+if not defined NOVA_PYTHON set "NOVA_PYTHON=%~dp0.venv\Scripts\python.exe"
+if not exist "%NOVA_PYTHON%" (
+  echo Preparing AI Monitor terminal dependencies for the first start...
+  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0setup.ps1"
+  if errorlevel 1 exit /b 1
 )
-"%~dp0.venv\Scripts\python.exe" -c "import textual" >nul 2>&1
+"%NOVA_PYTHON%" -c "import textual" >nul 2>&1
 if errorlevel 1 (
   echo Install terminal dependencies: .venv\Scripts\python.exe -m pip install -r tools\requirements.txt
   pause
   exit /b 1
 )
-"%~dp0.venv\Scripts\python.exe" "%~dp0tools\aim_terminal.py" %*
+"%NOVA_PYTHON%" "%~dp0tools\aim_terminal.py" %*
 exit /b %errorlevel%

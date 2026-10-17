@@ -365,6 +365,14 @@ def integration_help(root=ROOT, ask=input, home=None):
 
 
 def main(argv=None):
+    arguments=list(sys.argv[1:] if argv is None else argv)
+    if arguments[:1]==['--terminal']:
+        os.environ.pop('NO_COLOR',None)
+        if os.environ.get('TERM','') in ('','dumb'):os.environ['TERM']='xterm-256color'
+        os.environ['COLORTERM']='truecolor'
+        os.environ['TEXTUAL_COLOR_SYSTEM']='truecolor'
+        from aim_terminal import main as terminal_main
+        return terminal_main(arguments[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", action="store_true", help="Run the background companion")
     parser.add_argument('--start-host', action='store_true', help='Start this installation\'s independent background host')
