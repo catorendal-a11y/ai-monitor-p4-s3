@@ -296,9 +296,10 @@ class LoopTests(unittest.TestCase):
         with patch.object(host, "find_port", return_value="COM_TEST"), \
                 patch.object(host, "connect_panel", return_value=panel), \
                 patch.object(host, "poll_cycle", return_value=101), \
-                patch.object(host.time, "monotonic", side_effect=[100, 140, 140]), \
+                patch.object(host, "time", wraps=host.time) as clock, \
                 patch.object(host, "wait_connected", side_effect=KeyboardInterrupt) as wait, \
                 patch.object(host, "LOG"):
+            clock.monotonic.side_effect=[100,140,140]
             with self.assertRaises(KeyboardInterrupt):
                 host._run_loop(host.DEFAULT_CONFIG, 240, "", ["codex"])
         wait.assert_called_once_with(panel, 200, minimum_wait=0)

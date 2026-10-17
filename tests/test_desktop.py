@@ -81,6 +81,7 @@ class DesktopSettingsTests(unittest.TestCase):
         opened.assert_called_once_with('COM6')
         panel.close.assert_called_once()
 
+    @unittest.skipUnless(os.name=='nt','Windows sharing-lock retry')
     def test_transient_windows_lock_keeps_atomic_config_replacement(self):
         with tempfile.TemporaryDirectory() as directory:
             root=Path(directory)

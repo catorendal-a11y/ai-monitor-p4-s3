@@ -86,6 +86,7 @@ class AgentRepairTests(unittest.TestCase):
         write_record(self.activity/'codex-session-link.json',{'enabled':True,'generation':17})
         self.assertEqual(setup.codex_session_state(self.root,home=self.root),'not linked')
 
+    @unittest.skipUnless(os.name=='nt','Migration of legacy Windows PowerShell wrappers')
     def test_codex_upgrade_migrates_only_exact_legacy_observer_and_preserves_custom_hooks(self):
         # Simulate an older source setup with a Python interpreter outside the release.
         with patch.object(sys,'executable',str(self.root/'old-python/python.exe')):
