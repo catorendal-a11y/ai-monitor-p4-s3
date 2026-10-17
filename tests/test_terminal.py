@@ -130,6 +130,19 @@ async def mounted_widget(pilot,selector):
 
 
 class TerminalUITests(unittest.IsolatedAsyncioTestCase):
+    async def test_overview_agents_fit_common_window_height(self):
+        value=fixture()
+        value['providers']*=3
+        app=TerminalApp(ROOT,reader=lambda _:value)
+        async with app.run_test(size=(120,30)) as pilot:
+            await pilot.pause(.2)
+            main=app.screen_stack[0]
+            agents=main.query_one('#overview-agents')
+            self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
+            self.assertGreaterEqual(agents.region.height,7)
+            await pilot.resize_terminal(120,40);await pilot.pause(.1)
+            self.assertLessEqual(agents.region.bottom,main.query_one('#statusbar').region.y)
+
     async def test_invalid_settings_keep_draft_and_focus_field_until_corrected(self):
         from terminal_forms import settings_form
         from textual.widgets import Input,Select,Switch
