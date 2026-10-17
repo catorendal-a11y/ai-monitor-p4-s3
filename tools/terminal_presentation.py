@@ -4,6 +4,8 @@ from rich.console import Group
 from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
+from rich.align import Align
+from terminal_art import nova_cells
 
 GREEN='#95ffc2'
 MUTED='#a5adb7'
@@ -14,9 +16,9 @@ def heading(title,content):
     return Group(Text(title,style='bold '+GREEN),Rule(style=LINE),content)
 
 
-def provider_table(rows,compact=False):
+def provider_table(rows,compact=False,dense=False):
     table=Table(expand=True,show_header=False,show_edge=False,box=box.HORIZONTALS,
-                border_style=LINE,padding=(1,0 if compact else 1),show_lines=True)
+                border_style=LINE,padding=(0 if dense else 1,0 if compact else 1),show_lines=True)
     table.add_column(min_width=8,max_width=12,ratio=2,no_wrap=True,overflow='ellipsis')
     table.add_column(width=13,no_wrap=True)
     table.add_column(width=14 if compact else 22,no_wrap=True)
@@ -33,7 +35,8 @@ def provider_table(rows,compact=False):
             bar=Text();bar.append('█'*filled,style=color);bar.append('░'*(segments-filled),style='#35434d')
         note=row['quota_note'].replace(' / ','\n')
         if not known and row['health']=='activity_only':note='Quota unavailable'
-        label=Text(name,style='bold')
+        provider_color={'Codex':GREEN,'Z Code':'#76c9ff','Claude':'#c4a7ff'}.get(name,GREEN)
+        label=Text(name,style='bold '+provider_color)
         if row['health'] not in ('ready','activity_only'):label.append('\n'+row['health'].replace('_',' '),style=MUTED)
         table.add_row(label,Text(caption,style=GREEN if known else MUTED),bar,Text(note,style=MUTED))
     if not rows:table.add_row('No providers selected','','','Open Settings')
@@ -61,17 +64,16 @@ def agent_table(rows):
 
 def device_panel(device,connection):
     board={'guition-p4':'ESP32-P4','waveshare-s3-43':'ESP32-S3'}.get(device.get('board'),device.get('board','Unknown'))
-    text=Text(board+'\n',style='bold')
-    text.append(device.get('port','Unknown')+' / ')
+    text=Text(board+' / '+device.get('port','Unknown')+'  ',style='bold')
     connected=device.get('connected',False)
     text.append('● Connected' if connected else '○ Unconfirmed',style=GREEN if connected else MUTED)
     text.append('\nFirmware : '+device.get('firmware','Unknown'),style=MUTED)
     age=device.get('sync_age')
     text.append('\nLast sync: '+('Unknown' if age is None else f'{age}s ago'),style=MUTED)
-    return heading('DEVICE',text)
+    return Group(Text('USB DEVICE',style='bold #76c9ff'),text)
 
 
-def nova_panel(rows):
+def nova_panel(rows,image_rows=6):
     current=[row['state'] for row in rows if not row['state'].startswith('Last:')]
     if any(state in ('ERROR','FAILED') for state in current):mood='Needs attention';color='#ff7777'
     elif any(state in ('WORKING','THINKING','READING','SEARCHING','EDITING','WRITING','RUNNING','BUILDING','TESTING') for state in current):mood='Working';color=GREEN
@@ -79,11 +81,9 @@ def nova_panel(rows):
     elif current and all(state in ('IDLE','DONE','COMPLETED') for state in current):mood='Idle';color=MUTED
     elif current:mood='Unknown';color=MUTED
     else:mood='No fresh events';color=MUTED
-    robot="     o\n   .=|=.\n  .----- .\n (| ^ ^ |)\n  | [_] |\n   /   \\"
-    table=Table.grid(expand=True,padding=(0,1));table.add_column(width=13);table.add_column(ratio=1)
-    caption=Text('\n\nNOVA / ',style='bold');caption.append(mood,style=color)
-    table.add_row(Text(robot,style=GREEN),caption)
-    return table
+    pose='error' if mood=='Needs attention' else 'attention' if mood=='Waiting' else 'work' if mood=='Working' else 'done'
+    caption=Text('NOVA / ',style='bold');caption.append(mood,style=color)
+    return Group(Align.center(nova_cells(pose,image_rows)),Align.center(caption))
 
 
 def history_panel(rows,enabled):

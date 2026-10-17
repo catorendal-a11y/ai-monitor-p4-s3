@@ -27,6 +27,14 @@ arrows and **PageUp/PageDown** scroll, **R** reloads metadata, **?** toggles hel
 **Esc** cancels/closes forms and **Q** exits. Shortcuts do not steal text typed in
 forms. Narrow windows stack panels vertically. Terminal fonts/window management
 belong to the terminal emulator; tray/minimize settings apply to the desktop app.
+Wide windows also adapt to height: the quota rows become denser and the NOVA
+panel shrinks to keep the observed-agent table visible at 120 × 30 characters.
+Additional provider rows remain scrollable. NOVA uses original artwork drawn
+with colored terminal cells, with poses selected only from observed agent states.
+
+The Windows launcher explicitly enables true color in its own environment. This
+prevents inherited `NO_COLOR=1` / `TERM=dumb` values from a coding runner turning
+the app monochrome; no global Windows or terminal profile settings are changed.
 
 The dashboard uses filled quota bars with amber/red low-remaining indicators,
 colored agent status dots and separate device/companion panels. Labels accompany

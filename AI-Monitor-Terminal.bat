@@ -1,5 +1,10 @@
 @echo off
 setlocal
+rem This window uses full color even when launched by a monochrome coding runner.
+set NO_COLOR=
+set TERM=xterm-256color
+set COLORTERM=truecolor
+set TEXTUAL_COLOR_SYSTEM=truecolor
 title AI Monitor Terminal
 cd /d "%~dp0"
 if not exist "%~dp0.venv\Scripts\python.exe" (

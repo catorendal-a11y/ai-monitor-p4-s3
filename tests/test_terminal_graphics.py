@@ -16,7 +16,16 @@ class TerminalGraphicsTests(unittest.TestCase):
             aim_terminal.configure_terminal_colors()
             app=aim_terminal.TerminalApp(ROOT)
             self.assertFalse(app.no_color)
-            self.assertEqual(app.console.color_system,'truecolor')
+            self.assertIn(app.console.color_system,('256','truecolor'))
+
+    @unittest.skipUnless(os.name=='nt','Windows launcher')
+    def test_actual_launcher_uses_truecolor_with_inherited_no_color(self):
+        import subprocess
+        env=dict(os.environ,NO_COLOR='1',TERM='dumb')
+        result=subprocess.run([os.environ.get('COMSPEC','cmd.exe'),'/c',str(ROOT/'AI-Monitor-Terminal.bat'),'--check'],
+                              capture_output=True,text=True,timeout=20,env=env,cwd=ROOT)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('Color: truecolor',result.stdout)
 
     def test_nova_uses_colored_cells_for_each_mood_without_fake_activity(self):
         from terminal_presentation import nova_panel

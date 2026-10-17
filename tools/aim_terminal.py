@@ -4,6 +4,8 @@ import asyncio
 from pathlib import Path
 import sys
 import json
+import os
+from rich.text import Text
 from textual.app import App,ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal,Vertical,VerticalScroll
@@ -32,20 +34,27 @@ def agents_text(rows):
     return '\n'.join(lines)
 
 
+def configure_terminal_colors():
+    """Do not inherit the coding runner's monochrome/noninteractive terminal mode."""
+    os.environ.pop('NO_COLOR',None)
+    if os.environ.get('TERM','') in ('','dumb'):os.environ['TERM']='xterm-256color'
+    os.environ['COLORTERM']='truecolor'
+
+
 class TerminalApp(App):
     TITLE='AI Monitor — Terminal'
     CSS='''
     Screen { background: #101519; color: #eff5f3; }
-    #brand { height: 3; padding: 1 2 0 2; color: #95ffc2; text-style: bold; }
+    #brand { height: 2; padding: 0 2; color: #95ffc2; text-style: bold; }
     #connection { height: 1; width: 1fr; color: #95ffc2; }
     #statusbar { height: 2; border-top: solid #87929a; padding: 0 2; }
     #shortcuts { height: 1; width: auto; color: #a5adb7; }
     TabbedContent { height: 1fr; }
-    Tabs { background: #101519; height: 3; border-bottom: solid #87929a; }
-    Tab { padding: 0 2; height: 2; color: #a5adb7; }
+    Tabs { background: #101519; height: 2; border-bottom: solid #526572; }
+    Tab { padding: 0 2; height: 1; color: #a5adb7; }
     Tab.-active { background: #95ffc2; color: #101519; text-style: bold; }
     Underline { display: none; }
-    TabPane { padding: 1 2; }
+    TabPane { padding: 0 2; }
     VerticalScroll { height: 1fr; }
     .panel { border: round #526572; background: #151e25; padding: 0 1; height: auto; margin-bottom: 1; }
     #quota-wrap { border-top: solid #95ffc2; }
@@ -89,7 +98,9 @@ class TerminalApp(App):
                 for caption,identifier in items[index:index+2]:yield Button(caption,id=identifier)
 
     def compose(self)->ComposeResult:
-        yield Static('AI MONITOR  |  NOVA / USB companion',id='brand',markup=False)
+        brand=Text(' ▀▄  AI MONITOR ',style='bold #95ffc2 on #18382d')
+        brand.append('   NOVA  /  USB companion',style='#a5adb7 on #101519')
+        yield Static(brand,id='brand',markup=False)
         with TabbedContent(id='pages'):
             with TabPane('1 Overview',id='overview'):
                 with VerticalScroll():
@@ -138,15 +149,20 @@ class TerminalApp(App):
 
     def apply_width(self,width):
         main=self.screen_stack[0]
+        top_height=max(10,min(18,self.size.height-15))
         main.query_one('#overview-top').styles.layout='vertical' if width<90 else 'horizontal'
-        main.query_one('#overview-top').styles.height=18 if width>=90 else 'auto'
+        main.query_one('#overview-top').styles.height=top_height if width>=90 else 'auto'
+        main.query_one('#overview-device').styles.height=6
+        main.query_one('#nova-panel').styles.height=top_height-7
         main.query_one('#overview-side').styles.width='1fr' if width>=90 else '100%'
         main.query_one('#overview-side').styles.height='1fr' if width>=90 else 'auto'
         main.query_one('#quota-wrap').styles.width='2fr' if width>=90 else '100%'
         main.query_one('#quota-wrap').styles.height='1fr' if width>=90 else 'auto'
         main.query_one('#quota-wrap').styles.margin=(0,1 if width>=90 else 0,0 if width>=90 else 1,0)
         main.query_one('#shortcuts').display=width>=100
-        if self.latest:main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120))
+        if self.latest:
+            main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120,dense=top_height<18))
+            main.query_one('#nova-panel',Static).update(nova_panel(self.latest['agents'],image_rows=max(2,top_height-10)))
 
     def check_action(self,action,parameters):
         # Global shortcuts must never steal digits, q, r or ? from form inputs.
@@ -196,7 +212,8 @@ class TerminalApp(App):
             self.screen_stack[0].query_one('Button#stop').disabled=not value.get('running',False)
         count=len(value['agents'])
         update('#connection',value['connection']+f"  |  {count} observed session"+('' if count==1 else 's')+'  |  History '+('enabled' if value['history_enabled'] else 'disabled'))
-        update('#quota',provider_table(value['providers'],compact=self.size.width<120))
+        top_height=max(10,min(18,self.size.height-15))
+        update('#quota',provider_table(value['providers'],compact=self.size.width<120,dense=top_height<18))
         agents=agents_text(value['agents'])
         update('#agents-content',agents)
         update('#agents-table',agent_table(value['agents']))
@@ -206,7 +223,7 @@ class TerminalApp(App):
         description='DEVICE\n\n'+f"{device.get('board','Unknown')}\n{device.get('port','Unknown')}\nFirmware {device.get('firmware','Unknown')}\n{stamp}"
         update('#device-content',description+'\n\nStatus comes from the existing host.\nNo second USB connection is opened.')
         update('#overview-device',device_panel(device,value['connection']))
-        update('#nova-panel',nova_panel(value['agents']))
+        update('#nova-panel',nova_panel(value['agents'],image_rows=max(2,top_height-10)))
         update('#history-content',history_panel(value['history'],value['history_enabled']))
         settings=['SAVED SETTINGS','']+[f'{key}: {safe_text(item,80)}' for key,item in value['settings'].items()]
         close_policy='Closing this terminal stops the owned host, following the saved preference.' if value['settings'].get('keep_host_on_close') is False else 'Closing this terminal leaves the host running. Use Stop host to stop it.'
@@ -339,13 +356,15 @@ def main(argv=None):
     parser.add_argument('--root',type=Path,help='Existing AI Monitor application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
     args=parser.parse_args(argv)
+    configure_terminal_colors()
     if args.check:
         async def check():
             value=dict(connection='Synthetic check',error='',providers=[],agents=[],history=[],device={},settings={},history_enabled=False)
             app=TerminalApp(Path('.'),reader=lambda _:value)
             async with app.run_test(size=(100,35)) as pilot:
                 await pilot.pause(.1);await pilot.press('2','3','4','5','1','q')
-        asyncio.run(check());print('Terminal UI check passed.');return 0
+            return app.console.color_system
+        colors=asyncio.run(check());print('Terminal UI check passed. Color: '+str(colors));return 0
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         print('Open AI Monitor Terminal in an interactive terminal (or use --check).');return 2
     TerminalApp(args.root.resolve() if args.root else default_root()).run();return 0
