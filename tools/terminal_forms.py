@@ -6,6 +6,7 @@ from textual.widgets import Button,Input,Select,Static,Switch
 from board_profiles import BOARDS
 from provider_catalog import PROVIDERS
 from host_status import FLAGS,OPTIONS
+from host_security import serial_port
 
 
 class ActionForm(ModalScreen):
@@ -20,8 +21,8 @@ class ActionForm(ModalScreen):
     '''
     BINDINGS=[('escape','cancel','Cancel')]
 
-    def __init__(self,title,fields=(),note='',confirm=None):
-        super().__init__();self.caption=title;self.fields=list(fields);self.note=note;self.confirm=confirm
+    def __init__(self,title,fields=(),note='',confirm=None,validator=None):
+        super().__init__();self.caption=title;self.fields=list(fields);self.note=note;self.confirm=confirm;self.validator=validator
         if confirm:self.fields.append(('confirm','Type '+confirm+' to confirm','text','',None))
 
     def compose(self)->ComposeResult:
@@ -34,7 +35,7 @@ class ActionForm(ModalScreen):
                     if kind=='bool':yield Switch(bool(value),id='field-'+key)
                     elif kind=='select':yield Select(choices,value=value if value is not None and value!='' else Select.NULL,id='field-'+key)
                     else:yield Input(str(value or ''),password=kind=='secret',id='field-'+key)
-                yield Static('',id='form-error',markup=False)
+            yield Static('',id='form-error',markup=False)
             with Horizontal():
                 yield Button('Cancel',id='cancel')
                 yield Button('Continue',id='submit',variant='success')
@@ -56,7 +57,13 @@ class ActionForm(ModalScreen):
             value=self.query_one('#field-'+key).value
             values[key]=None if value is Select.NULL else value
         if self.confirm and values.get('confirm')!=self.confirm:
-            self.query_one('#form-error',Static).update('Confirmation did not match. Nothing was changed.');return
+            self.query_one('#form-error',Static).update('Confirmation did not match. Nothing was changed.')
+            self.query_one('#field-confirm').focus();return
+        error=self.validator(values) if self.validator else None
+        if error:
+            key,message=error
+            self.query_one('#form-error',Static).update(message+' Nothing was saved.')
+            self.query_one('#field-'+key).focus();return
         self.scrub();self.dismiss(values)
 
 
@@ -71,7 +78,23 @@ def settings_form(settings):
     fields += [('option-'+key,key.replace('_',' ').title()+' (desktop preference)' if key in ('start_host_on_open','keep_host_on_close','minimize_to_tray','close_to_tray') else key.replace('_',' ').title(),
                 'bool',settings.get(key,default),None) for key,default in FLAGS.items() if key!='usb_permissions']
     return ActionForm('SETTINGS / BOARD / PROVIDERS',fields,
-        'Save applies the same validation and protected storage as the desktop app. Cancel preserves everything. Physical AI approval remains disabled.')
+        'Save applies the same validation and protected storage as the desktop app. Cancel preserves everything. Physical AI approval remains disabled.',
+        validator=validate_settings_fields)
+
+
+def validate_settings_fields(fields):
+    """Local draft checks only; the shared save action remains authoritative."""
+    if fields.get('board') not in BOARDS:return 'board','Choose a display board.'
+    try:serial_port(fields.get('port'))
+    except ValueError:return 'port','Use auto, a COM port or a /dev/ serial device.'
+    for key,label,low,high in [('interval','Quota refresh',15,240)]+[
+            ('option-'+key,key.replace('_',' ').title(),limits[0],limits[1]) for key,limits in OPTIONS.items()]:
+        try:value=int(fields[key])
+        except (ValueError,TypeError,KeyError):return key,f'{label} must be a whole number between {low} and {high}.'
+        if not low<=value<=high:return key,f'{label} must be between {low} and {high}.'
+    if not any(fields.get('provider-'+key) is True for key in PROVIDERS):
+        return 'provider-'+next(iter(PROVIDERS)),'Choose at least one AI provider.'
+    return None
 
 
 def settings_values(fields):

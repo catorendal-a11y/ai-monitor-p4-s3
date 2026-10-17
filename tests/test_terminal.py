@@ -131,7 +131,7 @@ async def mounted_widget(pilot,selector):
 
 class TerminalUITests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_settings_keep_draft_and_focus_field_until_corrected(self):
-        from terminal_forms import settings_form,ResultScreen
+        from terminal_forms import settings_form
         from textual.widgets import Input,Select,Switch
         app=TerminalApp(ROOT,reader=lambda _:fixture())
         submitted=[]

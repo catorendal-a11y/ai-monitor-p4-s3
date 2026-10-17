@@ -36,8 +36,12 @@ recorded observations, not live token streams. Unknown agent phases remain unkno
 
 Canceling a form runs no action. Saves reuse desktop validation and protected
 storage, preserving keys unless explicitly replaced/cleared. One action worker
-runs at a time; read results predating a mutation are discarded. Quit waits for
-an active operation. Saved auto-start and keep-host-on-close policies are honored.
+runs at a time. Invalid settings keep the draft open, focus the affected field
+and show a fixed error above the buttons; numeric limits, board, port and provider
+selection are checked before submission. Draft keys stay masked and are cleared
+when the form is submitted or canceled. Read results predating a mutation are discarded.
+Quit waits for an active operation. Saved auto-start and keep-host-on-close
+policies are honored.
 Navigating does not save settings. Export files are published exclusively: existing
 or concurrently created files are never overwritten.
 
