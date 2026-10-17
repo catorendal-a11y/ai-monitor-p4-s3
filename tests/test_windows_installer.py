@@ -106,7 +106,7 @@ class InstallerTests(unittest.TestCase):
         with self.assertRaises(ValueError): builder.verify_package(self.package)
 
     def test_private_config_rejected_even_if_its_hash_is_added(self):
-        path = self.package/'tools/aim_host.json'; path.parent.mkdir(); path.write_text('{}'); self.hashes()
+        path = self.package/'tools/aim_host.json'; path.parent.mkdir(exist_ok=True); path.write_text('{}'); self.hashes()
         with self.assertRaises(ValueError): builder.verify_package(self.package)
 
     def test_checksum_path_cannot_escape_package(self):

@@ -129,6 +129,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable event observer failed.' }
           $gui = Start-Process -FilePath (Join-Path $package.FullName 'AI-Monitor.exe') -ArgumentList '--gui-check' -WindowStyle Hidden -Wait -PassThru
           if ($gui.ExitCode -ne 0) { throw 'Portable GUI assets or runtime failed.' }
+          python (Join-Path $package.FullName 'tools/aim_terminal.py') --check
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged terminal UI or artwork failed.' }
           & (Join-Path $package.FullName 'firmware-flasher.exe') --chip esp32p4 image-info (Join-Path $package.FullName 'firmware/guition-p4/application.bin')
           if ($LASTEXITCODE -ne 0) { throw 'Portable flasher failed.' }
           & (Join-Path $package.FullName 'firmware-flasher.exe') --chip esp32s3 image-info (Join-Path $package.FullName 'firmware/waveshare-s3-43/application.bin')
