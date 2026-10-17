@@ -2,7 +2,7 @@
 
 ## Recommended: Windows installer
 
-Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). No Python, PlatformIO, Node.js or Git installation is needed for this package.
+Use Windows 10/11 x64, a **GUITION JC4880P433 ESP32-P4** or **original Waveshare ESP32-S3-Touch-LCD-4.3** display and a USB data cable. S3 support is experimental and unverified on physical hardware; use its **USB TO UART** connector. [Check your board](BOARDS.md). The graphical app needs no Python, PlatformIO, Node.js or Git installation. The optional [terminal dashboard](TERMINAL.md#install-on-windows) needs Python 3.12 and one setup command; its launcher is included in the same package.
 
 The release includes its runtime and prebuilt firmware. For Codex, Windows 11 is recommended; updated Windows 10 is best effort and needs version 1809 or later for console support. You do not need Codex CLI in advance: **AI setup > Install / sign in Codex** offers the standalone installer and browser sign-in. [Included components and PC requirements](PC_REQUIREMENTS.md) · [Codex without an existing CLI](CODEX_SETUP.md).
 
