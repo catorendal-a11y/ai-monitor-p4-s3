@@ -22,7 +22,7 @@ def export_source(root,package):
         relative=Path(name)
         if relative.is_absolute() or '..' in relative.parts or not relative.parts:
             raise ValueError('Unsafe tracked source path')
-        if any(part in {'.git','.pio','.venv','.codex','.zcode','node_modules','work','__pycache__','outputs'} for part in relative.parts):
+        if any(part in {'.git','.pio','.venv','.codex','.zcode','node_modules','work','runtime','__pycache__','outputs'} for part in relative.parts):
             raise ValueError('Private/generated tracked path')
         if relative.parts[:2] in (('tools','activity'),('tools','companions')):
             raise ValueError('Runtime data is not release source')

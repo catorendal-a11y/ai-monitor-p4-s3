@@ -4,6 +4,7 @@ NOVA remains source code. No project executable or graphical runtime is compiled
 """
 import hashlib
 import json
+import shutil
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -47,7 +48,15 @@ def bundle_runtime(package):
     subprocess.run([sys.executable,'-m','pip','install','--target',str(folder/'Lib/site-packages'),
         '--no-compile','--only-binary=:all:','--platform','win_amd64','--python-version','3.13',
         '--implementation','cp','--abi','cp313','--find-links',str(wheels),
+        '-c',str(ROOT/'scripts/requirements-runtime-win313.txt'),
         '-r',str(ROOT/'tools/requirements.txt')],check=True)
+    # Generated console shims point to the builder interpreter and are not used.
+    # NOVA invokes Python modules directly; retain only the upstream interpreter.
+    wrappers=folder/'Lib/site-packages/bin'
+    if wrappers.exists():
+        if wrappers.is_symlink() or not wrappers.resolve().is_relative_to(folder.resolve()):
+            raise ValueError('Unsafe generated-wrapper directory')
+        shutil.rmtree(wrappers)
     (folder/'python313._pth').write_text('python313.zip\n.\nLib/site-packages\n../tools\nimport site\n',encoding='ascii')
     files={path.relative_to(folder).as_posix():hashlib.sha256(path.read_bytes()).hexdigest()
            for path in sorted(folder.rglob('*')) if path.is_file()}
