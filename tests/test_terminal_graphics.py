@@ -21,7 +21,7 @@ class TerminalGraphicsTests(unittest.TestCase):
     @unittest.skipUnless(os.name=='nt','Windows launcher')
     def test_actual_launcher_uses_truecolor_with_inherited_no_color(self):
         import subprocess
-        env=dict(os.environ,NO_COLOR='1',TERM='dumb')
+        env=dict(os.environ,NO_COLOR='1',TERM='dumb',AI_MONITOR_PYTHON=sys.executable)
         result=subprocess.run([os.environ.get('COMSPEC','cmd.exe'),'/c',str(ROOT/'AI-Monitor-Terminal.bat'),'--check'],
                               capture_output=True,text=True,timeout=20,env=env,cwd=ROOT)
         self.assertEqual(result.returncode,0,result.stderr)
