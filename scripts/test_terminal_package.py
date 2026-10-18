@@ -1,4 +1,4 @@
-"""Exercise an extracted, EXE-free terminal package on a disposable Windows directory."""
+"""Exercise an extracted terminal package without any NOVA application EXE."""
 import argparse
 import os
 from pathlib import Path
@@ -8,6 +8,11 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 from terminal_runtime import verify_runtime
 
+def unexpected_executables(root):
+    root=Path(root).resolve()
+    allowed={root/'runtime/python.exe',root/'runtime/pythonw.exe'}
+    return [path for path in root.rglob('*.exe') if path.resolve() not in allowed]
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--package',type=Path,required=True)
@@ -15,8 +20,8 @@ def main():
     if os.name!='nt':parser.error('Windows installation check')
     if (root/'.venv').exists():parser.error('Use a clean extracted package')
     bundled=verify_runtime(root)
-    if any(path for path in root.rglob('*.exe') if not path.is_relative_to(root/'runtime')):
-        raise ValueError('Only vendor dependency executables may exist under runtime/')
+    unexpected=unexpected_executables(root)
+    if unexpected:raise ValueError('Unexpected executable in terminal package: '+unexpected[0].relative_to(root).as_posix())
     powershell=str(Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe')
     with tempfile.TemporaryDirectory(prefix='nova command smoke ') as directory:
         command=Path(directory)/'bin'

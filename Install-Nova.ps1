@@ -45,14 +45,16 @@ namespace AiMonitorTerminal {
 }
 
 if ($Uninstall) {
-    # Another installation or a custom command must retain its command and PATH entry.
+    # Remove each surviving file owned by this exact installation. A partial install
+    # must be repairable without touching another installation or a custom command.
     $taskOwned = @($taskCmd,$taskPs | Where-Object {
         (Test-Path -LiteralPath $_) -and
         (Get-Content -LiteralPath $_ -Raw).Contains($taskMarker)
     })
-    if ($taskOwned.Count -eq 2) {
+    if ($taskOwned.Count -gt 0) {
         foreach ($taskFile in $taskOwned) { Remove-Item -LiteralPath $taskFile }
-        Update-TerminalPath $true
+        $taskForeign = @($taskCmd,$taskPs | Where-Object { Test-Path -LiteralPath $_ })
+        if ($taskForeign.Count -eq 0) { Update-TerminalPath $true }
         Write-Output 'Removed this installation''s nova command.'
     }
     exit 0

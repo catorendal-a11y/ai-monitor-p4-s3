@@ -71,7 +71,9 @@ class BundledRuntimeTests(unittest.TestCase):
             def extract(archive,folder):
                 folder.mkdir();(folder/'python.exe').write_bytes(b'interpreter');(folder/'LICENSE.txt').write_bytes(b'original license')
                 wrappers=folder/'Lib/site-packages/bin';wrappers.mkdir(parents=True);(wrappers/'unused.exe').write_bytes(b'generated wrapper')
-            with patch.object(build,'ROOT',root),patch.object(build.sys,'platform','win32'),patch.object(build.urllib.request,'urlopen',return_value=io.BytesIO(b'archive')),patch.object(build,'extract_python',side_effect=extract),patch.object(build.subprocess,'run') as run:
+            licenses=root/'licenses';licenses.mkdir();(licenses/'pyserial-LICENSE.txt').write_bytes(b'pyserial license')
+            hashed=root/'scripts';hashed.mkdir();(hashed/'requirements-runtime-win313-hashed.txt').write_text('fixture==1 --hash=sha256:'+'0'*64)
+            with patch.object(build,'ROOT',root),patch.object(build,'HASHED_REQUIREMENTS',hashed/'requirements-runtime-win313-hashed.txt'),patch.object(build.sys,'platform','win32'),patch.object(build.urllib.request,'urlopen',return_value=io.BytesIO(b'archive')),patch.object(build,'extract_python',side_effect=extract),patch.object(build,'prepare_wheelhouse'),patch.object(build.subprocess,'run') as run:
                 build.bundle_runtime(package)
             manifest=json.loads((package/'runtime/manifest.json').read_text())
             self.assertEqual(manifest['python_archive_sha256'],build.PYTHON_SHA256)
@@ -114,6 +116,6 @@ class BundledRuntimeTests(unittest.TestCase):
             for name in ('python.exe','pythonw.exe'):(runtime/name).write_bytes(b'fixture')
             self.assertEqual(unexpected_executables(root),[])
             extra=runtime/'dependency.exe';extra.write_bytes(b'fixture')
-            self.assertEqual(unexpected_executables(root),[extra])
+            self.assertEqual(unexpected_executables(root),[extra.resolve()])
 
 if __name__=='__main__':unittest.main()

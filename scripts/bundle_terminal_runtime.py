@@ -4,6 +4,7 @@ NOVA remains source code. No project executable or graphical runtime is compiled
 """
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path, PurePosixPath
 import subprocess
@@ -15,6 +16,9 @@ ROOT=Path(__file__).resolve().parents[1]
 PYTHON_VERSION='3.13.16'
 PYTHON_URL='https://www.python.org/ftp/python/3.13.16/python-3.13.16-embed-amd64.zip'
 PYTHON_SHA256='97dae5274cc54867065e8d5a3226e48c35017ed332a0fdb0e27d5b5821961297'
+ESPTOOL_SOURCE_SHA256='fd756598db0a26c9975fa18511b08687c54bf2ce7322ede80cf1f5117dad1f50'
+ESPTOOL_WHEEL_SHA256='a432dc49de9a5bc38306344bb365ae58d59618e6d4e08b2c837e05d341faad09'
+HASHED_REQUIREMENTS=ROOT/'scripts/requirements-runtime-win313-hashed.txt'
 
 
 def extract_python(archive,target,digest=PYTHON_SHA256):
@@ -29,6 +33,30 @@ def extract_python(archive,target,digest=PYTHON_SHA256):
         bundle.extractall(target)
 
 
+def _sha256(path):
+    with Path(path).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+
+
+def prepare_wheelhouse(scratch,wheels):
+    """Build one reproducible pure-Python wheel, then hash-check every Windows wheel."""
+    wheels.mkdir(parents=True,exist_ok=True)
+    sources=scratch/'sources';sources.mkdir(exist_ok=True)
+    source=sources/'esptool-5.4.0.tar.gz'
+    if not source.exists():
+        subprocess.run([sys.executable,'-m','pip','download','--no-cache-dir','--no-deps',
+            '--no-binary=:all:','--dest',str(sources),'esptool==5.4.0'],check=True)
+    if _sha256(source)!=ESPTOOL_SOURCE_SHA256:raise ValueError('esptool source archive checksum mismatch')
+    wheel=wheels/'esptool-5.4.0-py3-none-any.whl'
+    if not wheel.exists():
+        environment=dict(os.environ,SOURCE_DATE_EPOCH='1767225600')
+        subprocess.run([sys.executable,'-m','pip','wheel','--no-cache-dir','--no-deps',
+            '--wheel-dir',str(wheels),str(source)],check=True,env=environment)
+    if _sha256(wheel)!=ESPTOOL_WHEEL_SHA256:raise ValueError('esptool wheel checksum mismatch')
+    subprocess.run([sys.executable,'-m','pip','download','--dest',str(wheels),
+        '--require-hashes','--only-binary=:all:','--platform','win_amd64','--python-version','3.13',
+        '--implementation','cp','--abi','cp313','--find-links',str(wheels),'-r',str(HASHED_REQUIREMENTS)],check=True)
+
+
 def bundle_runtime(package):
     if sys.platform!='win32':raise RuntimeError('Build the Windows runtime on Windows')
     folder=Path(package)/'runtime'
@@ -41,15 +69,12 @@ def bundle_runtime(package):
         if len(data)>20_000_000:raise ValueError('Oversized Python archive')
         archive.write_bytes(data)
     extract_python(archive,folder)
-    wheels=scratch/'wheels';wheels.mkdir(exist_ok=True)
-    # esptool is published as source. Build its pure-Python wheel on the builder,
-    # then resolve Windows CPython 3.13 binary wheels for all runtime dependencies.
-    subprocess.run([sys.executable,'-m','pip','wheel','--no-deps','--wheel-dir',str(wheels),'esptool==5.4.0'],check=True)
+    wheels=scratch/'wheelhouse-cp313-v1'
+    prepare_wheelhouse(scratch,wheels)
     subprocess.run([sys.executable,'-m','pip','install','--target',str(folder/'Lib/site-packages'),
-        '--no-compile','--only-binary=:all:','--platform','win_amd64','--python-version','3.13',
-        '--implementation','cp','--abi','cp313','--find-links',str(wheels),
-        '-c',str(ROOT/'scripts/requirements-runtime-win313.txt'),
-        '-r',str(ROOT/'tools/requirements.txt')],check=True)
+        '--no-compile','--require-hashes','--no-index','--only-binary=:all:','--platform','win_amd64',
+        '--python-version','3.13','--implementation','cp','--abi','cp313','--find-links',str(wheels),
+        '-r',str(HASHED_REQUIREMENTS)],check=True)
     # Generated console shims point to the builder interpreter and are not used.
     # NOVA invokes Python modules directly; retain only the upstream interpreter.
     wrappers=folder/'Lib/site-packages/bin'
@@ -57,6 +82,8 @@ def bundle_runtime(package):
         if wrappers.is_symlink() or not wrappers.resolve().is_relative_to(folder.resolve()):
             raise ValueError('Unsafe generated-wrapper directory')
         shutil.rmtree(wrappers)
+    licenses=folder/'licenses';licenses.mkdir()
+    shutil.copyfile(ROOT/'licenses/pyserial-LICENSE.txt',licenses/'pyserial-LICENSE.txt')
     (folder/'python313._pth').write_text('python313.zip\n.\nLib/site-packages\n../tools\nimport site\n',encoding='ascii')
     files={path.relative_to(folder).as_posix():hashlib.sha256(path.read_bytes()).hexdigest()
            for path in sorted(folder.rglob('*')) if path.is_file()}
