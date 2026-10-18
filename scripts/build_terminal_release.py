@@ -47,7 +47,8 @@ def main():
     version=fw_version(ROOT)
     if version!=HOST_VERSION:parser.error('Host and firmware versions must match')
     output=args.output.resolve();output.mkdir(parents=True,exist_ok=True)
-    package=output/('nova-'+version+'-terminal')
+    suffix='windows-x64-terminal' if args.windows_runtime else 'terminal-source'
+    package=output/('nova-'+version+'-'+suffix)
     if package.exists() or (output/(package.name+'.zip')).exists():parser.error('Use a new output directory')
     package.mkdir()
     try:build_package(output,package,version,args)

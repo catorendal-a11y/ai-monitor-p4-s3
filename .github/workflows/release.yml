@@ -98,11 +98,16 @@ jobs:
       - run: python -m pip install -r tools/requirements.txt -r scripts/requirements-test.txt
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: python scripts/build_terminal_release.py --firmware-dir work/prebuilt --windows-runtime
-      - name: Test clean source terminal installation without Qt or packaged executables
+      - name: Test exact Windows archive without a NOVA application EXE
         shell: pwsh
         run: |
-          $package = Get-ChildItem work/terminal-release -Directory | Select-Object -First 1
-          python scripts/test_terminal_package.py --package $package.FullName
+          $archive = @(Get-ChildItem work/terminal-release -Filter '*.zip')
+          if ($archive.Count -ne 1) { throw 'Expected exactly one terminal archive.' }
+          $extracted = Join-Path $env:RUNNER_TEMP 'nova-release-smoke'
+          Expand-Archive -LiteralPath $archive[0].FullName -DestinationPath $extracted
+          $package = @(Get-ChildItem $extracted -Directory)
+          if ($package.Count -ne 1) { throw 'Terminal archive must contain one package root.' }
+          python scripts/test_terminal_package.py --package $package[0].FullName
           if ($LASTEXITCODE -ne 0) { throw 'Terminal installation test failed.' }
       - name: Collect terminal release metadata
         shell: pwsh
@@ -110,13 +115,16 @@ jobs:
           $archive = Get-ChildItem work/terminal-release -Filter '*.zip' | Select-Object -First 1
           $sum = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLower() + '  ' + $archive.Name
           [IO.File]::WriteAllText((Join-Path $archive.DirectoryName 'SHA256SUMS.txt'), $sum + [Environment]::NewLine)
+          $allNotes = [IO.File]::ReadAllText('docs/RELEASE_NOTES.md')
+          $current = [regex]::Match($allNotes, '\A[\s\S]*?(?=\r?\n# AI Monitor v|\z)').Value.Trim() + [Environment]::NewLine
+          [IO.File]::WriteAllText((Join-Path $archive.DirectoryName 'RELEASE_NOTES-current.md'), $current)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-package
           path: |
             work/terminal-release/*.zip
             work/terminal-release/SHA256SUMS.txt
-            docs/RELEASE_NOTES.md
+            work/terminal-release/RELEASE_NOTES-current.md
           if-no-files-found: error
           retention-days: 7
 
@@ -159,5 +167,5 @@ jobs:
           if ($LASTEXITCODE -eq 0) { exit 0 }
           $archive = Get-ChildItem work/publish/work/terminal-release -Filter '*.zip' | Select-Object -First 1
           $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
-          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "NOVA $env:GITHUB_REF_NAME" --notes-file work/publish/docs/RELEASE_NOTES.md
+          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "NOVA $env:GITHUB_REF_NAME" --notes-file work/publish/work/terminal-release/RELEASE_NOTES-current.md
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
