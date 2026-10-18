@@ -85,7 +85,7 @@
 - `tools/aim_terminal.py`, `terminal_forms.py`, `terminal_data.py`, `terminal_actions.py`: terminal UI using shared desktop operations. Preserve one action worker, epoch-bound reads, masked draft secrets, cancel-without-effects, typed firmware/history confirmations and existing serial ownership. Never infer agents from providers or enable production approvals.
 - `tools/terminal_presentation.py`: reference dashboard tables and NOVA presentation. Keep recorded quota age, unknown values and stale-event states truthful. Extra provider rows must remain scrollable; device-sync age is separate from last-observed hardware age.
 - Tests use synthetic configuration without provider requests or hardware writes.
-- `scripts/build_terminal_release.py`: reviewed source/notice and firmware ZIP; never bundle application EXEs, Qt or private runtime data.
+- `scripts/build_terminal_release.py`: reviewed source/notice and firmware ZIP; never bundle NOVA application EXEs, Qt or private runtime data. The normal Windows ZIP may vendor the hash-pinned official Python runtime and pinned dependencies under `runtime/`.
 - `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.
 - `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.

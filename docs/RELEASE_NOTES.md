@@ -1,3 +1,26 @@
+# AI Monitor v1.19.1-rc17
+
+## One ZIP, one-click terminal installation
+
+- Download/extract the Windows x64 terminal ZIP and double-click Install-Nova.cmd.
+  Then open a new terminal and type nova. No separate Python, pip, Node.js, npm or
+  manual dependency downloads are needed. Installation works offline after download.
+- The release asset is `nova-v1.19.1-rc17-windows-x64-terminal.zip`; GitHub's automatic
+  source archives remain source-only and use the developer setup path.
+- Bundle the hash-verified official CPython 3.13.16 embeddable runtime and hash-locked
+  Windows dependency wheels with retained original licenses, including pyserial's
+  byte-identical upstream license. NOVA remains Python source, without
+  a NOVA EXE or graphical Qt frontend. Remove unused generated console shims.
+- Verify the runtime manifest before execution and fail clearly on changed/missing
+  files. Keep other Python installations, unrelated commands, user settings and history.
+- Test the actual CMD installer and bare nova with Python removed from PATH and package
+  downloads blocked. Preserve source-only setup for developers.
+- Retain the existing USB-owner, firmware-confirmation and observed-agent safety gates.
+  No hardware flash is needed for this PC packaging change. P4 rc14 firmware remains
+  compatible; both rc17 firmware targets are included for future confirmed updates.
+- This remains a prerelease. Physical approvals stay disabled; S3 physical validation,
+  physical unplug/suspend and a new endurance pass are separate gates.
+
 # AI Monitor v1.19.1-rc16
 
 NOVA is now a terminal application distributed as Python source plus verified board firmware.

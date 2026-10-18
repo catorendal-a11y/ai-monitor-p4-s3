@@ -1,6 +1,9 @@
 # Current distribution
 
-rc16 replaces the graphical app and EXE distribution with NOVA Python terminal source.
+rc17 ships `nova-v1.19.1-rc17-windows-x64-terminal.zip`: NOVA terminal source with a
+verified private Python runtime and hash-locked dependencies for offline Windows setup.
+It replaces the graphical app and NOVA EXE distribution; double-click `Install-Nova.cmd`, then
+open a new terminal and type `nova`.
 See TERMINAL.md and RELEASE_NOTES.md. Physical approval stays disabled.
 
 ## Historical development evidence

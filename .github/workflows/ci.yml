@@ -92,4 +92,4 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pip-audit==2.10.1
-      - run: python -m pip_audit -r tools/requirements.txt -r scripts/requirements-release.txt -r scripts/requirements-test.txt
+      - run: python -m pip_audit -r tools/requirements.txt -r scripts/requirements-release.txt -r scripts/requirements-test.txt -r scripts/requirements-runtime-win313.txt

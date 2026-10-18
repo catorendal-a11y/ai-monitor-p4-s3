@@ -19,12 +19,14 @@ These are Espressif display/touch components. Original ownership and Apache-2.0 
 - [ArduinoJson](https://github.com/bblanchon/ArduinoJson), 7.4.3: MIT, copyright Benoit Blanchon and contributors; retain upstream notices.
 - [pyserial](https://github.com/pyserial/pyserial), 3.5: BSD-style license supplied by upstream.
 - [psutil](https://github.com/giampaolo/psutil), 7.0.0: BSD-3-Clause; used to identify only this checkout's host processes.
-- Portable releases bundle Python under its supplied PSF license and runtime dependency notices. PyInstaller 6.16.0 supplies its bootloader under GPL with its distribution exception; retain the supplied texts.
-- The separately invoked `firmware-flasher.exe` is built from [esptool](https://github.com/espressif/esptool), 5.4.0, under GPL-2.0-or-later. Its upstream source archive and license are included with portable releases. Project-owned source remains MIT; the root MIT text does not relicense this executable or its dependencies.
+- Current Windows terminal releases bundle the official Python runtime under its supplied PSF license and retain dependency notices. Historical graphical releases used a PyInstaller bootloader and a separate esptool-based flasher; their supplied license texts continue to govern those archived packages.
+- [esptool](https://github.com/espressif/esptool), 5.4.0, remains GPL-2.0-or-later. Current terminal releases distribute its Python source files and upstream license metadata inside the private runtime. Project-owned source remains MIT; the root MIT text does not relicense esptool or its dependencies.
 - [pioarduino](https://github.com/pioarduino/platform-espressif32), Arduino-ESP32 and ESP-IDF: obtained through PlatformIO. Component-specific licenses/notices continue to apply; consult the installed distributions before redistributing toolchains or combined artifacts.
 
-Dependencies are downloaded by build/setup, not vendored into this public source package.
-The portable Windows ZIP includes dependency license files/metadata under `licenses/` and esptool corresponding source under `third-party-source/`. Its reviewed build scripts and project source are included. Preserve these files when redistributing the complete portable package.
+Dependencies are downloaded only by source/developer setup or the release builder. The normal
+Windows x64 terminal ZIP vendors the hash-locked runtime wheels for offline installation.
+It includes dependency license files/metadata under `runtime/`, including the byte-identical
+pyserial license under `runtime/licenses/`. Preserve these files when redistributing the package.
 
 ## Protocol reference
 
@@ -49,10 +51,21 @@ The desktop app uses PySide6-Essentials and Shiboken 6.10.2, with Qt 6.10.2 Core
 
 The corresponding Qt/PySide source archives are pinned to the upstream 6.10.2 commits and hash-checked during packaging. See scripts/collect_qt_sources.py. Upstream build instructions: https://doc.qt.io/qt-6/build-sources.html and https://doc.qt.io/qtforpython-6/building_from_source/index.html.
 
-## Current terminal distribution
+## Historical source-only terminal distribution (rc15-rc16)
 
-rc15 distributes Python project source and firmware, without the former bundled Windows
+rc15 and rc16 distributed Python project source and firmware, without the former bundled Windows
 runtimes. Python dependencies, including esptool, are installed separately from their pinned
 upstream distributions with their own notices. Qt is used only by the optional developer
 artwork generator; it is not a NOVA runtime dependency. Historical notices above describe
 older packages and do not imply those binaries are included in the terminal ZIP.
+
+## One-click Windows terminal runtime (rc17 onward)
+
+The Windows x64 terminal ZIP includes the official CPython 3.13.16 embeddable distribution
+(PSF license, original `runtime/LICENSE.txt`) and upstream Python packages installed from
+hash-locked wheels. Available dist-info license/notice files are retained, and the missing
+pyserial wheel license is supplied byte-for-byte as `runtime/licenses/pyserial-LICENSE.txt`.
+It compiles no NOVA executable or Qt app. The official Python archive SHA-256 and every
+runtime wheel hash are pinned by the release scripts; generated runtime files are then hashed
+individually in `runtime/manifest.json`. esptool is distributed as Python source under its
+original GPL terms, independently from the project MIT code. Original license texts remain unchanged.

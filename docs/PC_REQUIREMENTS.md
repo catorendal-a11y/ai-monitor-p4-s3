@@ -1,9 +1,11 @@
 # PC requirements
 
-Windows 10/11 with Windows PowerShell and Python 3.10+ (3.12 recommended).
-Windows Terminal supports the full-color dashboard. Initial setup needs internet to install
-pinned Python packages. Keep the extracted directory writable and permanent.
-No application EXE, Qt, Node.js, npm, administrator rights or PlatformIO is required for ordinary
-use. USB display monitoring requires a data cable and the correct serial driver.
+Windows 10/11 x64 and built-in Windows PowerShell. Windows Terminal is recommended.
+Download `nova-v1.19.1-rc17-windows-x64-terminal.zip`, extract it to a permanent writable folder and double-click
+Install-Nova.cmd. Python and pinned libraries are included; installation works offline
+after the ZIP download. No separate Python, pip, Node.js, Qt or administrator access is
+required. Provider quotas and optional official AI-client setup still need internet.
+USB monitoring requires a data cable, the correct serial driver and a supported board.
 
-See [installation](TERMINAL.md). Linux/macOS source use is described there separately.
+Git checkouts and GitHub's automatic source archives require Python 3.10+ and dependency downloads.
+See [installation](TERMINAL.md). Linux/macOS source use is described separately.

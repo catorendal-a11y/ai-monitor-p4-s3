@@ -24,7 +24,9 @@ fallback. USB attachment and a local pipe do not authenticate a device approval.
 - `tools/permission_service.py` implements the optional local IPC service and rechecks authority
   immediately before returning a decision. Its endpoint contains only PID and instance ID. Endpoint
   removal is scoped to its owner; prompt arguments are not written to disk or logs.
-- The Windows package builder creates a separate AI-Monitor-Permission.exe and smoke-checks it.
+- The retired graphical prototype built a separate `AI-Monitor-Permission.exe`. The rc17
+  terminal package does not build or distribute that helper, and production permission
+  approval remains disabled.
 - `tools/permission_runtime.py` now manages explicit attachment to the existing Panel owner,
   authenticated client/service shutdown and host-instance replay protection across reconnections.
   User opt-in and a separate locally constructed validation gate are both required. Disabled
@@ -68,17 +70,15 @@ below; compile/native tests do not establish physical approval safety.
 
 ## Explicit setup and removal
 
-The Windows app has a separate, default-off USB permission preference in Host settings. It is
-available only with P4 and explicitly selected Claude Code. Save that preference before using
-**Link Claude permission helper**. The confirmation explains the preview gate and normal-dialog
-fallback. Setup uses Claude's documented executable form (`args: []`), not a shell command.
-It backs up settings before an atomic update and preserves other hooks and permission rules.
-**Remove permission helper** removes only the matching helper for this installation.
+Production NOVA deliberately exposes no USB-permission preference or permission-hook action.
+**Settings > Edit settings** omits the internal `usb_permissions` flag, and normal P4/S3 firmware
+keeps the approval runtime disabled. There is therefore no supported permission helper to install
+or remove in rc17.
 
-On the display, open **MENU > SETTINGS > CONNECT PC**, then tap **CONNECT PC** on that page
-to open the physical comparison screen. Use **Connect this PC to the display** in the Windows app,
-compare every code group, hold **HOLD TO CONFIRM** on the display and choose **Codes match** on PC.
-This enrolls a key only; it does not enable permissions.
+The separate enrollment-only path is available under **Device > Connect PC**. Open
+**MENU > SETTINGS > CONNECT PC** on the physical display, tap **CONNECT PC** there, then run the
+terminal action and compare every code group. This can enroll a PC key on supported developer
+firmware; it does not enable permissions or authorize a tool decision.
 
 The same display page has a separate permission toggle in the developer firmware. Consent resets
 on every reboot. Normal firmware shows a disabled preview control until physical release validation.
@@ -87,7 +87,7 @@ when a dialog appears. PC preferences cannot enable the local production validat
 
 The IPC service is deliberately not started by normal host startup. Synthetic locally constructed
 trust contexts establish state-machine behavior only; they do not establish actual USB trust.
-Observational AI-Monitor-Events hooks remain unchanged and have no approval capability.
+Observational provider-event hooks remain separate and have no approval capability.
 
 ## Remaining production gates
 

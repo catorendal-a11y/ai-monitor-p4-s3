@@ -2,24 +2,25 @@
 
 A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
 
-New candidate package: **[v1.19.1-rc16](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16)**,
+New candidate package: **[v1.19.1-rc17](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc17)**,
 with a full-color terminal dashboard, direct device navigation, observed agent sessions,
 local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
 physical permission control remains disabled pending hardware/provider validation.
 
-![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and a portable Windows app](docs/media/github-preview.png)
+![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the NOVA terminal](docs/media/github-preview.png)
 
-The [NOVA terminal application](docs/TERMINAL.md) is now the PC app. Install Python
-3.10+ (3.12 recommended), extract the terminal ZIP into a permanent writable folder,
-and run **Install-Nova.ps1** once. Open a new terminal and type:
+The [NOVA terminal application](docs/TERMINAL.md) is now the PC app. Download one
+Windows x64 terminal ZIP, extract it into a permanent writable folder, and double-click
+**Install-Nova.cmd** once. Open a new terminal and type:
 
 ```powershell
 nova
 ```
 
-The terminal package contains source and both boards' firmware, without application
-EXEs or Qt. Python is required; Node.js and npm are not.
+Python and the required libraries are included, so installation needs no additional
+downloads or separate Python, pip, Node.js or npm setup. NOVA remains source code;
+there is no separate NOVA EXE or Qt application.
 NOVA provides setup, host controls, integrations, history, firmware and companion
 operations through the shared backend. **1–5** changes page, **Tab/Enter** uses
 controls, **?** opens help and **Q** quits. Use a 120 × 30 character window or larger.
@@ -28,7 +29,7 @@ Use `nova --version` or `nova --help` for command information.
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
 
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc17"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/ai-monitor-p4-s3/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
@@ -59,7 +60,7 @@ Use `nova --version` or `nova --help` for command information.
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16"><img alt="NOVA terminal source" src="https://img.shields.io/badge/NOVA-Python%20terminal-54c4f2?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc17"><img alt="NOVA terminal source" src="https://img.shields.io/badge/NOVA-Python%20terminal-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
   <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
@@ -74,7 +75,7 @@ Use `nova --version` or `nova --help` for command information.
 
 [![Support AI Monitor — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
 
-**[Download NOVA terminal](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
+**[Download NOVA terminal](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc17)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
@@ -84,7 +85,7 @@ Use `nova --version` or `nova --help` for command information.
 
 [![Watch AI Monitor: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
 
-**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual UI, and learn how USB, provider setup, quota windows, themes and the Windows app fit together. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the NOVA terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
 
 ## Meet your desk companion
 
@@ -109,9 +110,9 @@ The S3 target is the original CH422G model, **not B or C**. [Board compatibility
 
 - Your selected board from the table above.
 - A **USB data cable** connected to the board's USB data port.
-- A **Windows 10/11 PC with Python 3.10+**, plus your own AI account or local CLI installation.
+- A **Windows 10/11 x64 PC**, plus your own AI account or local CLI installation.
 
-The terminal ZIP includes PC source, pinned Python requirements and both boards' prebuilt firmware. Install-Nova.ps1 creates an isolated environment and registers `nova`. No PlatformIO or Arduino IDE is needed for ordinary use. Linux/macOS users can run the terminal from source.
+The terminal ZIP includes PC source, a verified private Python runtime with hash-locked libraries, and both boards' prebuilt firmware. Install-Nova.cmd registers `nova` without extra downloads. No PlatformIO or Arduino IDE is needed for ordinary use. Linux/macOS users can run the terminal from source.
 
 ## PC companion: NOVA terminal
 
@@ -124,7 +125,7 @@ firmware updates, companion packs and screen capture through the existing USB ho
 
 ### Earlier graphical PC companion
 
-Open **AI-Monitor.exe** for a native window with NOVA artwork, a NOVA program icon, board/provider controls and a terminal-style activity log. Each AI has visible setup instructions, including ZCode's optional Coding Plan key and the requirements for activity-only bridges. Save settings, start/stop the hidden host, or open the Firmware tab to install the verified board-specific image. Progress and errors stay visible. The window reads local status; it does not generate AI prompts.
+The retired **AI-Monitor.exe** provided a native window with NOVA artwork, a NOVA program icon, board/provider controls and a terminal-style activity log. Each AI had visible setup instructions, including ZCode's optional Coding Plan key and the requirements for activity-only bridges. Users could save settings, start or stop the hidden host, or open the Firmware tab to install the verified board-specific image. The window read local status; it did not generate AI prompts.
 
 ![AI Monitor desktop app with NOVA, setup controls and terminal-style logs](docs/media/desktop-app.png)
 
@@ -150,15 +151,15 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 ## Get running on Windows
 
-1. **Download and prepare.** Install Python 3.10+ (3.12 recommended). Download the terminal ZIP from [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc16) and extract it into a permanent writable folder.
-2. **Install the command once.** Open PowerShell in that folder and run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1`. Open a new terminal and type `nova`. No administrator rights or application EXE is needed.
+1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc17) and extract it into a permanent writable folder.
+2. **Install the command once.** Double-click **Install-Nova.cmd**. It checks the bundled runtime and registers `nova` for your user. Open a new terminal and type `nova`. No separate Python, package downloads or administrator rights are needed.
 3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. **Agents** offers provider setup and explicit observational links.
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing AI Monitor boards can use the application update to preserve settings. Nothing is flashed automatically.
 5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it.
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Terminal ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc16/nova-v1.19.1-rc16-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc16/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
+**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc17/nova-v1.19.1-rc17-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc17/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
 
 The graphical Windows app and EXE distribution are retired. Existing rc14 display firmware works with the terminal-only PC change; updating the display is optional. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
 
@@ -166,7 +167,7 @@ GitHub's automatic **Source code (zip)** contains source only, without prebuilt 
 
 ## PC requirements
 
-Use Windows 10/11, Python 3.10+ (3.12 recommended), internet for initial pinned dependency installation, a USB data cable and your supported display. Windows Terminal is recommended. No Qt, Node.js, npm, Git, PlatformIO or Arduino IDE is required for ordinary use. [PC requirements](docs/PC_REQUIREMENTS.md) · [Codex setup](docs/CODEX_SETUP.md).
+Use Windows 10/11 x64, a USB data cable and your supported display. Windows Terminal is recommended. The ZIP includes Python and its dependencies; installation works offline after downloading it. Provider quotas and optional AI-client setup still need internet. No Qt, Node.js, npm, Git, PlatformIO or Arduino IDE is required for ordinary use. [PC requirements](docs/PC_REQUIREMENTS.md) · [Codex setup](docs/CODEX_SETUP.md).
 
 ## Provider setup
 

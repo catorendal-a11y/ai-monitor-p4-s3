@@ -3,7 +3,7 @@
 For the connection checklist, a live observation test, optional local history and Claude's separate
 session-event integration, see [Usage insights](USAGE_INSIGHTS.md).
 
-First-time setup has **no preselected AI**. Check one or more providers explicitly in the desktop app, or use the numbered console choices. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
+First-time setup has **no preselected AI**. Open **Settings > Edit settings** in NOVA and select one or more providers explicitly. Unselected providers are not polled or scanned. A missing API key never silently changes your selection. Existing pre-selection configurations retain the old Codex/ZCode combination when loaded; newly created configurations contain `"providers": []` until setup is completed.
 
 ## What each choice supports
 
@@ -18,19 +18,19 @@ First-time setup has **no preselected AI**. Check one or more providers explicit
 | Antigravity | Numeric telemetry bridge | No automatic quota adapter | Supply numeric telemetry. The CLI's interactive quota panel is not treated as a stable machine API. |
 | OpenCode | Numeric SQLite message/session projections | No automatic quota adapter | Select OpenCode and use its client. No monitor key or script is needed for supported local schemas. |
 
-**Check AI setup** checks selected local sources and prints next steps in the Activity panel without model requests or USB writes. The graphical app exposes these limitations in each provider's tooltip; the console menu also lists them. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. The panel shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
+**Agents > Check AI setup** checks selected local sources and prints next steps without model requests or USB writes. The Agents page also exposes provider instructions and optional links. Selecting an integration is not proof that its source is readable. Status lists the sources actually readable on this machine. NOVA shows **LOCAL / Activity only** when no real quota percentage is available. It never substitutes context occupancy, request counts, billing estimates or made-up percentages for a plan quota.
 
 ## ZCode
 
-Optional live agent phases are available through **Link ZCode session events** in
-AI setup. This uses the [documented process hook interface](https://zcode.z.ai/en/docs/hooks)
+Optional live agent phases are available through **Agents > Provider events**. Choose ZCode,
+leave Remove off and type `LINK`. This uses the [documented process hook interface](https://zcode.z.ai/en/docs/hooks)
 and stores fixed state/timing metadata with hashed identities. Confirm Hooks is enabled
 in ZCode settings and start a new session. Existing global disablement and unrelated
 hooks are preserved. This observer never supplies model context or tool decisions;
 per-subagent lifecycle is not supported by this adapter. The PC's Agent USB line confirms
 transport delivery separately from receipt of a genuine client event.
 
-Use ZCode normally on this PC for local token activity. For quota percentages, obtain your own **GLM Coding Plan API key** from the appropriate plan page in your Z.AI account; [official key instructions](https://docs.z.ai/devpack/quick-start). Select ZCode in Setup, paste the key into the masked field and save. The monitor does not recover ZCode's encrypted login or ask for your Z.AI password. Leave the key blank if you only want local activity; an existing saved key is preserved unless explicitly replaced or cleared.
+Use ZCode normally on this PC for local token activity. For quota percentages, obtain your own **GLM Coding Plan API key** from the appropriate plan page in your Z.AI account; [official key instructions](https://docs.z.ai/devpack/quick-start). Select ZCode in **Settings > Edit settings**, paste the key into the masked field and save. The monitor does not recover ZCode's encrypted login or ask for your Z.AI password. Leave the key blank if you only want local activity; an existing saved key is preserved unless explicitly replaced or cleared.
 
 The quota adapter separates model quotas (**5 HOURS / 7 DAYS**) from the monthly MCP tool allowance (**MONTHLY MCP**) when reported. In the provider response, `CREDIT_LIMIT` / `TOKENS_LIMIT` model windows use hours (`unit=3`, normally `number=5`) or weeks (`unit=6`, normally `number=1`); `TIME_LIMIT` is the monthly MCP allowance. A monthly subscription payment is not a monthly token budget. **SET > AI USAGE** explains the windows and key setup, shows each remaining percentage/data status, and saves the selected window. Missing windows remain unavailable even if selected. Keep local configuration private.
 
@@ -40,9 +40,9 @@ Primary references: [ZCode quota and tool usage](https://zcode.z.ai/en/docs/usag
 
 Local activity uses assistant `message.usage` numeric fields from recent default CLI transcripts under `~/.claude/projects/`. Records with the same `message.id` are not counted twice; increases in a streamed record may still be registered later. Inputs, outputs and reported cache tokens are observed counts, not an invoice. CLI versions may omit or incompletely report output usage. Desktop/web sessions have separate storage and are not automatically covered.
 
-For quota display, select Claude Code in AI setup, save, then click **Link Claude quota** below its instructions. The console **Provider setup** also offers this optional integration. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
+For quota display, select Claude Code in **Settings > Edit settings**, save, then open **Agents > Claude quota link**. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
 
-If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `AI-Monitor-Console.exe --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. **Remove Claude quota link** removes only the command owned by this installation and preserves other settings. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it.
+If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `nova --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an owned link, open **Agents > Claude quota link**, enable Remove and type `LINK`; other settings are preserved. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it. Source-only checkouts can use `python tools/aim_terminal.py --claude-statusline`.
 
 Primary references: [Claude statusline fields](https://code.claude.com/docs/en/statusline), [CLI session storage](https://code.claude.com/docs/en/sessions), [usage monitoring](https://code.claude.com/docs/en/monitoring-usage). The numeric transcript adapter uses a version-sensitive local format; unsupported records remain unavailable.
 
@@ -62,10 +62,10 @@ Primary references: [official database location](https://docs.opencode.ai/docs/c
 
 ## External numeric bridge
 
-Cursor, Copilot and Antigravity need an external integration that reports usage. OpenCode automatically reads its supported local numeric database; an external bridge is an optional alternative. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the portable executable, for example:
+Cursor, Copilot and Antigravity need an external integration that reports usage. OpenCode automatically reads its supported local numeric database; an external bridge is an optional alternative. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the installed terminal command, for example:
 
 ```text
-AI-Monitor-Console.exe --ingest copilot
+nova --ingest copilot
 ```
 
 Input:
@@ -74,7 +74,7 @@ Input:
 {"session_id":"your-local-session-id","total_tokens":12345}
 ```
 
-`total_tokens` must be a nonnegative, cumulative integer for that session. The bridge stores only that number, a receive timestamp and a hashed session identifier under ignored `tools/activity/<provider>/`. Prompts, responses, credentials and unrelated fields are discarded. The host detects increases after its startup baseline. The same payload can be supplied with `--ingest cursor`, `--ingest antigravity` or `--ingest opencode`. Source installations use `python tools/aim_control.py` instead of the executable.
+`total_tokens` must be a nonnegative, cumulative integer for that session. The bridge stores only that number, a receive timestamp and a hashed session identifier under ignored `tools/activity/<provider>/`. Prompts, responses, credentials and unrelated fields are discarded. The host detects increases after its startup baseline. The same payload can be supplied with `nova --ingest cursor`, `nova --ingest antigravity` or `nova --ingest opencode`. Source-only checkouts can use `python tools/aim_terminal.py --ingest <provider>`.
 
 Copilot SDK exposes live `assistant.usage` events with input/output token counts, while some events are ephemeral and are not replayed on resume. Accumulate the counts in your SDK application and forward the running total. This does not monitor all VS Code Copilot use automatically. [Official Copilot SDK usage guide](https://github.com/github/copilot-sdk/blob/main/docs/features/usage-and-billing.md).
 

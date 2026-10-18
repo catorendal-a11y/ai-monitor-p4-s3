@@ -1,10 +1,11 @@
 # Real device screen over USB
 
-In the Windows app, open Host settings / Diagnostics, then **Device screen** and
-**Capture / Refresh**. The running host remains the only USB serial owner. The window shows
+In NOVA, open **Device > Device screen**. The running host remains the only USB serial owner.
+The read-only result shows
 the actual 800×480 RGB565 pixels rendered by the device, including normal overlays. It does not
 show a desktop simulation or generated preview. The capture time and STALE marker distinguish
-a captured image from live video. Refresh is explicit; opening the viewer does not start polling.
+a captured image from live video. Return and choose **Device screen** again for a fresh capture;
+opening the result does not start polling.
 
 P4 pixels are captured before its manual portrait rotation; S3 pixels before its panel write.
 One complete LVGL refresh is frozen, then sent in 600 correlated chunks of 640 pixels. Each chunk
