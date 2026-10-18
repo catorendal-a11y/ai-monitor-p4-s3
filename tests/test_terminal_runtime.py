@@ -1,5 +1,5 @@
 """Bundled runtime integrity and safe upstream archive handling."""
-import hashlib,json
+import hashlib,json,os,subprocess
 from pathlib import Path
 import sys,tempfile,unittest,zipfile
 sys.path[:0]=[str(Path(__file__).resolve().parents[1]/'tools'),str(Path(__file__).resolve().parents[1]/'scripts')]
@@ -76,12 +76,44 @@ class BundledRuntimeTests(unittest.TestCase):
             manifest=json.loads((package/'runtime/manifest.json').read_text())
             self.assertEqual(manifest['python_archive_sha256'],build.PYTHON_SHA256)
             self.assertIn('LICENSE.txt',manifest['files'])
+            self.assertIn('licenses/pyserial-LICENSE.txt',manifest['files'])
             self.assertFalse((package/'runtime/Lib/site-packages/bin').exists())
-            install=run.call_args_list[1].args[0]
+            install=run.call_args_list[-2].args[0]
             self.assertIn('--only-binary=:all:',install);self.assertIn('3.13',install)
-            self.assertIn(str(root/'scripts/requirements-runtime-win313.txt'),install)
+            self.assertIn('--require-hashes',install);self.assertIn('--no-index',install)
+            self.assertIn(str(root/'scripts/requirements-runtime-win313-hashed.txt'),install)
             self.assertEqual(run.call_args_list[-1].args[0][1],'-B')
             with patch.object(build.sys,'platform','win32'),self.assertRaises(ValueError):build.bundle_runtime(package)
             with patch.object(build.sys,'platform','linux'),self.assertRaises(RuntimeError):build.bundle_runtime(package)
+
+    @unittest.skipUnless(os.name=='nt','Windows PowerShell runtime gate')
+    def test_powershell_gate_rejects_changed_extra_and_wrong_metadata(self):
+        script=Path(__file__).resolve().parents[1]/'scripts/verify_terminal_runtime.ps1'
+        def run_case(change):
+            with tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);folder=root/'runtime';folder.mkdir()
+                payload=b'fixture';(folder/'python.exe').write_bytes(payload)
+                data={'schema':1,'python_version':'3.13.16','python_archive_sha256':'97dae5274cc54867065e8d5a3226e48c35017ed332a0fdb0e27d5b5821961297','files':{'python.exe':hashlib.sha256(payload).hexdigest()}}
+                change(folder,data)
+                (folder/'manifest.json').write_text(json.dumps(data),encoding='utf-8')
+                return subprocess.run(['powershell','-NoProfile','-ExecutionPolicy','Bypass','-File',str(script),'-Root',str(root)],capture_output=True,text=True,timeout=20)
+        self.assertEqual(run_case(lambda folder,data:None).returncode,0)
+        self.assertNotEqual(run_case(lambda folder,data:(folder/'python.exe').write_bytes(b'changed')).returncode,0)
+        self.assertNotEqual(run_case(lambda folder,data:(folder/'extra.txt').write_text('extra')).returncode,0)
+        self.assertNotEqual(run_case(lambda folder,data:data.update(python_version='3.13.15')).returncode,0)
+
+    def test_launcher_validates_bundled_runtime_before_executing_it(self):
+        launcher=(Path(__file__).resolve().parents[1]/'AI-Monitor-Terminal.bat').read_text()
+        self.assertIn('verify_terminal_runtime.ps1',launcher)
+        self.assertLess(launcher.index('verify_terminal_runtime.ps1'),launcher.index('"%NOVA_PYTHON%" -B'))
+
+    def test_package_check_allows_only_the_two_upstream_python_executables(self):
+        from test_terminal_package import unexpected_executables
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);runtime=root/'runtime';runtime.mkdir()
+            for name in ('python.exe','pythonw.exe'):(runtime/name).write_bytes(b'fixture')
+            self.assertEqual(unexpected_executables(root),[])
+            extra=runtime/'dependency.exe';extra.write_bytes(b'fixture')
+            self.assertEqual(unexpected_executables(root),[extra])
 
 if __name__=='__main__':unittest.main()

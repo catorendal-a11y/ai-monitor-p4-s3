@@ -49,3 +49,11 @@ class TerminalInstallTests(unittest.TestCase):
         self.assertEqual(self.install('-Uninstall').returncode,0)
         self.assertEqual(file.read_text(),'@echo user command')
         self.assertFalse((self.bin/'nova-launcher.ps1').exists())
+
+    def test_uninstall_repairs_each_partial_owned_installation(self):
+        for missing in ('nova.cmd','nova-launcher.ps1'):
+            result=self.install();self.assertEqual(result.returncode,0,result.stderr)
+            (self.bin/missing).unlink()
+            result=self.install('-Uninstall');self.assertEqual(result.returncode,0,result.stderr)
+            self.assertFalse((self.bin/'nova.cmd').exists())
+            self.assertFalse((self.bin/'nova-launcher.ps1').exists())
