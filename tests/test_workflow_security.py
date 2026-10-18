@@ -57,6 +57,12 @@ class WorkflowSecurityTests(unittest.TestCase):
             self.assertIn({'name':'firmware-'+board,'path':'work/prebuilt/'+board},downloads,
                           'Equal firmware filenames from different boards must never be merged')
 
+    def test_release_smokes_fresh_archive_and_publishes_only_current_notes(self):
+        raw=(ROOT/'.github/workflows/release.yml').read_text()
+        self.assertIn('Expand-Archive',raw)
+        self.assertIn('RELEASE_NOTES-current.md',raw)
+        self.assertNotIn('--notes-file work/publish/docs/RELEASE_NOTES.md',raw)
+
     def test_external_events_do_not_get_privileged_context_or_named_secrets(self):
         for path, document in self.workflows():
             raw = path.read_text()

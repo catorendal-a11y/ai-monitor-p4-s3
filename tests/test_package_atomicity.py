@@ -49,7 +49,7 @@ class PackageAtomicityTests(unittest.TestCase):
                     patch.object(build, 'build_package', side_effect=fail):
                 with self.assertRaises(OSError): build.main()
             self.assertEqual(preserved.read_bytes(), b'keep')
-            package = output/('nova-'+HOST_VERSION+'-terminal')
+            package = output/('nova-'+HOST_VERSION+'-terminal-source')
             self.assertFalse(package.exists())
             with patch.object(build, 'ROOT', root), patch.object(build.sys, 'argv', arguments), \
                     patch.object(build.sys, 'platform', 'win32'), \
@@ -58,6 +58,17 @@ class PackageAtomicityTests(unittest.TestCase):
                 build.main()
                 retry.assert_called_once()
             self.assertTrue(package.is_dir())
+
+    def test_runtime_package_name_identifies_windows_x64(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'src').mkdir();(root/'src/config.h').write_text('#define FW_VERSION "'+HOST_VERSION+'"\n')
+            output=root/'out'
+            arguments=['build','--firmware-dir',str(root/'firmware'),'--output',str(output),'--windows-runtime']
+            with patch.object(build,'ROOT',root),patch.object(build.sys,'argv',arguments),\
+                    patch.object(build.subprocess,'check_output',return_value=str(root)),\
+                    patch.object(build,'build_package') as package:
+                build.main()
+            self.assertEqual(package.call_args.args[1].name,'nova-'+HOST_VERSION+'-windows-x64-terminal')
 
 
 if __name__ == '__main__': unittest.main()
