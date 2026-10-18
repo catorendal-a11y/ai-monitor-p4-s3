@@ -360,11 +360,13 @@ def main(argv=None):
     parser.add_argument('--version',action='version',version=HOST_VERSION)
     parser.add_argument('--root',type=Path,help='Existing AI Monitor application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
-    parser.add_argument('--ingest',choices=tuple(PROVIDERS),help='Read cumulative numeric provider telemetry from stdin')
+    bridge=parser.add_mutually_exclusive_group()
+    bridge.add_argument('--ingest',choices=tuple(PROVIDERS),help='Read cumulative numeric provider telemetry from stdin')
+    bridge.add_argument('--claude-statusline',action='store_true',help='Read documented Claude quota fields from stdin')
     args=parser.parse_args(argv)
-    if args.ingest:
+    if args.ingest or args.claude_statusline:
         from aim_control import main as control_main
-        return control_main(['--ingest',args.ingest])
+        return control_main(['--ingest',args.ingest] if args.ingest else ['--claude-statusline'])
     configure_terminal_colors()
     if args.check:
         async def check():
