@@ -10,7 +10,7 @@ cd /d "%~dp0"
 set "NOVA_PYTHON=%AI_MONITOR_PYTHON%"
 set "NOVA_BUNDLED="
 if not defined NOVA_PYTHON if exist "%~dp0runtime\python.exe" (
-  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\verify_terminal_runtime.ps1" -Root "%~dp0" >nul
+  "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\verify_terminal_runtime.ps1" -Root "%~dp0." >nul
   if errorlevel 1 (
     echo The bundled runtime failed its integrity check. Extract the complete Windows ZIP again.
     pause
