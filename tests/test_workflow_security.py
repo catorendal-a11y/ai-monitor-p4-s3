@@ -42,7 +42,8 @@ class WorkflowSecurityTests(unittest.TestCase):
                         if step['uses'].startswith('actions/attest-build-provenance@'):
                             self.assertNotIn('run', step)
                             subjects = step['with']['subject-path']
-                            self.assertIn('work/publish/work/terminal-release/', subjects)
+                            self.assertIn('work/publish/', subjects)
+                            self.assertNotIn('work/publish/work/terminal-release/', subjects)
                             self.assertNotIn('${{', subjects)
                     script = step.get('run', '')
                     self.assertNotRegex(script, r'(?i)python|pip install|\.exe|checkout|Invoke-Expression')
@@ -61,6 +62,8 @@ class WorkflowSecurityTests(unittest.TestCase):
         raw=(ROOT/'.github/workflows/release.yml').read_text()
         self.assertIn('Expand-Archive',raw)
         self.assertIn('RELEASE_NOTES-current.md',raw)
+        self.assertIn("$taskFolder = 'work/publish'",raw)
+        self.assertNotIn("$taskFolder = 'work/publish/work/terminal-release'",raw)
         self.assertNotIn('--notes-file work/publish/docs/RELEASE_NOTES.md',raw)
 
     def test_external_events_do_not_get_privileged_context_or_named_secrets(self):
