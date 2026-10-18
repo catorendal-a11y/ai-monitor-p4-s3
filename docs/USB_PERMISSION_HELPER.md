@@ -24,7 +24,7 @@ fallback. USB attachment and a local pipe do not authenticate a device approval.
 - `tools/permission_service.py` implements the optional local IPC service and rechecks authority
   immediately before returning a decision. Its endpoint contains only PID and instance ID. Endpoint
   removal is scoped to its owner; prompt arguments are not written to disk or logs.
-- The retired graphical prototype built a separate `AI-Monitor-Permission.exe`. The rc17
+- The retired graphical prototype built a separate `AI-Monitor-Permission.exe`. The current
   terminal package does not build or distribute that helper, and production permission
   approval remains disabled.
 - `tools/permission_runtime.py` now manages explicit attachment to the existing Panel owner,
@@ -73,7 +73,7 @@ below; compile/native tests do not establish physical approval safety.
 Production NOVA deliberately exposes no USB-permission preference or permission-hook action.
 **Settings > Edit settings** omits the internal `usb_permissions` flag, and normal P4/S3 firmware
 keeps the approval runtime disabled. There is therefore no supported permission helper to install
-or remove in rc17.
+or remove in rc18.
 
 The separate enrollment-only path is available under **Device > Connect PC**. Open
 **MENU > SETTINGS > CONNECT PC** on the physical display, tap **CONNECT PC** there, then run the

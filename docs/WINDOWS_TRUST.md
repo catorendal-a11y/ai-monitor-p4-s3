@@ -1,6 +1,6 @@
 # Windows installation and terminal trust
 
-Download `nova-v1.19.1-rc17-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases. Compare the ZIP's SHA-256, extract the complete archive into a permanent writable folder and double-click **Install-Nova.cmd**. It verifies the bundled runtime before registering `nova` for the current user. Open a new terminal and type `nova`.
+Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases. Compare the ZIP's SHA-256, extract the complete archive into a permanent writable folder and double-click **Install-Nova.cmd**. It verifies the bundled runtime before registering `nova` for the current user. Open a new terminal and type `nova`.
 
 The release includes NOVA Python source, the official CPython 3.13.16 embeddable runtime, hash-locked dependency wheels and both boards' firmware. It contains the upstream `python.exe` and `pythonw.exe` interpreters under `runtime/`, but no compiled NOVA application EXE, Qt frontend, PyInstaller package or Inno installer. Keep the complete extracted folder; the registered command points to it. No separate Python, pip, Node.js, PlatformIO or administrator access is required. Installing from the extracted ZIP works offline; provider requests and optional AI-client installation/sign-in still need internet.
 

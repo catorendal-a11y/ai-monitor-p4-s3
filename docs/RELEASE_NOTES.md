@@ -1,3 +1,15 @@
+# AI Monitor v1.19.1-rc18
+
+## Verified one-click Windows terminal package
+
+- Retain the rc17 one-ZIP terminal implementation, bundled hash-verified CPython
+  runtime, both board images and the complete clean-install test.
+- Correct the isolated publisher's artifact path after GitHub flattens the selected
+  upload root during download. A regression test now fixes the publisher to the
+  actual download directory before checksum verification and attestation.
+- rc17 was not published because its publisher stopped safely before attestation or
+  release creation. rc18 uses a new immutable tag for the corrected workflow.
+
 # AI Monitor v1.19.1-rc17
 
 ## One ZIP, one-click terminal installation
