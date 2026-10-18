@@ -5,7 +5,6 @@ import base64
 import os
 import re
 from pathlib import Path
-import shutil
 import sys
 import time
 from host_security import powershell_executable, read_local_json
@@ -324,7 +323,7 @@ def setup_report(root, home=None):
     from provider_catalog import PROVIDERS
     from token_activity import TokenReporter
     from session_activity import summary
-    from live_events import live_agents,marker
+    from live_events import live_agents
     config=local_config(root)
     reporter=TokenReporter(providers=config['providers'],activity_dir=root/'tools/activity',home=home)
     sample=reporter.poll()
