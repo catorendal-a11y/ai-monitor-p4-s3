@@ -108,6 +108,7 @@ class BundledRuntimeTests(unittest.TestCase):
         launcher=(Path(__file__).resolve().parents[1]/'AI-Monitor-Terminal.bat').read_text()
         self.assertIn('verify_terminal_runtime.ps1',launcher)
         self.assertLess(launcher.index('verify_terminal_runtime.ps1'),launcher.index('"%NOVA_PYTHON%" -B'))
+        self.assertIn('-Root "%~dp0."',launcher)
 
     def test_package_check_allows_only_the_two_upstream_python_executables(self):
         from test_terminal_package import unexpected_executables
