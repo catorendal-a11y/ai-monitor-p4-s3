@@ -22,6 +22,12 @@ class TerminalGraphicsTests(unittest.TestCase):
             self.assertEqual(aim_terminal.main(['--ingest','cursor']),0)
             control.assert_called_once_with(['--ingest','cursor'])
 
+    def test_nova_routes_claude_statusline_to_the_shared_bounded_bridge(self):
+        import aim_terminal
+        with patch('aim_control.main',return_value=0) as control:
+            self.assertEqual(aim_terminal.main(['--claude-statusline']),0)
+            control.assert_called_once_with(['--claude-statusline'])
+
     def test_frozen_art_reads_extracted_resource_instead_of_source_location(self):
         import base64,json,tempfile,zlib
         from terminal_art import pixels
