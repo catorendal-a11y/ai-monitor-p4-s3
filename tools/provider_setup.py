@@ -447,8 +447,8 @@ def _claude_extra(link):
 def _bridge_extra(provider, readable):
     if readable:
         return 'Numeric bridge is reporting; the companion animates from forwarded counters. Account quota remains unavailable.'
-    return ('Numeric bridge required: forward cumulative session tokens to AI-Monitor-Console.exe --ingest ' + provider +
-            ' (source installs: python tools/aim_control.py --ingest ' + provider + '). '
+    return ('Numeric bridge required: forward cumulative session tokens to nova --ingest ' + provider +
+            ' (source-only checkouts: python tools/aim_control.py --ingest ' + provider + '). '
             'Selection alone cannot read this editor; see docs/PROVIDERS.md.')
 
 

@@ -47,7 +47,7 @@ PROVIDER_SETUP = {
                  'remaining account quota is unavailable. No scripts or monitor API key are needed.',
                  'https://docs.opencode.ai/docs/'),
     **{key: (f'1. Select {name} and save settings.\n2. Connect your own integration to '
-              f'AI-Monitor-Console.exe --ingest {key}, sending cumulative numeric token counters. '
+              f'nova --ingest {key}, sending cumulative numeric token counters. '
               'See the bundled provider guide for the JSON format.\n3. This bridge shows LOCAL activity. '
               'Selecting the provider alone does not import editor activity or account quota.',
               'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md#external-numeric-bridge')

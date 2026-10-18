@@ -7,6 +7,7 @@ import json
 import os
 from rich.text import Text
 from project_version import HOST_VERSION
+from provider_catalog import PROVIDERS
 from textual.app import App,ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal,Vertical,VerticalScroll
@@ -359,7 +360,11 @@ def main(argv=None):
     parser.add_argument('--version',action='version',version=HOST_VERSION)
     parser.add_argument('--root',type=Path,help='Existing AI Monitor application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
+    parser.add_argument('--ingest',choices=tuple(PROVIDERS),help='Read cumulative numeric provider telemetry from stdin')
     args=parser.parse_args(argv)
+    if args.ingest:
+        from aim_control import main as control_main
+        return control_main(['--ingest',args.ingest])
     configure_terminal_colors()
     if args.check:
         async def check():
