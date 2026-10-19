@@ -1,10 +1,8 @@
 """Numeric-only local bridge. No prompts, responses or credentials are saved."""
 import hashlib
-import json
 import math
-import os
+import os  # noqa: F401 (tests patch os.replace through this module)
 from pathlib import Path
-import tempfile
 import time
 from provider_catalog import PROVIDERS
 from host_security import read_local_json

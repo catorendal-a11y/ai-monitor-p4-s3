@@ -1,7 +1,7 @@
 """Opt-in local numeric history. One bounded writer, no USB or model access."""
 from collections import OrderedDict, deque
 from contextlib import closing
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import math
 from pathlib import Path
 import sqlite3

@@ -3,7 +3,6 @@ from private_files import backup as private_backup
 from claude_paths import config_root
 from pathlib import Path
 import copy
-import shutil
 import time
 from host_security import read_local_json
 from telemetry_bridge import write_record

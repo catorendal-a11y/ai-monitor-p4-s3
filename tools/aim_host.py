@@ -17,7 +17,6 @@
 import json
 import math
 import os
-import ssl
 import sys
 import time
 import urllib.request
@@ -27,7 +26,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter, TokenSampler
 from host_status import HostStatus, OPTIONS, FLAGS, validate_options
-from provider_catalog import selected_providers, PROVIDERS
+from provider_catalog import selected_providers
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
 from host_security import open_provider_request, read_local_json, safe_text, serial_port
@@ -969,7 +968,6 @@ def frame_payload(provider, view_index, rows, notice=None):
 def run(cfg):
     interval = cfg["interval_s"]
     zai_key = cfg.get("zai_key", "")
-    zai_provider = cfg.get("zai_provider", "zcode")
     views = selected_providers(cfg)
     if not views:
         raise ValueError('No providers selected. Open First-time setup.')
@@ -1072,7 +1070,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.report_tokens()
                     LOG(f"connected to {port_name}, views={views}")
                 except Exception as exc:
-                    LOG(f"open {port_name} failed: {exc}")
+                    LOG(f"open {port_name} failed: {type(exc).__name__}")
                     # Handshake can succeed before optional runtime setup or a
                     # diagnostics write fails. Release that owner before retry.
                     if panel is not None:
@@ -1107,7 +1105,7 @@ def _run_loop(cfg, interval, zai_key, views):
                 cooldown = max(0, 15 - (time.monotonic() - cycle_started))
                 wait_connected(panel, delay, minimum_wait=cooldown)
             except Exception as exc:
-                LOG(f"panel link failed: {exc}; reconnecting")
+                LOG(f"panel link failed: {type(exc).__name__}; reconnecting")
                 panel.close()
                 panel = None
                 health.update('reconnecting')

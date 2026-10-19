@@ -9,7 +9,6 @@ import secrets
 import sqlite3
 import time
 from host_security import read_local_json
-from telemetry_bridge import write_record
 from provider_catalog import PROVIDERS
 
 EVENTS=frozenset(('SessionStart','SessionEnd','UserPromptSubmit','PreToolUse','PostToolUse',

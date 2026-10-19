@@ -2,7 +2,6 @@
 from collections import OrderedDict
 import hashlib
 import json
-from pathlib import Path
 from host_security import read_local_json
 
 MAX_FILES = 16

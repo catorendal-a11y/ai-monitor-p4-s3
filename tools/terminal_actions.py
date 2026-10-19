@@ -11,7 +11,6 @@ import aim_control as control
 import desktop_support as desktop
 from host_security import safe_text
 from host_status import read_status,OPTIONS,FLAGS
-from provider_catalog import PROVIDERS
 
 
 def require(value,word):

@@ -9,7 +9,6 @@ import re
 import struct
 import subprocess
 import sys
-import tempfile
 import time
 
 import psutil
@@ -17,7 +16,7 @@ from serial.tools import list_ports
 import aim_host as host
 from provider_catalog import PROVIDERS, selected_providers
 from codex_support import setup_codex, codex_command
-from host_security import read_local_json, safe_text, serial_port, powershell_executable
+from host_security import read_local_json, safe_text, serial_port
 from board_profiles import BOARDS, get_board, configured_board
 from host_status import validate_options
 
@@ -305,11 +304,11 @@ def flash(root=ROOT, ask=input):
         if len(ports) != 1:
             raise SetupError("Select an explicit port before flashing; no unambiguous display was found.")
         port = ports[0]
-    command = flash_command(kind, port, root, board_id=board.id)
+    flash_command(kind, port, root, board_id=board.id)  # validate firmware and port before prompting
     if ask(f"Write firmware to {port} on {board.name}? Type FLASH to proceed: ").strip() != "FLASH":
         print("Cancelled. Nothing was written.")
         return
-    # Share the identity, file, port and child-lifetime guards with the GUI.
+    # Share the identity, file, port and child-lifetime guards with the terminal UI.
     from desktop_support import write_firmware
     config["port"] = port
     save_config(config, root)
