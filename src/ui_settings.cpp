@@ -37,7 +37,7 @@ static lv_obj_t *nightButton = nullptr, *nightOverlay = nullptr, *nightToggleLab
 static lv_obj_t *nightTimeValues[4] = {}, *nightTimeButtons[8] = {}, *nightSlider = nullptr;
 static app_settings::NightSettings nightDraft;
 static lv_obj_t *appearanceOverlay = nullptr, *companionPreview = nullptr;
-static lv_obj_t *companionButtons[2] = {}, *companionCaptions[2] = {}, *themeButtons[4] = {}, *themeCaptions[4] = {};
+static lv_obj_t *companionButtons[app_settings::companion_count] = {}, *companionCaptions[app_settings::companion_count] = {}, *themeButtons[4] = {}, *themeCaptions[4] = {};
 static lv_obj_t *quotaButton = nullptr, *quotaOverlay = nullptr, *quotaProviderLabel = nullptr, *quotaSelectionLabel = nullptr;
 static lv_obj_t *quotaProviderHelp = nullptr, *quotaSetupHelp = nullptr;
 static lv_obj_t* quotaDetails[4] = {};
@@ -176,7 +176,7 @@ static lv_obj_t* make_choice(lv_obj_t* parent,int x,int y,const char* options,lv
 
 static void refresh_appearance() {
   const auto look = app_settings::appearance();
-  for (size_t i = 0; i < 2; ++i) {
+  for (size_t i = 0; i < app_settings::companion_count; ++i) {
     const bool selected = static_cast<uint8_t>(look.companion) == i;
     style_button(companionButtons[i], selected);
     lv_obj_set_style_text_color(companionCaptions[i], lv_color_hex(selected ? ui_theme::background : ui_theme::text), 0);
@@ -187,7 +187,7 @@ static void refresh_appearance() {
     lv_obj_set_style_border_color(themeButtons[i], lv_color_hex(ui_theme::palettes[i].accent), 0);
     lv_obj_set_style_text_color(themeCaptions[i], lv_color_hex(ui_theme::palettes[i].text), 0);
   }
-  lv_image_set_src(companionPreview, look.companion == app_settings::Companion::orbit ? &nova_assets::orbit_thumb : &nova_assets::nova_thumb);
+  lv_image_set_src(companionPreview, nova_assets::companion_thumb(static_cast<uint8_t>(look.companion)));
 }
 static void companion_select(lv_event_t* event) {
   companions::runtime::use_builtin();
@@ -241,7 +241,7 @@ static void refresh_quota_choices() {
       (gemini || opencode) ? "Local token activity only. No account quota is available." :
       "Shows quota rows supplied by your numeric bridge.\nNo automatic editor account quota is available.");
   quota_text(quotaSetupHelp, !snapshot.hostPresent ? "Host offline. Open the PC app and Start host." :
-      codex ? "For quota: sign in to Codex with ChatGPT in the PC app.\nTap a window; its percentage is shown on NOVA / ORBIT." :
+      codex ? "For quota: sign in to Codex with ChatGPT in the PC app.\nTap a window; its percentage is shown on your companion." :
       zcode ? "For quota: add your ZAI Coding Plan API key in the PC app.\nOnly windows returned by your plan have a percentage." :
       claude ? "For quota: tap Link Claude quota in the PC app AI setup.\nAn API key alone does not provide subscription quota." :
       gemini ? "Use Gemini CLI with session recording for local activity.\nQuota options stay unavailable until real data is supplied." :
@@ -646,7 +646,8 @@ void ui_settings_init() {
   lv_obj_set_scrollable(appearanceCard, false);
   make_label(appearanceCard, 24, 18, 700, "Make it yours", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   make_label(appearanceCard, 24, 58, 400, "COMPANION", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  for (size_t i = 0; i < 2; ++i) companionButtons[i] = make_button(appearanceCard, 24 + i * 180, 86, 166,
+  // Three choices end before the 144 px preview at x 546.
+  for (size_t i = 0; i < app_settings::companion_count; ++i) companionButtons[i] = make_button(appearanceCard, 24 + i * 172, 86, 160,
       app_settings::companion_name(static_cast<app_settings::Companion>(i)), companion_select, reinterpret_cast<void*>(i), &companionCaptions[i]);
   companionPreview = lv_image_create(appearanceCard); lv_obj_set_pos(companionPreview, 546, 54); lv_obj_set_clickable(companionPreview, false);
   make_label(appearanceCard, 24, 160, 700, "UI COLOR THEME", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
@@ -685,7 +686,7 @@ void ui_settings_init() {
   lv_label_set_long_mode(quotaSelectionLabel, LV_LABEL_LONG_MODE_DOTS);
   lv_obj_set_height(quotaSelectionLabel, 24);
   quotaSetupHelp = make_wrap_label(quotaCard, 24, 340, 704, "", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_wrap_label(quotaCard, 24, 386, 400, "NOVA + ORBIT show quota remaining.\nAlerts still check every window.",
+  make_wrap_label(quotaCard, 24, 386, 400, "Your companion shows quota remaining.\nAlerts still check every window.",
                   &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(quotaOverlay, 464, 406, 136, "REFRESH", refresh_quota, nullptr);
   make_button(quotaOverlay, 616, 406, 136, "DONE", close_quota, nullptr);

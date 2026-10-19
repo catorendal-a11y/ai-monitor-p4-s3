@@ -301,6 +301,21 @@ static void window_label(uint32_t windowMinutes, char* out, size_t cap) {
   else snprintf(out, cap, "%lu MIN", (unsigned long)windowMinutes);
 }
 
+// Status suffixes share the row's 220 px caption; a short period keeps the status word whole.
+static void window_short(uint32_t windowMinutes, char* out, size_t cap) {
+  if (windowMinutes == 0) snprintf(out, cap, "QUOTA");
+  else if (windowMinutes % 1440 == 0) snprintf(out, cap, "%luD", (unsigned long)(windowMinutes / 1440));
+  else if (windowMinutes % 60 == 0) snprintf(out, cap, "%luH", (unsigned long)(windowMinutes / 60));
+  else snprintf(out, cap, "%luM", (unsigned long)windowMinutes);
+}
+
+static void age_short(uint32_t ageMs, char* out, size_t cap, bool upper = true) {
+  const unsigned long minutes = ageMs / 60000u;
+  if (minutes < 60) snprintf(out, cap, upper ? "%luM" : "%lu min", minutes);
+  else if (minutes < 1440) snprintf(out, cap, upper ? "%luH" : "%lu h", minutes / 60);
+  else snprintf(out, cap, upper ? "%luD" : "%lu d", minutes / 1440);
+}
+
 // ───────────────────────────────────────────────────────────────────────────────
 // CARD BUILD (v2 geometry from the SVG)
 // ───────────────────────────────────────────────────────────────────────────────
@@ -327,6 +342,9 @@ static void build_row(CardWidgets& c, size_t r, lv_coord_t yTop, bool withDivide
   lv_obj_set_style_radius(w.bar, 5, LV_PART_INDICATOR);
   w.knob = make_dot(w.bar, 314, 1, 8, C_GREEN);  // child of the bar; x set per value
   w.reset = make_label(c.card, 18, yTop + 82, 330, &lv_font_montserrat_18, C_RESET, LV_TEXT_ALIGN_LEFT, "");
+  // One line with an ellipsis: a retained provider error must never end mid-word.
+  lv_obj_set_height(w.reset, lv_font_get_line_height(&lv_font_montserrat_18));
+  lv_label_set_long_mode(w.reset, LV_LABEL_LONG_MODE_DOTS);
 }
 
 static CardWidgets build_big_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y) {
@@ -426,10 +444,11 @@ void dashboard_init() {
   lv_obj_set_style_text_letter_space(hdr.eyebrow, 2, 0);
   hdr.title = make_label(header, 24, 31, 306, F_PROVIDER, C_TITLE, LV_TEXT_ALIGN_LEFT, "Usage Dashboard");
   // live dot + halo + label (SVG: dot center (475,30) r4, halo r8)
-  hdr.halo = make_dot(header, 467, 22, 16, C_GREEN);
+  // Room for the longest state (FETCHING / NO HOST) left of the right-aligned clock.
+  hdr.halo = make_dot(header, 437, 22, 16, C_GREEN);
   lv_obj_set_style_bg_opa(hdr.halo, LV_OPA_20, 0);
-  hdr.dot = make_dot(header, 471, 26, 8, C_GREEN);
-  hdr.live = make_label(header, 488, 22, 76, F_META, C_META_BRIGHT, LV_TEXT_ALIGN_LEFT, "LIVE");
+  hdr.dot = make_dot(header, 441, 26, 8, C_GREEN);
+  hdr.live = make_label(header, 458, 22, 112, F_META, C_META_BRIGHT, LV_TEXT_ALIGN_LEFT, "LIVE");
   lv_obj_set_style_text_letter_space(hdr.live, 1, 0);
 
   hdr.clock = make_label(header, 574, 26, 78, F_TIME, C_TITLE, LV_TEXT_ALIGN_RIGHT, "--:--");
@@ -533,15 +552,19 @@ static void layout_rows(CardWidgets& card, const aim::ViewData* view) {
       lv_obj_set_pos(row.bar, 16, top + 20);
       lv_obj_set_pos(row.reset, 116, top);
     } else {
+      // Three rows share 72 px each: the row title already names the window, so
+      // drop the caption line and keep a visible gap between reset text and the next row.
+      const bool dense = count == 3;
       lv_obj_set_pos(row.winMeta, 18, top);
-      lv_obj_set_pos(row.name, 18, top + (count == 3 ? 17 : 20));
-      lv_obj_set_pos(row.pct, 236, top + (count == 3 ? 2 : 0));
-      lv_obj_set_style_text_font(row.pct, count == 3 ? &lv_font_montserrat_26 : &lv_font_montserrat_40, 0);
+      visible(row.winMeta, !dense);
+      lv_obj_set_pos(row.name, 18, top + (dense ? 2 : 20));
+      lv_obj_set_pos(row.pct, 236, top);
+      lv_obj_set_style_text_font(row.pct, dense ? &lv_font_montserrat_26 : &lv_font_montserrat_40, 0);
       lv_obj_set_pos(row.unit, 236, top + 45);
-      visible(row.unit, count <= 2);
-      lv_obj_set_pos(row.bar, 18, top + (count == 3 ? 42 : 62));
-      lv_obj_set_height(row.bar, count == 3 ? 8 : 10);
-      lv_obj_set_pos(row.reset, 18, top + (count == 3 ? 54 : 82));
+      visible(row.unit, !dense);
+      lv_obj_set_pos(row.bar, 18, top + (dense ? 32 : 62));
+      lv_obj_set_height(row.bar, dense ? 8 : 10);
+      lv_obj_set_pos(row.reset, 18, top + (dense ? 44 : 82));
       if (row.divider) lv_obj_set_y(row.divider, top - 17);
     }
     lv_obj_set_width(row.name, notice ? 330 : (card.compact ? 96 : 210));
@@ -677,14 +700,23 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
                                   (quota_critical(remaining, view->providerKey, row) ? C_RED : (quota_low(remaining, view->providerKey, row) ? C_AMBER : base));
       if (fresh && hostConnected && !view->notice && !view->fetching && quota_low(remaining, view->providerKey, row) && !c.compact) {
         char period[16];
-        window_label(row.windowMinutes, period, sizeof(period));
+        window_short(row.windowMinutes, period, sizeof(period));
         snprintf(winBuf, sizeof(winBuf), "%s / %s", period, quota_critical(remaining, view->providerKey, row) ? "CRITICAL" : "LOW");
       }
       if (view->notice && view->hasUsage) {
         const unsigned long ageMinutes = (now - view->quotaReceivedMs) / 60000u;
-        snprintf(winBuf, sizeof(winBuf), "LAST GOOD / %lu m ago", ageMinutes);
+        char age[12];
+        age_short(now - view->quotaReceivedMs, age, sizeof(age));
+        // State the age once per card; later rows keep their window names.
+        if (r == 0) snprintf(winBuf, sizeof(winBuf), "LAST GOOD / %s", age);
         if (c.compact) snprintf(resetBuf, sizeof(resetBuf), "Old / %lu m", ageMinutes);
-        else if (r == 0) snprintf(resetBuf, sizeof(resetBuf), "%.47s", view->message);
+        // Three rows hide the caption line and leave no room for a message (the card
+        // header still says ERROR - TAP), so the age moves to the first reset line.
+        else if (r == 0 && c.layoutRows <= 2) snprintf(resetBuf, sizeof(resetBuf), "%.47s", view->message);
+        else if (r == 0) {
+          age_short(now - view->quotaReceivedMs, age, sizeof(age), false);
+          snprintf(resetBuf, sizeof(resetBuf), "Last good %s ago", age);
+        }
       }
       const uint32_t percentColor = quotaColor == base ? C_PCT : quotaColor;
       if (rc.percentColor != percentColor) {

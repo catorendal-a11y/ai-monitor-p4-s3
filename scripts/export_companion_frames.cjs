@@ -10,7 +10,7 @@ const output=path.resolve(process.argv[position+1]);
   const header=fs.readFileSync(path.join(root,'src/ui/nova_assets.h'),'utf8');
   const cpp=fs.readFileSync(path.join(root,'src/ui/nova_assets.cpp'),'utf8');
   const frames=[];
-  for(const robot of ['nova','orbit']) for(const pose of poses){
+  for(const robot of ['nova','orbit','claude']) for(const pose of poses){
     const left=Number(header.match(new RegExp(robot+'_origin_x = (\\d+)'))[1]);
     const top=Number(header.match(new RegExp(robot+'_origin_y = (\\d+)'))[1]);
     const symbol=robot==='nova'?pose:robot+'_'+pose;
@@ -33,5 +33,5 @@ const output=path.resolve(process.argv[position+1]);
       sha256:crypto.createHash('sha256').update(raw).digest('hex')});
   }
   fs.writeFileSync(path.join(output,'frames.json'),JSON.stringify({schema:1,format:'RGB565A8',frames},null,2)+'\n');
-  console.log('Exported 12 trusted frames; all equal the committed pixel arrays.');
+  console.log('Exported '+frames.length+' trusted frames; all equal the committed pixel arrays.');
 })().catch(error=>{console.error(error.message);process.exitCode=1;});

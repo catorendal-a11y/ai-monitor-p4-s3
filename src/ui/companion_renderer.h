@@ -9,6 +9,12 @@ struct CompanionFrameView {
   const lv_image_dsc_t* descriptor = nullptr;
   int16_t originX = 0, originY = 0;
 };
+// Built-in companion index: 0 NOVA, 1 ORBIT, 2 CLAUDE (app_settings::Companion order).
+inline CompanionFrameView builtin_companion_view(uint8_t companion, const lv_image_dsc_t* pose) {
+  if (companion == 1) return {nova_assets::companion_pose(1, pose), nova_assets::orbit_origin_x, nova_assets::orbit_origin_y};
+  if (companion == 2) return {nova_assets::companion_pose(2, pose), nova_assets::claude_origin_x, nova_assets::claude_origin_y};
+  return {pose, nova_assets::nova_origin_x, nova_assets::nova_origin_y};
+}
 class CompanionRenderer {
  public:
   // Storage is allocated once at startup and must outlive this UI-owned renderer.
@@ -49,14 +55,15 @@ class CompanionRenderer {
     if (lv_obj_get_y(image) != y)lv_obj_set_y(image,y);
     return true;
   }
-  void render(lv_obj_t* image, bool orbit, const lv_image_dsc_t* pose, int x, int y) {
+  void render(lv_obj_t* image, uint8_t companion, const lv_image_dsc_t* pose, int x, int y) {
+    if (companion > 2) companion = 0;
 #if !defined(AIM_BOARD_WAVESHARE_S3) || defined(AIM_COMPANION_CACHE_TEST)
     if (cache_) {
       unsigned index=0;
       const lv_image_dsc_t* poses[]={&nova_assets::work,&nova_assets::done,&nova_assets::low,
         &nova_assets::critical,&nova_assets::sleep,&nova_assets::blink};
       for (unsigned i=0;i<6;++i)if (pose==poses[i])index=i;
-      const auto* wanted=&companions::builtin_frames[index+(orbit?6:0)];
+      const auto* wanted=&companions::builtin_frames[index+companion*companions::builtin_poses];
       if (wanted!=requested_) {
         externalRequested_=false;
         requested_=wanted;cached_=false;
@@ -75,15 +82,11 @@ class CompanionRenderer {
         } else { ++failures_;binding_.detach(); }
       }
       if (cached_ && binding_.activate(image,*cache_,active_,x,y))return;
-      render(image,{orbit?&nova_assets::orbit_work:&nova_assets::work,
-          orbit?nova_assets::orbit_origin_x:nova_assets::nova_origin_x,
-          orbit?nova_assets::orbit_origin_y:nova_assets::nova_origin_y},x,y);
+      render(image,builtin_companion_view(companion,&nova_assets::work),x,y);
       return;
     }
 #endif
-    const auto* frame = nova_assets::companion_pose(orbit, pose);
-    render(image,{frame,orbit ? nova_assets::orbit_origin_x : nova_assets::nova_origin_x,
-        orbit ? nova_assets::orbit_origin_y : nova_assets::nova_origin_y},x,y);
+    render(image,builtin_companion_view(companion,pose),x,y);
   }
  private:
   static bool same_frame(const companions::Frame& a,const companions::Frame& b) {

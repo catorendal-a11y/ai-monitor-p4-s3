@@ -52,6 +52,11 @@ int main() {
   CHECK(appearance().companion == Companion::orbit && appearance().theme == Theme::ocean);
   fake_nvs::values["appear_v1"] = {255,255}; s_loaded = false;
   CHECK(appearance().companion == Companion::nova && appearance().theme == Theme::forest);
+  // CLAUDE is the third stored companion; the next unassigned value still falls back.
+  fake_nvs::values["appear_v1"] = {2,1}; s_loaded = false;
+  CHECK(appearance().companion == Companion::claude && std::string(companion_name(appearance().companion)) == "CLAUDE");
+  fake_nvs::values["appear_v1"] = {3,1}; s_loaded = false;
+  CHECK(appearance().companion == Companion::nova);
   CHECK(nova_window("codex").automatic && nova_window("zcode").automatic);
   set_nova_window("codex", manual_window(300, "Session"));
   set_nova_window("zcode", manual_window(43200, "Monthly"));

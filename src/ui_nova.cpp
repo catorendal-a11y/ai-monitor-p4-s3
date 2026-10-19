@@ -260,7 +260,7 @@ void update() {
 #endif
   if(!external || !renderer.render_external(figure,external->frames[animationFrame].frame,external->codec,
       companions::runtime::frame(animationFrame),-55,motionY))
-    renderer.render(figure, companion == app_settings::Companion::orbit, pose, -55, motionY);
+    renderer.render(figure, static_cast<uint8_t>(companion), pose, -55, motionY);
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
   if (decodeCount!=renderer.decoded_frames() || failureCount!=renderer.decode_failures()) {
     cacheTelemetry.lastSwitchUs=micros()-switchStarted;

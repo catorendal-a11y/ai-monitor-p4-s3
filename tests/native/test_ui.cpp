@@ -154,7 +154,33 @@ static void read_touch(lv_indev_t* input, lv_indev_data_t* data) {
   if (!testTouchGuard.accept(touchPressed)) data->state = LV_INDEV_STATE_RELEASED;
 }
 
+static unsigned clippedLabels = 0;
+
+// Visible clip/dot labels must show their whole text; scrolling labels opt out deliberately.
+static void audit_clipped_labels(lv_obj_t* object, const char* scene) {
+  if (lv_obj_has_flag(object, LV_OBJ_FLAG_HIDDEN)) return;
+  if (lv_obj_check_type(object, &lv_label_class)) {
+    const auto mode = lv_label_get_long_mode(object);
+    const char* text = lv_label_get_text(object);
+    // DOTS labels end in an ellipsis by design; only hard clipping loses text silently.
+    if (mode == LV_LABEL_LONG_MODE_CLIP && text && *text && !std::strchr(text, '\n')) {
+      lv_point_t size{};
+      lv_text_get_size(&size, text, lv_obj_get_style_text_font(object, LV_PART_MAIN),
+                      lv_obj_get_style_text_letter_space(object, LV_PART_MAIN), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+      const auto width = lv_obj_get_content_width(object);
+      if (size.x > width) {
+        std::fprintf(stderr, "[%s] clipped label: \"%s\" (%d > %d px)\n", scene, text, (int)size.x, (int)width);
+        ++clippedLabels;
+      }
+    }
+  }
+  for (uint32_t i = 0; i < lv_obj_get_child_count(object); ++i) audit_clipped_labels(lv_obj_get_child(object, i), scene);
+}
+
 static void screenshot(const std::filesystem::path& directory, const char* name) {
+  lv_obj_update_layout(lv_screen_active());
+  audit_clipped_labels(lv_screen_active(), name);
+  audit_clipped_labels(lv_layer_top(), name);
   if (directory.empty()) return;
   std::filesystem::create_directories(directory);
   lv_refr_now(nullptr);
@@ -213,6 +239,39 @@ static void check_readable_text(lv_obj_t* object) {
                   0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
   CHECK(size.x <= lv_obj_get_content_width(object));
   CHECK(size.y <= lv_obj_get_height(object));
+}
+
+// Clipped single-line labels silently drop the end of a status word.
+static void check_line_fits(lv_obj_t* object) {
+  lv_obj_update_layout(lv_screen_active());
+  lv_point_t size{};
+  lv_text_get_size(&size, lv_label_get_text(object), lv_obj_get_style_text_font(object, LV_PART_MAIN),
+                  lv_obj_get_style_text_letter_space(object, LV_PART_MAIN), 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  if (size.x > lv_obj_get_content_width(object))
+    std::fprintf(stderr, "clipped label: \"%s\" (%d > %d px)\n", lv_label_get_text(object), (int)size.x,
+                 (int)lv_obj_get_content_width(object));
+  CHECK(size.x <= lv_obj_get_content_width(object));
+}
+
+// Each row's reset text must end before the next row's title begins.
+static void check_three_row_spacing(const CardWidgets& card) {
+  lv_obj_update_layout(lv_screen_active());
+  for (size_t r = 0; r + 1 < 3; ++r) {
+    lv_area_t reset{}, next{};
+    lv_obj_get_coords(card.rows[r].reset, &reset);
+    lv_obj_get_coords(card.rows[r + 1].name, &next);
+    CHECK(reset.y2 + 4 <= next.y1);
+  }
+}
+
+static void check_header_clear_of_clock() {
+  lv_obj_update_layout(lv_screen_active());
+  lv_point_t clockText{};
+  lv_text_get_size(&clockText, "23:59", lv_obj_get_style_text_font(hdr.clock, LV_PART_MAIN), 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  lv_area_t live{}, clock{};
+  lv_obj_get_coords(hdr.live, &live);
+  lv_obj_get_coords(hdr.clock, &clock);
+  CHECK(live.x2 < clock.x2 - clockText.x);  // right-aligned clock text starts here
 }
 
 static void test_nova_readability(const std::filesystem::path& screenshots) {
@@ -762,6 +821,9 @@ int main(int argc, char** argv) {
   CHECK(g_barColor[0][0] == C_RED);
   CHECK(g_barColor[1][0] == C_AMBER);
   CHECK(std::string(lv_label_get_text(big[0].rows[0].winMeta)).find("CRITICAL") != std::string::npos);
+  check_line_fits(big[0].rows[0].winMeta);
+  check_line_fits(big[1].rows[0].winMeta);
+  check_header_clear_of_clock();
   screenshot(screenshots, "dashboard-low-quota");
   sample.views[0].showsRemaining = false;
   sample.views[0].rows[0].usedPercent = 90;
@@ -772,6 +834,8 @@ int main(int argc, char** argv) {
   CHECK(g_barColor[0][0] == C_META);
   CHECK(std::string(lv_label_get_text(footServices)) == "0 / 2 services online");
   CHECK(std::string(lv_label_get_text(big[0].vendor)).find("OFFLINE") != std::string::npos);
+  CHECK(std::string(lv_label_get_text(hdr.live)) == "NO HOST");
+  check_line_fits(hdr.live);
   screenshot(screenshots, "dashboard-offline");
 
   sample.hostPresent = true;
@@ -790,6 +854,7 @@ int main(int argc, char** argv) {
     CHECK(!lv_obj_is_hidden(big[0].rows[2].bar));
     check_inside(big[0].card, big[0].rows[2].reset);
   }
+  check_three_row_spacing(big[0]);
   screenshot(screenshots, "dashboard-three-rows");
 
   set_sample(4, 3);
@@ -848,6 +913,8 @@ int main(int argc, char** argv) {
   sample.views[0].fetching = sample.views[1].fetching = true;
   dashboard_update();
   CHECK(std::string(lv_label_get_text(hdr.live)) == "FETCHING");
+  check_line_fits(hdr.live);
+  check_header_clear_of_clock();
   sample.views[0].fetching = sample.views[1].fetching = false;
   sample.views[0].notice = true;
   dashboard_update();
@@ -1032,6 +1099,12 @@ int main(int argc, char** argv) {
   back(nullptr); dashboard_update();
   CHECK(!lv_obj_is_hidden(big[0].rows[0].bar));
   CHECK(g_barColor[0][0] == C_META);
+  // Three rows drop the caption line; the retained age moves to the first reset line
+  // and the full message stays on the details screen.
+  CHECK(lv_obj_is_hidden(big[0].rows[0].winMeta));
+  CHECK(std::string(lv_label_get_text(big[0].rows[0].reset)) == "Last good 40 min ago");
+  CHECK(std::string(lv_label_get_text(big[0].rows[1].reset)).find("Resets") != std::string::npos);
+  check_three_row_spacing(big[0]);
   screenshot(screenshots, "dashboard-retained-error");
   ui_details_show(0);
   std::strcpy(sample.viewKeys[0], "gemini");
@@ -1308,6 +1381,25 @@ int main(int argc, char** argv) {
   lv_obj_send_event(themeButtons[2], LV_EVENT_CLICKED, nullptr);
   close_appearance(nullptr); ui_settings_hide(); ui_nova_show();
   screenshot(screenshots, "orbit-amethyst");
+
+  // CLAUDE is a third built-in companion with its own six poses and thumbnail.
+  ui_settings_show(); open_appearance(nullptr);
+  lv_obj_update_layout(lv_screen_active());
+  lv_area_t lastChoice{}, preview{};
+  lv_obj_get_coords(companionButtons[app_settings::companion_count - 1], &lastChoice);
+  lv_obj_get_coords(companionPreview, &preview);
+  CHECK(lastChoice.x2 < preview.x1);
+  lv_obj_send_event(companionButtons[2], LV_EVENT_CLICKED, nullptr);
+  CHECK(app_settings::appearance().companion == app_settings::Companion::claude);
+  CHECK(lv_image_get_src(companionPreview) == &nova_assets::claude_thumb);
+  screenshot(screenshots, "settings-appearance-claude");
+  close_appearance(nullptr); ui_settings_hide(); ui_nova_show(); ui_nova_update();
+  CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "CLAUDE");
+  CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::claude_work || lv_image_get_src(nova_ui::figure) == &nova_assets::claude_blink);
+  screenshot(screenshots, "claude-amethyst");
+  ui_settings_show(); open_appearance(nullptr);
+  lv_obj_send_event(companionButtons[1], LV_EVENT_CLICKED, nullptr);  // restore ORBIT for later checks
+  close_appearance(nullptr); ui_settings_hide(); ui_nova_show();
   ui_settings_show(); open_appearance(nullptr);
   lv_obj_send_event(companionButtons[0], LV_EVENT_CLICKED, nullptr);
   lv_obj_send_event(themeButtons[3], LV_EVENT_CLICKED, nullptr);
@@ -1336,12 +1428,13 @@ int main(int argc, char** argv) {
   CompanionRenderer cropRenderer;
   const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,
       &nova_assets::critical, &nova_assets::sleep, &nova_assets::blink};
-  for (bool orbit : {false, true}) for (const auto* pose : poses) {
-    cropRenderer.render(rendered, orbit, pose, -40, -2);
+  for (uint8_t companion : {0, 1, 2}) for (const auto* pose : poses) {
+    const auto expected = builtin_companion_view(companion, pose);
+    cropRenderer.render(rendered, companion, pose, -40, -2);
     lv_obj_update_layout(rendered);
-    CHECK(lv_image_get_src(rendered) == nova_assets::companion_pose(orbit, pose));
-    CHECK(lv_obj_get_x(rendered) == -40 + (orbit ? nova_assets::orbit_origin_x : nova_assets::nova_origin_x));
-    CHECK(lv_obj_get_y(rendered) == -2 + (orbit ? nova_assets::orbit_origin_y : nova_assets::nova_origin_y));
+    CHECK(lv_image_get_src(rendered) == expected.descriptor);
+    CHECK(lv_obj_get_x(rendered) == -40 + expected.originX);
+    CHECK(lv_obj_get_y(rendered) == -2 + expected.originY);
   }
   CHECK(!cropRenderer.render(rendered,CompanionFrameView{},0,0));
   CHECK(cropRenderer.render(rendered,{&nova_assets::work,3,4},10,20));
@@ -1360,8 +1453,10 @@ int main(int argc, char** argv) {
       const lv_image_dsc_t* raw[]={&nova_assets::work,&nova_assets::done,&nova_assets::low,
         &nova_assets::critical,&nova_assets::sleep,&nova_assets::blink,&nova_assets::orbit_work,
         &nova_assets::orbit_done,&nova_assets::orbit_low,&nova_assets::orbit_critical,
-        &nova_assets::orbit_sleep,&nova_assets::orbit_blink};
-      for (unsigned i=0;i<12;++i) {
+        &nova_assets::orbit_sleep,&nova_assets::orbit_blink,&nova_assets::claude_work,
+        &nova_assets::claude_done,&nova_assets::claude_low,&nova_assets::claude_critical,
+        &nova_assets::claude_sleep,&nova_assets::claude_blink};
+      for (unsigned i=0;i<18;++i) {
         const auto& frame=companions::builtin_frames[i];
         if (!strcmp(expected,frame.frame.encodedSha256))
           return size==frame.frame.encodedBytes && !memcmp(data,frame.encoded,size);
@@ -1377,17 +1472,18 @@ int main(int argc, char** argv) {
     {
       CompanionRenderer cached;
       cached.initialize(cache,hash,decode);
-      for (bool orbit:{false,true})for (const auto* pose:poses) {
-        cached.render(target,orbit,pose,-40,-2);
+      for (uint8_t companion:{0,1,2})for (const auto* pose:poses) {
+        const auto expected=builtin_companion_view(companion,pose);
+        cached.render(target,companion,pose,-40,-2);
         CHECK(cached.cache_active());
         const auto* image=static_cast<const lv_image_dsc_t*>(lv_image_get_src(target));
-        const auto* raw=nova_assets::companion_pose(orbit,pose);
+        const auto* raw=expected.descriptor;
         CHECK(image->data_size==raw->data_size && !memcmp(image->data,raw->data,raw->data_size));
         const auto count=cached.decoded_frames();
-        cached.render(target,orbit,pose,-40,-3);
+        cached.render(target,companion,pose,-40,-3);
         CHECK(cached.decoded_frames()==count); // Motion never decodes the same frame again.
         lv_obj_update_layout(target);
-        CHECK(lv_obj_get_y(target)==-3+(orbit?nova_assets::orbit_origin_y:nova_assets::nova_origin_y));
+        CHECK(lv_obj_get_y(target)==-3+expected.originY);
       }
       CHECK(cached.decode_failures()==0);
       cached.reset();
