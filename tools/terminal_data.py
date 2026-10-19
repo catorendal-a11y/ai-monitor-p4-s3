@@ -19,6 +19,26 @@ def default_root():
     return own if (own/'tools/aim_host.json').is_file() else installed if (installed/'tools/aim_host.json').is_file() else own
 
 
+def window_text(minutes):
+    if not minutes:return 'unknown'
+    return f'{minutes//1440}d' if minutes%1440==0 else f'{minutes//60}h' if minutes%60==0 else f'{minutes}m'
+
+
+def age_text(seconds):
+    if seconds<60:return f'{seconds}s'
+    if seconds<3600:return f'{seconds//60}m'
+    if seconds<86400:return f'{seconds//3600}h {seconds//60%60:02}m'
+    return f'{seconds//86400}d {seconds//3600%24}h'
+
+
+def live_windows(entry,now):
+    """Host-validated quota copy; reset countdowns are derived from the saved deadline."""
+    if not isinstance(entry,dict):return []
+    return [dict(title=window['title'],remaining=window['remaining'],window=window_text(window['window']),
+                 reset_in=None if window['reset_at'] is None else max(0,int(window['reset_at']-now)))
+            for window in entry['windows']]
+
+
 def read_dashboard(root,now=None):
     root=Path(root);now=time.time() if now is None else now
     result=dict(connection='Host stopped',error='',providers=[],agents=[],history=[],device={},
@@ -48,16 +68,26 @@ def read_dashboard(root,now=None):
     history=compact_history(root/'tools/activity',providers,True,now=now) if enabled else {'providers':[],'error':False}
     if history.get('error'):result['error']='History unavailable. Values remain unknown.'
     records={item['provider']:item for item in history['providers']}
+    live_quota=health.get('quota',{})
     for provider in providers:
         record=records.get(provider,{})
-        quota=record.get('quota')
-        remaining=None;note='No recorded quota' if enabled else 'Quota history disabled'
-        if quota:
+        state=health.get('providers',{}).get(provider,'unconfirmed')
+        windows=live_windows(live_quota.get(provider),now)
+        remaining=None;source=None
+        if windows:
+            # The most constrained window decides whether work can continue.
+            remaining=min(window['remaining'] for window in windows);source='live'
+            age=max(0,int(now-live_quota[provider]['at']))
+            note=('Last known '+age_text(age)+' ago; provider unavailable' if state=='unavailable'
+                  else 'Live / updated '+age_text(age)+' ago')
+        elif record.get('quota'):
+            quota=record['quota'];source='history'
             remaining=round(100-quota['usedPercent'],1)
-            minutes=quota['windowMinutes'];window=f'{minutes//1440}d' if minutes and minutes%1440==0 else f'{minutes//60}h' if minutes and minutes%60==0 else f'{minutes}m'
-            note=f"Recorded {quota['ageMinutes']}m ago / {window} window"
+            note=f"Recorded {quota['ageMinutes']}m ago / {window_text(quota['windowMinutes'])} window"
+        elif not result['running']:note='Start the host to read quota'
+        else:note='Waiting for the first provider update' if state=='unconfirmed' else 'No quota reported'
         result['providers'].append(dict(name=PROVIDERS[provider][0],remaining=remaining,quota_note=note,
-            health=health.get('providers',{}).get(provider,'unconfirmed')))
+            health=state,windows=windows,source=source))
         result['history'].append(dict(provider=PROVIDERS[provider][0],today=record.get('today'),
             daily=record.get('daily',[None]*7),agents=record.get('agents',{})))
     for row in live_agents(root/'tools/activity',providers,now=now):

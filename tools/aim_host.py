@@ -1035,12 +1035,13 @@ def _run_loop(cfg, interval, zai_key, views):
                     live_sampler.configure(changed_views)
                 retries.interval = interval
                 tokens.poll_seconds = cfg.get('token_poll_s', 2)
-                health.data['providers'] = {key: value for key, value in health.data['providers'].items() if key in changed_views}
+                health.retain_providers(changed_views)
                 if previous.get("zai_key") != zai_key:
                     retries.succeeded("zcode")
                     # A success from the old credential cannot verify the
                     # newly saved key while its first request is pending.
                     health.data['providers'].pop('zcode', None)
+                    health.data.get('quota', {}).pop('zcode', None)
                     health.update()
                 if (cfg["port"] != previous["port"] or cfg.get('board') != previous.get('board') or changed_views != views
                         or cfg.get('usb_permissions',False)!=previous.get('usb_permissions',False)):
@@ -1203,6 +1204,11 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
         health = getattr(panel, 'health', None)
         if isinstance(health, HostStatus):
             health.provider(provider, 'activity_only' if informational else 'ready' if rows and not notice else 'unavailable')
+            if rows and not notice:
+                try:
+                    health.quota(provider, [dict(row, resetSeconds=reset_seconds(row.get('resetsAt'))) for row in rows])
+                except (ValueError, TypeError):
+                    pass  # The PC dashboard copy is advisory; the display frame was already acknowledged.
         history = getattr(panel, 'history', None)
         if history is not None and rows and not notice: history.record_quota(provider, rows)
         LOG(f"{provider}: frame {frame_id} ACK")

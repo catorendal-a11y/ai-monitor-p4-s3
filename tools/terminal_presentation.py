@@ -10,10 +10,56 @@ from terminal_art import nova_cells
 GREEN='#95ffc2'
 MUTED='#a5adb7'
 LINE='#65717b'
+AMBER='#ffcf66'
+RED='#ff7777'
 
 
 def heading(title,content):
     return Group(Text(title,style='bold '+GREEN),Rule(style=LINE),content)
+
+
+def remaining_color(remaining):
+    return RED if remaining<=10 else AMBER if remaining<=30 else GREEN
+
+
+def percent_caption(remaining,stale=False):
+    return Text(f'{remaining:g}% left',style=MUTED if stale else 'bold '+remaining_color(remaining))
+
+
+def quota_bar(remaining,segments,stale=False):
+    filled=max(0,min(segments,round(remaining*segments/100)))
+    bar=Text();bar.append('█'*filled,style=MUTED if stale else remaining_color(remaining))
+    bar.append('░'*(segments-filled),style='#35434d')
+    return bar
+
+
+def countdown(seconds):
+    if seconds<=0:return 'now'
+    if seconds<3600:return f'{max(1,seconds//60)}m'
+    if seconds<86400:return f'{seconds//3600}h {seconds//60%60:02}m'
+    return f'{seconds//86400}d {seconds//3600%24}h'
+
+
+def remaining_color(remaining):
+    return RED if remaining<=10 else AMBER if remaining<=30 else GREEN
+
+
+def percent_caption(remaining,stale=False):
+    return Text(f'{remaining:g}% left',style=MUTED if stale else 'bold '+remaining_color(remaining))
+
+
+def quota_bar(remaining,segments,stale=False):
+    filled=max(0,min(segments,round(remaining*segments/100)))
+    bar=Text();bar.append('█'*filled,style=MUTED if stale else remaining_color(remaining))
+    bar.append('░'*(segments-filled),style='#35434d')
+    return bar
+
+
+def countdown(seconds):
+    if seconds<=0:return 'now'
+    if seconds<3600:return f'{max(1,seconds//60)}m'
+    if seconds<86400:return f'{seconds//3600}h {seconds//60%60:02}m'
+    return f'{seconds//86400}d {seconds//3600%24}h'
 
 
 def provider_table(rows,compact=False,dense=False):
@@ -25,20 +71,25 @@ def provider_table(rows,compact=False,dense=False):
     table.add_column(min_width=9 if compact else 12,ratio=3,overflow='fold')
     for row in rows:
         name={'ZCode':'Z Code','Claude Code':'Claude'}.get(row['name'],row['name'])
-        remaining=row['remaining'];known=remaining is not None
-        caption=f'{remaining:g}% left' if known else 'Activity only' if row['health']=='activity_only' else 'Unknown'
-        bar=Text('—',style=MUTED)
-        if known:
-            segments=12 if compact else 20
-            filled=max(0,min(segments,round(remaining*segments/100)))
-            color='#ff7777' if remaining<=10 else '#ffcf66' if remaining<=30 else GREEN
-            bar=Text();bar.append('█'*filled,style=color);bar.append('░'*(segments-filled),style='#35434d')
-        note=row['quota_note'].replace(' / ','\n')
-        if not known and row['health']=='activity_only':note='Quota unavailable'
         provider_color={'Codex':GREEN,'Z Code':'#76c9ff','Claude':'#c4a7ff'}.get(name,GREEN)
         label=Text(name,style='bold '+provider_color)
         if row['health'] not in ('ready','activity_only'):label.append('\n'+row['health'].replace('_',' '),style=MUTED)
-        table.add_row(label,Text(caption,style=GREEN if known else MUTED),bar,Text(note,style=MUTED))
+        windows=row.get('windows') or []
+        if windows:
+            stale=row['health']=='unavailable'
+            for index,window in enumerate(windows):
+                detail=Text(window['title']+' / '+window['window'],style=MUTED if stale else 'bold')
+                if window['reset_in'] is not None:detail.append('\nResets in '+countdown(window['reset_in']),style=MUTED)
+                if index==len(windows)-1:detail.append('\n'+row['quota_note'],style=MUTED)
+                table.add_row(label if index==0 else Text(''),percent_caption(window['remaining'],stale),
+                              quota_bar(window['remaining'],12 if compact else 20,stale),detail)
+            continue
+        remaining=row['remaining'];known=remaining is not None
+        caption=percent_caption(remaining) if known else Text('Activity only' if row['health']=='activity_only' else 'Unknown',style=MUTED)
+        bar=quota_bar(remaining,12 if compact else 20) if known else Text('—',style=MUTED)
+        note=row['quota_note'].replace(' / ','\n')
+        if not known and row['health']=='activity_only':note='Quota unavailable'
+        table.add_row(label,caption,bar,Text(note,style=MUTED))
     if not rows:table.add_row('No providers selected','','','Open Settings')
     return heading('PROVIDER USAGE',table)
 

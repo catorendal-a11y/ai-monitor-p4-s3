@@ -74,6 +74,64 @@ class HostStatus:
         if state=='ready': self.data.setdefault('provider_success_at',{})[name]=stamp
         self.update()
 
+    def quota(self, name, rows, now=None):
+        """Overwrite the latest accepted numeric quota; this is not a history record.
+
+        Each row carries usedPercent, windowMinutes, title and an optional
+        resetSeconds countdown already derived by the host.
+        """
+        from provider_catalog import PROVIDERS
+        if name not in PROVIDERS: raise ValueError('Unknown provider')
+        stamp = time.time() if now is None else now
+        windows = [quota_window(row, stamp) for row in rows[:MAX_QUOTA_WINDOWS]]
+        if not windows: raise ValueError('No quota windows')
+        self.data.setdefault('quota', {})[name] = {'windows': windows, 'at': stamp}
+        self.update()
+
+    def retain_providers(self, names):
+        for field in ('providers', 'provider_updated_at', 'provider_success_at', 'quota'):
+            values = self.data.get(field)
+            if isinstance(values, dict):
+                self.data[field] = {key: value for key, value in values.items() if key in names}
+
+
+MAX_QUOTA_WINDOWS = 3
+MAX_QUOTA_TITLE = 16
+
+
+def quota_window(row, now):
+    """Reduce one provider row to display numbers; titles are bounded plain text."""
+    used = row.get('usedPercent')
+    if type(used) not in (int, float) or not math.isfinite(used): raise ValueError('Invalid quota percentage')
+    minutes = row.get('windowMinutes', 0)
+    if type(minutes) is not int or not 0 <= minutes <= 0xffffffff: raise ValueError('Invalid quota window')
+    title = row.get('title')
+    if not isinstance(title, str) or not title.strip(): raise ValueError('Invalid quota title')
+    countdown = row.get('resetSeconds')
+    if countdown is not None and (type(countdown) is not int or not 0 <= countdown <= 0xffffffff):
+        raise ValueError('Invalid quota reset')
+    return {'title': ''.join(c for c in title.strip() if c.isprintable())[:MAX_QUOTA_TITLE],
+            'remaining': round(max(0.0, min(100.0, 100.0 - used)), 1), 'window': minutes,
+            'reset_at': None if countdown is None else now + countdown}
+
+
+def valid_quota(quota, now):
+    from provider_catalog import PROVIDERS
+    if not isinstance(quota, dict) or len(quota) > len(PROVIDERS): return False
+    for name, value in quota.items():
+        if name not in PROVIDERS or not isinstance(value, dict) or set(value) != {'windows', 'at'}: return False
+        stamp, windows = value['at'], value['windows']
+        if type(stamp) not in (int, float) or not math.isfinite(stamp) or not 0 <= stamp <= now + 1: return False
+        if not isinstance(windows, list) or not 1 <= len(windows) <= MAX_QUOTA_WINDOWS: return False
+        for window in windows:
+            if not isinstance(window, dict) or set(window) != {'title', 'remaining', 'window', 'reset_at'}: return False
+            if not isinstance(window['title'], str) or not 0 < len(window['title']) <= MAX_QUOTA_TITLE: return False
+            remaining, minutes, reset = window['remaining'], window['window'], window['reset_at']
+            if type(remaining) not in (int, float) or not math.isfinite(remaining) or not 0 <= remaining <= 100: return False
+            if type(minutes) is not int or not 0 <= minutes <= 0xffffffff: return False
+            if reset is not None and (type(reset) not in (int, float) or not math.isfinite(reset)): return False
+    return True
+
 
 def read_status(root, pids):
     try:
@@ -95,6 +153,7 @@ def read_status(root, pids):
             if not isinstance(stamps,dict) or len(stamps)>len(PROVIDERS): return None
             for name,stamp in stamps.items():
                 if name not in PROVIDERS or type(stamp) not in (int,float) or not math.isfinite(stamp) or not 0<=stamp<=time.time()+1: return None
+        if 'quota' in data and not valid_quota(data['quota'], time.time()): return None
         if 'display_sources' in data:
             mask,stamp=data['display_sources'],data.get('display_sources_at')
             if type(mask) is not int or not 0<=mask<=255 or type(stamp) not in (int,float) or not math.isfinite(stamp): return None
