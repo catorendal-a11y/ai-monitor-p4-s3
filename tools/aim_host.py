@@ -30,6 +30,7 @@ from provider_catalog import selected_providers
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
 from host_security import open_provider_request, read_local_json, safe_text, serial_port
+import private_files
 import queue
 import subprocess
 import threading
@@ -43,6 +44,10 @@ HERE = Path(sys.executable).resolve().parent / "tools" if getattr(sys, "frozen",
 CONFIG_PATH = HERE / "aim_host.json"
 CODEX_AUTH = codex_home() / 'auth.json'
 MAX_FRAME_BYTES = 4095
+MIN_INTERVAL_SECONDS = 15
+MAX_INTERVAL_SECONDS = 240  # the panel marks quota STALE after aim::kQuotaStaleMs
+CYCLE_DEADLINE_SECONDS = 45
+ACK_TIMEOUT_SECONDS = 5  # one slow acknowledgement must not tear down the USB link
 HEARTBEAT_SECONDS = 10
 MAX_RESPONSE_BYTES = 65536
 
@@ -98,19 +103,25 @@ def provider_failure(provider, error):
 
 
 LOG_PATH = HERE / "aim_host.log"
+_log_lock = threading.Lock()
 
 
 def LOG(msg):
     line = f"[{time.strftime('%H:%M:%S')}] {safe_text(msg)}"
     if sys.stdout is not None:
         print(line, flush=True)
-    try:
-        if LOG_PATH.exists() and LOG_PATH.stat().st_size >= 1_000_000:
-            os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
-        with open(LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-    except OSError:
-        pass
+    # Rotation and append must not interleave between threads; the file may hold
+    # port names and provider notices, so create it with current-user protection.
+    with _log_lock:
+        try:
+            if not LOG_PATH.exists():
+                private_files.write_bytes(LOG_PATH, b"")
+            elif LOG_PATH.stat().st_size >= 1_000_000:
+                os.replace(LOG_PATH, LOG_PATH.with_suffix(".log.1"))
+            with open(LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except (OSError, ValueError):
+            pass
 
 DEFAULT_CONFIG = {
     "board": "",          # First-time setup requires an explicit hardware choice.
@@ -194,8 +205,8 @@ def load_config():
     validate_options(out)
     if not isinstance(out["interval_s"], int) or isinstance(out["interval_s"], bool):
         raise ValueError("interval_s must be an integer")
-    if not 15 <= out["interval_s"] <= 240:
-        raise ValueError("interval_s must be between 15 and 240 (panel freshness limit)")
+    if not MIN_INTERVAL_SECONDS <= out["interval_s"] <= MAX_INTERVAL_SECONDS:
+        raise ValueError(f"interval_s must be between {MIN_INTERVAL_SECONDS} and {MAX_INTERVAL_SECONDS} (panel freshness limit)")
     if out["zai_provider"] != "zcode":
         raise ValueError("zai_provider must be 'zcode'")
     if not isinstance(out["zai_key"], str):
@@ -1081,7 +1092,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     continue
             try:
                 cycle_started = time.monotonic()
-                panel.cycle_deadline = cycle_started + 45
+                panel.cycle_deadline = cycle_started + CYCLE_DEADLINE_SECONDS
                 request_id = panel.take_refresh_request()
                 if type(request_id) is not int:
                     request_id = None
@@ -1188,7 +1199,7 @@ def poll_cycle(cfg, zai_key, views, frame_id, panel):
             payload['data'][0]['informational'] = True
         payload["frameId"] = frame_id
         panel.send_frame(json.dumps(payload, allow_nan=False), frame_id)
-        panel.wait_for("ack", seconds=2, frame_id=frame_id)
+        panel.wait_for("ack", seconds=ACK_TIMEOUT_SECONDS, frame_id=frame_id)
         health = getattr(panel, 'health', None)
         if isinstance(health, HostStatus):
             health.provider(provider, 'activity_only' if informational else 'ready' if rows and not notice else 'unavailable')

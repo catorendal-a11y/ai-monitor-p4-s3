@@ -38,7 +38,7 @@ class NovaState {
       const auto* provider = aim::provider_style(view.providerKey);
       hasFresh |= view.valid && view.informational && provider && tokenSignalFresh &&
                   (snapshot.tokenSourceMask & provider->activityMask);
-      if (!view.valid || !view.hasUsage || view.notice || view.fetching || now - view.quotaReceivedMs >= 300000u) continue;
+      if (!view.valid || !view.hasUsage || view.notice || view.fetching || now - view.quotaReceivedMs >= aim::kQuotaStaleMs) continue;
       for (size_t r = 0; r < view.rowCount; ++r) {
         const auto& row = view.rows[r]; if (!row.valid) continue;
         hasFresh = true;

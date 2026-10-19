@@ -15,6 +15,9 @@ namespace aim {
 
 static constexpr size_t kMaxRows = 3;   // protocol: usage.rows[] is capped at 3
 static constexpr size_t kMaxViews = 8;  // protocol: set_views accepts up to 8 windows
+// Quota older than this is STALE. Must exceed the host's slowest refresh cycle
+// (interval_s <= 240 plus its 45 s cycle deadline); tests/test_freshness.py enforces it.
+static constexpr uint32_t kQuotaStaleMs = 300000u;
 
 // One usage row ("Current session (5h)", percent, when it resets).
 struct Row {

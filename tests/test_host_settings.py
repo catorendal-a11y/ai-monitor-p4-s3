@@ -178,7 +178,7 @@ class HostSettingsTests(unittest.TestCase):
         panel = Mock(); panel.health = HostStatus(self.root/'tools'); panel.health.update('connected', 'COM6')
         with patch.object(host, 'fetch_codex', return_value=(None, 'Codex quota unavailable')), patch.object(host, 'LOG'):
             host.poll_cycle(host.DEFAULT_CONFIG, '', ['codex'], 100, panel)
-        panel.wait_for.assert_called_once_with('ack', seconds=2, frame_id=101)
+        panel.wait_for.assert_called_once_with('ack', seconds=host.ACK_TIMEOUT_SECONDS, frame_id=101)
         self.assertFalse(panel.last_poll_success)
         self.assertEqual(read_status(self.root, {os.getpid()})['providers']['codex'], 'unavailable')
 
@@ -197,7 +197,7 @@ class HostSettingsTests(unittest.TestCase):
         data = json.loads(panel.send_frame.call_args.args[0])['data'][0]
         self.assertTrue(data['informational']); self.assertNotIn('usage', data)
         self.assertIn('add a Z.AI key for quota', data['notice'])
-        panel.wait_for.assert_called_once_with('ack', seconds=2, frame_id=101)
+        panel.wait_for.assert_called_once_with('ack', seconds=host.ACK_TIMEOUT_SECONDS, frame_id=101)
 
     def test_invalid_start_preferences_cannot_replace_working_host(self):
         control.save_config(dict(host.DEFAULT_CONFIG, board='guition-p4', providers=['gemini'], port='COM9999', token_poll_s=False), self.root)

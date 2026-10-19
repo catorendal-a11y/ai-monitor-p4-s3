@@ -25,6 +25,7 @@
 #include "ui/interaction.h"
 #include "ui/navigation.h"
 #include "ui/quota_alert.h"
+#include "ui/quota_state.h"
 #include "ui_usage_details.h"
 #include "ui_nova.h"
 #include "ui/nova_assets.h"
@@ -69,7 +70,7 @@ static const uint32_t C_AMBER = 0xFFAA00;
 #define F_BADGE &lv_font_montserrat_22
 
 static constexpr size_t kBigCards = 2;       // side-by-side (<= 2 providers)
-static constexpr uint32_t STALE_MS = 300000;
+static constexpr uint32_t STALE_MS = aim::kQuotaStaleMs;
 
 // Per-provider v2 styling: brand base, light knob tint, badge colors, vendor.
 struct V2Style {
@@ -596,9 +597,8 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
   set_label_cached(c.name, cache.name, sizeof(cache.name), nameBuf);
 
   const bool fresh = view && view->hasUsage && now - view->quotaReceivedMs < STALE_MS;
-  const char* quotaStatus = "CONNECTED";
+  bool critical = false, low = false;
   if (fresh && hostConnected && view && !view->notice && !view->fetching) {
-    bool critical = false, low = false;
     for (size_t r = 0; r < view->rowCount; ++r) {
       const auto& row = view->rows[r];
       if (!row.valid) continue;
@@ -606,17 +606,13 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
       critical |= quota_critical(remaining, view->providerKey, row);
       low |= quota_low(remaining, view->providerKey, row);
     }
-    quotaStatus = critical ? "CRITICAL" : (low ? "LOW QUOTA" : "CONNECTED");
   }
+  const quota_state::State quota = quota_state::classify(view, hostConnected, fresh, critical, low);
   char vendorBuf[sizeof(cache.vendor)];
-  snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor,
-           !view || !view->valid ? "WAITING" :
-           (!hostConnected ? "OFFLINE" : (view->informational ? "ACTIVITY / SETUP" : (view->notice ? "ERROR - TAP" : (view->fetching ? "FETCHING" : (!fresh ? "STALE" : quotaStatus))))));
+  snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor, quota_state::label(quota, false));
   if (hostConnected && sessions.known && (sessions.waiting || sessions.running || sessions.error || sessions.completed)) {
     // Keep quota health visible alongside an independent observed session.
-    const char* quotaLabel=!view || !view->valid?"WAITING":view->informational?"ACTIVITY":
-        view->notice?"ERROR":view->fetching?"UPDATING":!fresh?"STALE":quotaStatus;
-    snprintf(vendorBuf, sizeof(vendorBuf), "%s / %s", quotaLabel,
+    snprintf(vendorBuf, sizeof(vendorBuf), "%s / %s", quota_state::label(quota, true),
              sessions.waiting ? "NEEDS YOU" : sessions.error ? "SESSION ERROR" : sessions.running ? "RUNNING" : "TURN DONE");
   }
   set_label_cached(c.vendor, cache.vendor, sizeof(cache.vendor), vendorBuf);

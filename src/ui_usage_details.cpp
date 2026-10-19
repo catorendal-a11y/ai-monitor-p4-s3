@@ -229,7 +229,7 @@ void ui_details_update() {
   const bool changed = (snapshot.viewsConfigured && selected >= snapshot.viewCount) || strcmp(key, expectedKey) != 0;
   const auto* style = aim::provider_style(expectedKey);
   char text[256]; snprintf(text, sizeof(text), "%s / Details", style ? style->label : "Provider"); detail_text(title, text);
-  const bool fresh = view.hasUsage && now - view.quotaReceivedMs < 300000u;
+  const bool fresh = view.hasUsage && now - view.quotaReceivedMs < aim::kQuotaStaleMs;
   snprintf(text, sizeof(text), "%s / %s / Last good %lu m ago", view.hasUsage ? (view.showsRemaining ? "REMAINING" : "USED") : "NO DATA",
            !snapshot.hostPresent ? "OFFLINE" : (view.notice ? "ERROR" : (view.fetching ? "FETCHING" : (!fresh ? "STALE" : "CONNECTED"))),
            static_cast<unsigned long>((now - view.quotaReceivedMs) / 60000));

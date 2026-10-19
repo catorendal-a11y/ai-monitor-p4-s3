@@ -281,7 +281,7 @@ static void refresh_quota_choices() {
     if (row) {
       const float remaining = view->showsRemaining ? row->usedPercent : 100.0f - row->usedPercent;
       const char* state = !snapshot.hostPresent ? "OFFLINE" : view->notice ? "ERROR" : view->fetching ? "UPDATING" :
-          millis() - view->quotaReceivedMs >= 300000u ? "STALE" : "REPORTED";
+          millis() - view->quotaReceivedMs >= aim::kQuotaStaleMs ? "STALE" : "REPORTED";
       char percent[16]; format_percent(remaining, true, percent, sizeof(percent));
       snprintf(text, sizeof(text), "%s left / %s", percent, state);
     } else snprintf(text, sizeof(text), "%s", i ? "NOT REPORTED / can select" :

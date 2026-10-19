@@ -322,7 +322,7 @@ void update() {
     const auto* selectedRow = nova_quota_row(view, key, choice);
     const bool hasRow = selectedRow != nullptr;
     const float remaining = hasRow ? (view.showsRemaining ? selectedRow->usedPercent : 100.0f - selectedRow->usedPercent) : 0;
-    const bool fresh = hasRow && !view.notice && !view.fetching && snapshot.hostPresent && now - view.quotaReceivedMs < 300000u;
+    const bool fresh = hasRow && !view.notice && !view.fetching && snapshot.hostPresent && now - view.quotaReceivedMs < aim::kQuotaStaleMs;
     const auto& row = selectedRow ? *selectedRow : view.rows[0];
     const uint32_t color = !fresh ? ui_theme::muted : (quota_critical(remaining, key, row) ? 0xFF5252 :
                             (quota_low(remaining, key, row) ? 0xFFAA00 : (style ? style->color : ui_theme::accent)));
