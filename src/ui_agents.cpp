@@ -92,7 +92,7 @@ void update() {
     const auto* style=aim::provider_style(entry.provider);
     const size_t idLength=strlen(entry.id);
     const char* shortId=entry.id+(idLength>8?idLength-8:0);
-    char heading[64];snprintf(heading,sizeof(heading),"%s / %s",style?style->label:"UNKNOWN",shortId);
+    char heading[64];snprintf(heading,sizeof(heading),"%.24s / %.8s",style?style->label:"UNKNOWN",shortId);
     text(row.provider,heading);
     char identifier[80];
     const auto observedAge=static_cast<unsigned long long>(live_agent::observed_age_ms(snapshot,entry,millis())/1000u);

@@ -207,7 +207,7 @@ void ui_details_show(uint8_t viewIndex) {
   selected = viewIndex;
   const auto snapshot = aim::read();
   const char* key = snapshot.viewsConfigured ? snapshot.viewKeys[selected] : snapshot.views[selected].providerKey;
-  snprintf(expectedKey, sizeof(expectedKey), "%s", key);
+  snprintf(expectedKey, sizeof(expectedKey), "%.*s", static_cast<int>(sizeof(expectedKey) - 1), key);
   lv_screen_load(screen);
   ui_details_update();
 }
