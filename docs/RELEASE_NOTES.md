@@ -1,3 +1,17 @@
+# LimitBuddy v1.19.1-rc23
+
+## A clearer PC terminal
+
+- **Summary line** above the pages: how many sessions need you, work or failed, and the tightest
+  quota window ("29% left / Codex Week"), the same answer the display's header gives.
+- **Agents page** shows one card per session in the colour the display uses, with its name,
+  state, last event and elapsed time; sessions waiting for you have an amber frame.
+- **A clearer NOVA**: the robot is lifted off its dark background, the panel border follows its
+  mood and the number of live sessions is shown.
+- Compact one-line buttons, quiet scrollbars, aligned Device and Settings tables, and a quota
+  panel that no longer clips its last rows when many sessions are listed.
+- Display firmware is unchanged from rc22; only the PC application differs.
+
 # LimitBuddy v1.19.1-rc22
 
 ## The display tells you when it needs you, and the Agents screen explains itself
