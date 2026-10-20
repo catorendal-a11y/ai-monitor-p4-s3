@@ -1,4 +1,4 @@
-name: NOVA terminal release
+name: LimitBuddy terminal release
 
 on:
   push:
@@ -168,5 +168,5 @@ jobs:
           if ($LASTEXITCODE -eq 0) { exit 0 }
           $archive = Get-ChildItem work/publish -Filter '*.zip' | Select-Object -First 1
           $sums = Join-Path $archive.DirectoryName 'SHA256SUMS.txt'
-          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "NOVA $env:GITHUB_REF_NAME" --notes-file work/publish/RELEASE_NOTES-current.md
+          gh release create $env:GITHUB_REF_NAME $archive.FullName $sums --verify-tag --draft --title "LimitBuddy $env:GITHUB_REF_NAME" --notes-file work/publish/RELEASE_NOTES-current.md
           if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
