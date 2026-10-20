@@ -153,11 +153,26 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 ## Get running on Windows
 
+**Before you start**
+
+- **Hardware:** a supported 4.3-inch display (Guition ESP32-P4, or the experimental Waveshare S3), a data-capable USB cable, and a Windows 10/11 PC (x64). Without the display there is little to see.
+- **Not code-signed:** the ZIP is built by GitHub from this repository (check it against `SHA256SUMS.txt`), but it is not signed by a publisher. Windows SmartScreen may warn the first time: choose **More info > Run anyway** only if you downloaded it from this repository's Releases page.
+- **Extract first:** unpack the whole ZIP into a permanent folder you can write to (not `Program Files`, not inside the ZIP viewer) and keep it there; the `limitbuddy` command points at that folder.
+
+**Steps**
+
 1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18) and extract it into a permanent writable folder.
 2. **Install the command once.** Double-click **Install-LimitBuddy.cmd**. It checks the bundled runtime and registers `limitbuddy` for your user (the older `nova` command keeps working as an alias). Open a new terminal and type `limitbuddy`. No separate Python, package downloads or administrator rights are needed.
-3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. **Agents** offers provider setup and explicit observational links.
+3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. To see sessions on the **Agents** screen and get the "agent needs you" alert, open **Agents > Provider events** in the terminal and link Claude Code and/or Codex; nothing is linked automatically.
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
 5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it, unless you switch on **Start at Windows sign-in** in **Settings > Edit settings**: the display then comes back by itself after every restart (a per-user Startup entry; it needs no administrator rights and can also be turned off in Windows Settings > Apps > Startup).
+
+**Something not working?**
+
+- `limitbuddy` is not recognized: open a **new** terminal after running **Install-LimitBuddy.cmd**.
+- The display says **NO HOST**: use **Settings > Start host**, and check the port in **Settings > Edit settings** (pick the explicit COM port if several boards are connected). Optionally switch on **Start at Windows sign-in** so it comes back after a restart.
+- The Agents screen is empty: that is expected until the providers are linked (see step 3); the screen names the ones that are not linked.
+- Anything else: **History > Diagnostic export** writes a report with no keys or conversations that you can attach to an [issue](https://github.com/catorendal-a11y/limitbuddy/issues).
 
 **Upgrading from an earlier release?** Each release lives in its own folder, and your settings stay in the old one until you move them:
 
