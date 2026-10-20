@@ -1,3 +1,23 @@
+# LimitBuddy v1.19.1-rc19
+
+## New name, live quota in the terminal and a third companion
+
+- The project is now **LimitBuddy** (formerly AI Monitor P4). The repository moved to
+  `catorendal-a11y/limitbuddy`; old links redirect. Installed paths, executables, the
+  scheduled task and USB pairing labels keep their old identifiers, so existing
+  installations and paired displays continue to work.
+- NOVA terminal shows live provider quota without enabling history: every reported
+  window (session, week, monthly), percent left, a reset countdown and the age of the
+  last update. A failed provider keeps its last known value, labeled as such.
+- New built-in **CLAUDE** companion: the Claude Code banner critter as pixel art, with
+  the same six expressions and animations as NOVA and ORBIT. Choose it in
+  SETTINGS > APPEARANCE. Claude and Claude Code are Anthropic trademarks; this fan
+  rendition is not affiliated with Anthropic.
+- Dashboard text no longer clips: the header state (NO HOST, FETCHING) clears the
+  clock, low/critical captions read "5H / CRITICAL", a retained error states its age
+  once, and three-row cards drop the caption line so rows no longer touch. A new test
+  audits every visible label in every UI scene for clipping.
+
 # AI Monitor v1.19.1-rc18
 
 ## Verified one-click Windows terminal package
