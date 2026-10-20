@@ -33,6 +33,16 @@ epoch changes, theme updates, expiry/disconnect clearing and returning to the co
 Physical USB/client exchange, installation of current executables and P4 touch validation remain
 required before release. Physical S3 validation remains unavailable.
 
+## Summary, names and the needs-you banner
+
+The top line counts sessions by state ("1 error / 2 need you / 2 working"), coloured by the most
+urgent one, and the page label shows the real total ("8 of 11") when more sessions exist than fit.
+Each row has a colour chip and a name derived from the session id (the same in the PC terminal);
+it is a recognition aid only. With nothing listed, the screen names the providers that are not linked
+to LimitBuddy yet. A fresh WAITING or NEEDS ATTENTION event also raises a banner on other screens and
+wakes a dimmed display once per request; DISMISS silences that request only. Old events and stale
+feeds never raise it, and the Agents screen itself shows no banner.
+
 ## Observed timers and generic phases
 
 Metadata capability 2 adds WORKING, READING, WRITING, RUNNING, NEEDS_ATTENTION, ERROR and

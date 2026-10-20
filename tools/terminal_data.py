@@ -9,6 +9,7 @@ from host_security import safe_text
 from provider_catalog import PROVIDERS
 from device_history import compact_history
 from live_events import live_agents
+from session_identity import identity
 
 
 def default_root():
@@ -93,7 +94,8 @@ def read_dashboard(root,now=None):
             daily=record.get('daily',[None]*7),agents=record.get('agents',{})))
     for row in live_agents(root/'tools/activity',providers,now=now):
         age=row.get('observedAgeSeconds',0)
-        result['agents'].append(dict(provider=PROVIDERS[row['provider']][0],id=row['id'][-8:],
+        name,hue=identity(row['id'])
+        result['agents'].append(dict(provider=PROVIDERS[row['provider']][0],id=row['id'][-8:],name=name,hue=hue,
             state=('Last: ' if age>=30 else '')+row['state'].replace('_',' '),age=age,
             elapsed=row.get('elapsedSeconds')))
     return result

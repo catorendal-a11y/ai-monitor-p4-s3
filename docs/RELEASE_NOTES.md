@@ -1,3 +1,22 @@
+# LimitBuddy v1.19.1-rc22
+
+## The display tells you when it needs you, and the Agents screen explains itself
+
+- **A critical quota wakes a dimmed screen** for a minute and the banner now shows when the
+  window resets ("Resets in 2 h 5 m"). A low quota still waits for the next touch.
+- **Agent needs you banner**: when a session starts waiting for you, the display shows
+  "AGENT NEEDS YOU / CLAUDE" with the session's name and how long it has waited, and wakes a dimmed
+  screen once per request. Tap DISMISS to silence one request; the next one alerts again. The banner
+  stays off the Agents screen, which lists every request itself.
+- **Agents screen**: a one-line summary by state ("1 error / 2 need you / 2 working"), the real
+  session count ("8 of 11 / page 1/2"), and when nothing is shown it says which providers are not
+  linked and where to link them (PC app: Agents > Provider events).
+- **Recognizable sessions**: every session gets a name like "Eager Badger" and a colour chip, the
+  same on the display and in the terminal's agent table. Needs a host update; an older host or
+  display simply shows the id as before.
+- The dashboard header shows the most urgent quota window ("58% left / GEMINI Week"), and the
+  data-age and refresh hints moved into a readable line next to the navigation buttons.
+
 # LimitBuddy v1.19.1-rc21
 
 ## The display comes back after a restart, and quota stays current while you work

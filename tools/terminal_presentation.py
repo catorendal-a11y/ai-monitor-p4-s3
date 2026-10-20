@@ -101,13 +101,27 @@ def state_color(state):
     return GREEN if state not in ('UNKNOWN','IDLE') else MUTED
 
 
+# The same 12 hues as the device's session chips (src/ui_agents.cpp hue_colors).
+HUE_COLORS=('#F26B6B','#F2A25C','#E8D55B','#A5D96B','#5CD68A','#5CD6C0','#5CC4F2','#6B8CF2','#8F6BF2','#C06BF2','#F26BC8','#F26B94')
+
+
+def session_cell(row):
+    """Recognizable name with its hue; the id tail stays as the exact identity."""
+    name=row.get('name')
+    if not name:return Text(row['id'])
+    cell=Text('● ',style=HUE_COLORS[row.get('hue',0)%len(HUE_COLORS)])
+    cell.append(name)
+    cell.append(f" {row['id']}",style=MUTED)
+    return cell
+
+
 def agent_table(rows):
     table=Table(expand=True,box=box.HORIZONTALS,show_edge=False,show_lines=True,
                 border_style=LINE,header_style=MUTED,padding=(0,1))
-    for caption,ratio in (('Provider',2),('Session',3),('Last event',3),('State',3)):
+    for caption,ratio in (('Provider',2),('Session',4),('Last event',3),('State',3)):
         table.add_column(caption,ratio=ratio)
     for row in rows:
-        table.add_row(Text(row['provider']),Text(row['id']),Text(f"{row['age']}s ago"),
+        table.add_row(Text(row['provider']),session_cell(row),Text(f"{row['age']}s ago"),
                       Text('● '+row['state'],style=state_color(row['state'])))
     if not rows:table.add_row('No observed sessions','—','—','Unknown')
     return heading('OBSERVED AGENTS',table)

@@ -97,6 +97,18 @@ class TerminalDataTests(unittest.TestCase):
         self.assertEqual(result['agents'][0]['id'],'ab12cd34')
         self.assertEqual(result['agents'][0]['elapsed'],77)
 
+    def test_agent_rows_carry_the_same_name_and_hue_as_the_device(self):
+        result=self.collect(agents=[dict(provider='codex',id='a91f2c08',state='WORKING',observedAgeSeconds=1)])
+        self.assertEqual((result['agents'][0]['name'],result['agents'][0]['hue']),('Jolly Beaver',4))
+
+    def test_agent_table_shows_the_session_name_before_the_id_tail(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import agent_table
+        stream=StringIO();console=Console(file=stream,width=110,color_system=None)
+        console.print(agent_table([dict(provider='Codex',id='a91f2c08',name='Jolly Beaver',hue=4,state='WAITING',age=4,elapsed=None)]))
+        self.assertIn('Jolly Beaver',stream.getvalue());self.assertIn('a91f2c08',stream.getvalue())
+
     def test_bad_configuration_is_actionable_without_exception_text(self):
         with patch.object(data,'local_config',side_effect=ValueError('DO-NOT-DISPLAY')):
             result=data.read_dashboard(self.root,now=1000)

@@ -46,6 +46,18 @@ and fixed state names: UNKNOWN, IDLE, THINKING, EDITING, SEARCHING, BUILDING, TE
 FAILED and DONE. UNKNOWN/IDLE preserve honest incomplete data instead of inventing task activity.
 No tool hints, transcript, provider command or permission fields are accepted.
 
+### Summary and session names (`liveSummary:1`)
+
+Firmware that also advertises `liveSummary:1` accepts three optional top-level fields on
+`live_state`, always together: `total` (sessions observed on the PC, 0-255, at least the number
+listed), `selectedMask` and `linkedMask` (bit per provider in catalog order: providers the user
+selected, and providers whose lifecycle events are linked). They let the Agents screen say "8 of 11"
+and explain an empty list ("Not linked: CODEX, CLAUDE") instead of showing nothing. Each row may
+carry `label` (1-15 ASCII letters, digits, space, dash) and `hue` (0-11), a name and colour derived
+from the opaque id by `tools/session_identity.py`, so the device and the PC terminal show the same
+"Jolly Beaver" for the same session. A name is a recognition aid, not an identity; it carries no
+content. Hosts send these fields only when `get_info` advertises `liveSummary:1`.
+
 State is a complete replacement, including an empty list. Sequence must strictly increase;
 duplicate/older sequences cannot renew freshness. Incorrect boot/epoch traffic is rejected without
 renewing or replacing current state. Invalid current-session metadata clears display data atomically.
