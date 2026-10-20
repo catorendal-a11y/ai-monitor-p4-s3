@@ -5,6 +5,7 @@ from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 from rich.align import Align
+from rich.panel import Panel
 from terminal_art import nova_cells
 
 GREEN='#95ffc2'
@@ -116,7 +117,7 @@ def session_cell(row):
 
 
 def agent_table(rows):
-    table=Table(expand=True,box=box.HORIZONTALS,show_edge=False,show_lines=True,
+    table=Table(expand=True,box=box.HORIZONTALS,show_edge=False,show_lines=False,
                 border_style=LINE,header_style=MUTED,padding=(0,1))
     for caption,ratio in (('Provider',2),('Session',4),('Last event',3),('State',3)):
         table.add_column(caption,ratio=ratio)
@@ -138,7 +139,8 @@ def device_panel(device,connection):
     return text
 
 
-def nova_panel(rows,image_rows=6):
+def nova_mood(rows):
+    """(mood, color, pose) from current, non-expired session states only."""
     current=[row['state'] for row in rows if not row['state'].startswith('Last:')]
     if any(state in ('ERROR','FAILED') for state in current):mood='Needs attention';color='#ff7777'
     elif any(state in ('WORKING','THINKING','READING','SEARCHING','EDITING','WRITING','RUNNING','BUILDING','TESTING') for state in current):mood='Working';color=GREEN
@@ -147,8 +149,15 @@ def nova_panel(rows,image_rows=6):
     elif current:mood='Unknown';color=MUTED
     else:mood='No fresh events';color=MUTED
     pose='error' if mood=='Needs attention' else 'attention' if mood=='Waiting' else 'work' if mood=='Working' else 'done'
-    caption=Text('NOVA / ',style='bold');caption.append(mood,style=color)
-    return Group(Align.center(nova_cells(pose,image_rows)),Align.center(caption))
+    return mood,color,pose,len(current)
+
+
+def nova_panel(rows,image_rows=6):
+    mood,color,pose,live=nova_mood(rows)
+    caption=Text('NOVA / ',style='bold');caption.append(mood,style='bold '+color)
+    parts=[Align.center(nova_cells(pose,image_rows)),Align.center(caption)]
+    if live:parts.append(Align.center(Text(f"{live} live session{'' if live==1 else 's'}",style=MUTED)))
+    return Group(*parts)
 
 
 def history_panel(rows,enabled):
@@ -173,3 +182,81 @@ def history_panel(rows,enabled):
     return heading('LOCAL HISTORY / TODAY',Group(table,Text(
         'Daily trend: oldest → today; scaled per provider. · = unknown gap; ▁ = zero/minimum.\n'
         'Elapsed run time includes waiting and is not active time.',style=MUTED)))
+
+
+WORKING_STATES=('WORKING','THINKING','READING','SEARCHING','EDITING','WRITING','RUNNING','BUILDING','TESTING')
+
+
+def clock(seconds):
+    return 'Unknown' if seconds is None else f'{seconds//3600}:{seconds//60%60:02}:{seconds%60:02}'
+
+
+def urgent_quota(providers):
+    """(remaining, label) of the lowest live quota window, or None; stale rows never headline."""
+    best=None
+    for row in providers:
+        if row.get('health')=='unavailable':continue
+        name={'ZCode':'Z Code','Claude Code':'Claude'}.get(row['name'],row['name'])
+        windows=row.get('windows') or ([dict(remaining=row.get('remaining'),title='',window='')] if row.get('remaining') is not None else [])
+        for window in windows:
+            if window['remaining'] is None:continue
+            label=(name+' '+window['title']).strip()
+            if best is None or window['remaining']<best[0]:best=(window['remaining'],label)
+    return best
+
+
+def headline(providers,agents):
+    """One line that answers "do I need to do anything?": session states, then the tightest quota."""
+    current=[row['state'] for row in agents if not row['state'].startswith('Last:')]
+    errors=sum(state in ('ERROR','FAILED') for state in current)
+    waiting=sum(state in ('WAITING','NEEDS ATTENTION') for state in current)
+    working=sum(state in WORKING_STATES for state in current)
+    line=Text()
+    for count,word,color in ((errors,'error',RED),(waiting,'need you',AMBER),(working,'working',GREEN)):
+        if count:line.append(f'● {count} {word}   ',style='bold '+color)
+    if not line.plain:line.append('● No active sessions   ',style=MUTED)
+    quota=urgent_quota(providers)
+    if quota:
+        line.append('│  ',style=LINE)
+        line.append(f'{quota[0]:g}% left',style='bold '+remaining_color(quota[0]))
+        line.append(' · '+quota[1],style=MUTED)
+    return line
+
+
+def session_cards(rows,columns=2):
+    """One card per session in the same hue the display uses; waiting sessions stand out."""
+    if not rows:
+        return Text('No recent observed sessions.\nUse Check AI setup and Provider events on this page.',style=MUTED)
+    cards=[]
+    for row in rows:
+        stale=row['state'].startswith('Last:')
+        color=MUTED if stale else state_color(row['state'])
+        hue=HUE_COLORS[row.get('hue',0)%len(HUE_COLORS)]
+        body=Text('● '+row['state'],style='bold '+color)
+        body.append(f"\n{row['provider']} {row['id']}",style=MUTED)
+        body.append(f"\nLast event {row['age']}s ago / elapsed {clock(row.get('elapsed'))}",style=MUTED)
+        title=Text('● ',style=hue);title.append(row.get('name') or row['id'],style='bold')
+        cards.append(Panel(body,title=title,title_align='left',box=box.ROUNDED,
+                           border_style=AMBER if color==AMBER else LINE,padding=(0,1)))
+    grid=Table.grid(expand=True,padding=(0,1))
+    for _ in range(columns):grid.add_column(ratio=1)
+    for start in range(0,len(cards),columns):
+        line=cards[start:start+columns]
+        grid.add_row(*line,*['']*(columns-len(line)))
+    return grid
+
+
+def facts_table(title,pairs):
+    """Aligned label/value rows; values may be Text to carry their own color."""
+    table=Table.grid(padding=(0,2))
+    table.add_column(style=MUTED,no_wrap=True,min_width=22);table.add_column(overflow='fold')
+    for label,value in pairs:table.add_row(label,value)
+    return heading(title,table)
+
+
+def settings_panel(settings,close_policy):
+    pairs=[]
+    for key,value in settings.items():
+        shown=Text(('On' if value else 'Off'),style=GREEN if value else MUTED) if isinstance(value,bool) else Text(str(value))
+        pairs.append((key[:-2].replace('_',' ')+' (s)' if key.endswith('_s') else key.replace('_',' '),shown))
+    return Group(facts_table('SAVED SETTINGS',pairs),Text('\nUse Edit settings to configure board, providers, credentials and collection preferences.\n'+close_policy,style=MUTED))

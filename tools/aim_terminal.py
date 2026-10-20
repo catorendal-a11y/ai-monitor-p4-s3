@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import json
 import os
+from rich.console import Group
 from rich.text import Text
 from project_version import HOST_VERSION
 from provider_catalog import PROVIDERS
@@ -16,7 +17,7 @@ from host_security import safe_text
 from terminal_data import default_root,read_dashboard
 from terminal_actions import TerminalActions
 from terminal_forms import ActionForm,ResultScreen,settings_form,settings_values
-from terminal_presentation import provider_table,agent_table,device_panel,nova_panel,history_panel
+from terminal_presentation import provider_table,agent_table,device_panel,nova_panel,nova_mood,history_panel,headline,session_cards,facts_table,settings_panel
 
 
 def number(value):
@@ -25,15 +26,6 @@ def number(value):
 
 def duration(value):
     return 'Unknown' if value is None else f'{value//3600}:{value//60%60:02}:{value%60:02}'
-
-
-def agents_text(rows):
-    lines=['OBSERVED AGENTS','']
-    if not rows:lines.extend(['No recent observed sessions.','Use Check AI setup and Provider events on this page.'])
-    for row in rows:
-        lines.extend([f"{row['provider']} / {row['id']}  |  {row['state']}",
-                      f"Event {row['age']}s ago  |  Elapsed {duration(row['elapsed'])}",''])
-    return '\n'.join(lines)
 
 
 def configure_terminal_colors():
@@ -47,7 +39,11 @@ class TerminalApp(App):
     TITLE='LimitBuddy — Terminal'
     CSS='''
     Screen { background: #101519; color: #eff5f3; }
+    * { scrollbar-background: #101519; scrollbar-background-hover: #101519; scrollbar-background-active: #101519;
+        scrollbar-color: #35434d; scrollbar-color-hover: #526572; scrollbar-color-active: #95ffc2;
+        scrollbar-size-vertical: 1; scrollbar-corner-color: #101519; }
     #brand { height: 2; padding: 0 2; color: #95ffc2; text-style: bold; }
+    #summary { height: 1; padding: 0 2; margin-bottom: 1; }
     #connection { height: 1; width: 1fr; color: #95ffc2; }
     #statusbar { height: 2; border-top: solid #87929a; padding: 0 2; }
     #shortcuts { height: 1; width: auto; color: #a5adb7; }
@@ -62,11 +58,13 @@ class TerminalApp(App):
     #quota-wrap { border-top: solid #95ffc2; }
     #overview-device { border-top: solid #76c9ff; }
     #nova-panel { border: round #95ffc2; background: #13231f; }
-    #overview-agents, #agents-content { border-top: solid #b4a0ff; }
+    #overview-agents { border-top: solid #b4a0ff; }
+    #agents-content { border: none; background: #101519; padding: 0; }
     #history-content { border-top: solid #76c9ff; }
-    Button { background: #1d2d37; border: round #526572; }
+    Button { background: #1d2d37; border: none; height: 1; min-width: 12; padding: 0 2; color: #eff5f3; }
     Button:hover { background: #2c414d; }
-    Button:focus { border: round #95ffc2; text-style: bold; }
+    Button:focus { background: #95ffc2; color: #101519; text-style: bold; }
+    Button:disabled { background: #151e25; color: #65717b; }
     #overview-top { height: 18; margin-bottom: 1; }
     #quota-wrap { width: 2fr; height: 1fr; margin-right: 1; margin-bottom: 0; }
     #quota { height: auto; }
@@ -76,8 +74,8 @@ class TerminalApp(App):
     #overview-agents { min-height: 8; margin-bottom: 0; }
     #notice { height: auto; max-height: 3; color: #ffcf66; padding: 0 2; }
     #help { display: none; height: auto; padding: 1 2; border: round #35d07f; }
-    .actions { layout: horizontal; height: auto; margin-bottom: 1; }
-    .actions Button { margin-right: 1; min-width: 12; }
+    .actions { layout: horizontal; height: 1; margin-bottom: 1; }
+    .actions Button { margin-right: 2; }
     '''
     ENABLE_COMMAND_PALETTE=False
     BINDINGS=[Binding(str(i),f"page('{page}')",page.title(),show=False,priority=True)
@@ -94,15 +92,16 @@ class TerminalApp(App):
         self.service=service or TerminalActions(self.root,comparison=self.compare_from_worker)
 
     def actions(self,*items):
-        # One row per two actions keeps keyboard targets usable in narrow windows.
-        for index in range(0,len(items),2):
+        # Compact one-line buttons, three per row, stay reachable in narrow windows.
+        for index in range(0,len(items),3):
             with Horizontal(classes='actions'):
-                for caption,identifier in items[index:index+2]:yield Button(caption,id=identifier)
+                for caption,identifier in items[index:index+3]:yield Button(caption,id=identifier)
 
     def compose(self)->ComposeResult:
         brand=Text(' ▀▄  LIMITBUDDY ',style='bold #95ffc2 on #18382d')
         brand.append('   NOVA  /  USB companion',style='#a5adb7 on #101519')
         yield Static(brand,id='brand',markup=False)
+        yield Static('',id='summary',markup=False)
         with TabbedContent(id='pages'):
             with TabPane('1 Overview',id='overview'):
                 with VerticalScroll():
@@ -116,7 +115,6 @@ class TerminalApp(App):
             with TabPane('2 Agents',id='agents'):
                 with VerticalScroll():
                     yield from self.actions(('Check AI setup','setup_report'),('Provider events','events'),('Claude quota link','quota-link'),('Codex sign-in','codex_setup'))
-                    yield Static('',id='agents-table',classes='panel',markup=False)
                     yield Static('',id='agents-content',classes='panel',markup=False)
             with TabPane('3 History',id='history'):
                 with VerticalScroll():
@@ -149,9 +147,15 @@ class TerminalApp(App):
         if not self.ready():return
         self.apply_width(event.size.width,event.size.height)
 
+    def top_rows(self,height=None):
+        # The quota panel gets what the session table below does not need, so rows are not clipped.
+        agents=len(self.latest['agents']) if self.latest else 0
+        need=max(8,7+min(agents,6))
+        return max(10,min(22,(self.size.height if height is None else height)-11-need))
+
     def apply_width(self,width,height=None):
         main=self.screen_stack[0]
-        top_height=max(10,min(18,(self.size.height if height is None else height)-17))
+        top_height=self.top_rows(height)
         main.query_one('#overview-top').styles.layout='vertical' if width<90 else 'horizontal'
         main.query_one('#overview-top').styles.height=top_height if width>=90 else 'auto'
         main.query_one('#overview-device').border_title='USB DEVICE'
@@ -165,7 +169,7 @@ class TerminalApp(App):
         main.query_one('#quota-wrap').styles.margin=(0,1 if width>=90 else 0,0 if width>=90 else 1,0)
         main.query_one('#shortcuts').display=width>=100
         if self.latest:
-            main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120,dense=top_height<18))
+            main.query_one('#quota',Static).update(provider_table(self.latest['providers'],compact=width<120,dense=top_height<16))
             main.query_one('#nova-panel',Static).update(nova_panel(self.latest['agents'],image_rows=max(2,top_height-8)))
 
     def check_action(self,action,parameters):
@@ -216,23 +220,22 @@ class TerminalApp(App):
             self.screen_stack[0].query_one('Button#stop').disabled=not value.get('running',False)
         count=len(value['agents'])
         update('#connection',value['connection']+f"  |  {count} observed session"+('' if count==1 else 's')+'  |  History '+('enabled' if value['history_enabled'] else 'disabled'))
-        top_height=max(10,min(18,self.size.height-17))
-        update('#quota',provider_table(value['providers'],compact=self.size.width<120,dense=top_height<18))
-        agents=agents_text(value['agents'])
-        update('#agents-content',agents)
-        update('#agents-table',agent_table(value['agents']))
+        top_height=self.top_rows()
+        update('#quota',provider_table(value['providers'],compact=self.size.width<120,dense=top_height<16))
+        update('#summary',headline(value['providers'],value['agents']))
+        update('#agents-content',session_cards(value['agents'],columns=2 if self.size.width>=100 else 1))
         update('#overview-agents',agent_table(value['agents']))
         device=value['device']
         stamp='Unknown observation age' if device.get('age') is None else f"Observed {device['age']}s ago"
-        description='DEVICE\n\n'+f"{device.get('board','Unknown')}\n{device.get('port','Unknown')}\nFirmware {device.get('firmware','Unknown')}\n{stamp}"
-        update('#device-content',description+'\n\nStatus comes from the existing host.\nNo second USB connection is opened.')
+        update('#device-content',Group(facts_table('DEVICE',[('Board',device.get('board','Unknown')),('Port',device.get('port','Unknown')),
+              ('Firmware',device.get('firmware','Unknown')),('Status',stamp)]),
+              Text('\nStatus comes from the existing host. No second USB connection is opened.',style='#a5adb7')))
         update('#overview-device',device_panel(device,value['connection']))
         update('#nova-panel',nova_panel(value['agents'],image_rows=max(2,top_height-8)))
+        self.screen_stack[0].query_one('#nova-panel').styles.border=('round',nova_mood(value['agents'])[1])
         update('#history-content',history_panel(value['history'],value['history_enabled']))
-        settings=['SAVED SETTINGS','']+[f'{key}: {safe_text(item,80)}' for key,item in value['settings'].items()]
         close_policy='Closing this terminal stops the owned host, following the saved preference.' if value['settings'].get('keep_host_on_close') is False else 'Closing this terminal leaves the host running. Use Stop host to stop it.'
-        settings+=['','Use Edit settings to configure board, providers, credentials and collection preferences.',close_policy]
-        update('#settings-content','\n'.join(settings));update('#notice',value['error'] or self.last_action_notice)
+        update('#settings-content',settings_panel({key:safe_text(item,80) if isinstance(item,str) else item for key,item in value['settings'].items()},close_policy));update('#notice',value['error'] or self.last_action_notice)
 
     def form(self,title,fields,action,note='',confirm=None):
         self.push_screen(ActionForm(title,fields,note,confirm),lambda values:self.dispatch(action,values) if values is not None else None)

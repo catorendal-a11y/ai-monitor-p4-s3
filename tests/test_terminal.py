@@ -109,6 +109,35 @@ class TerminalDataTests(unittest.TestCase):
         console.print(agent_table([dict(provider='Codex',id='a91f2c08',name='Jolly Beaver',hue=4,state='WAITING',age=4,elapsed=None)]))
         self.assertIn('Jolly Beaver',stream.getvalue());self.assertIn('a91f2c08',stream.getvalue())
 
+    def test_headline_counts_current_sessions_and_names_the_tightest_quota(self):
+        from terminal_presentation import headline
+        providers=[dict(name='Codex',remaining=64,health='ready',windows=[
+                       dict(title='Session',window='5h',remaining=64,reset_in=60),dict(title='Week',window='7d',remaining=29,reset_in=60)]),
+                   dict(name='ZCode',remaining=5,health='unavailable'),dict(name='Claude Code',remaining=None,health='activity_only')]
+        agents=[dict(state='WAITING'),dict(state='WORKING'),dict(state='THINKING'),dict(state='Last: WORKING'),dict(state='ERROR')]
+        text=headline(providers,agents).plain
+        for part in ('1 error','1 need you','2 working','29% left','Codex Week'):self.assertIn(part,text)
+        self.assertNotIn('5% left',text)          # a stale row never headlines
+        self.assertIn('No active sessions',headline([],[]).plain)
+
+    def test_session_cards_show_name_state_and_elapsed_without_markup(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import session_cards
+        rows=[dict(provider='Claude',id='[red]x[/red]',name='Jolly Beaver',hue=4,state='WAITING',age=4,elapsed=310)]
+        stream=StringIO();Console(file=stream,width=100,color_system=None).print(session_cards(rows))
+        for part in ('Jolly Beaver','WAITING','0:05:10','[red]x[/red]'):self.assertIn(part,stream.getvalue())
+        self.assertIn('No recent observed sessions',session_cards([]).plain)
+
+    def test_settings_panel_lists_values_with_readable_labels(self):
+        from rich.console import Console
+        from io import StringIO
+        from terminal_presentation import settings_panel
+        stream=StringIO();Console(file=stream,width=100,color_system=None).print(
+            settings_panel(dict(board='guition-p4',usage_history=True,keep_host_on_close=False),'Closing leaves the host running.'))
+        text=stream.getvalue()
+        for part in ('board','guition-p4','usage history','On','keep host on close','Off','Closing leaves'):self.assertIn(part,text)
+
     def test_bad_configuration_is_actionable_without_exception_text(self):
         with patch.object(data,'local_config',side_effect=ValueError('DO-NOT-DISPLAY')):
             result=data.read_dashboard(self.root,now=1000)
@@ -330,7 +359,10 @@ class TerminalUITests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(.15);await pilot.press('2','tab','down','pagedown')
             self.assertEqual(app.query_one(TabbedContent).active,'agents')
             content=app.query_one('#agents-content',Static)
-            self.assertIn('[red]literal[/red]',str(content.render()))
+            from io import StringIO
+            from rich.console import Console
+            stream=StringIO();Console(file=stream,width=60,color_system=None).print(content.content)
+            self.assertIn('[red]literal[/red]',stream.getvalue())
             await pilot.resize_terminal(140,45);await pilot.pause(.1)
             self.assertEqual(app.query_one(TabbedContent).active,'agents')
 
