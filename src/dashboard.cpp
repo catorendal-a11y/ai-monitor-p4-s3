@@ -25,6 +25,7 @@
 #include "ui/interaction.h"
 #include "ui/navigation.h"
 #include "ui/quota_alert.h"
+#include "ui/quota_headline.h"
 #include "ui/quota_state.h"
 #include "ui_usage_details.h"
 #include "ui_nova.h"
@@ -196,6 +197,8 @@ struct CardCaches {
 static CardCaches bigCache[kBigCards];
 static char liveCache[12] = {0};
 static char clockCache[8] = {0};
+static char titleCache[64] = {0};
+static uint32_t titleColorCache = 0;
 static uint32_t liveDotColor = 0;
 static char footStrongCache[20] = {0};
 static char footFramesCache[24] = {0};
@@ -442,7 +445,11 @@ void dashboard_init() {
 #endif
   hdr.eyebrow = make_label(header, 24, 13, 300, F_EYEBROW, C_EYEBROW, LV_TEXT_ALIGN_LEFT, boardCaption);
   lv_obj_set_style_text_letter_space(hdr.eyebrow, 2, 0);
-  hdr.title = make_label(header, 24, 31, 306, F_PROVIDER, C_TITLE, LV_TEXT_ALIGN_LEFT, "Usage Dashboard");
+  // Wide enough for "99% left / Z CODE Monthly", ending before the status dot at x 437; an
+  // ellipsis, never a hard clip, shows when a long provider or window name does not fit.
+  hdr.title = make_label(header, 24, 31, 405, F_PROVIDER, C_TITLE, LV_TEXT_ALIGN_LEFT, "Usage Dashboard");
+  lv_label_set_long_mode(hdr.title, LV_LABEL_LONG_MODE_DOTS);
+  lv_obj_set_height(hdr.title, lv_font_get_line_height(F_PROVIDER));
   // live dot + halo + label (SVG: dot center (475,30) r4, halo r8)
   // Room for the longest state (FETCHING / NO HOST) left of the right-aligned clock.
   hdr.halo = make_dot(header, 437, 22, 16, C_GREEN);
@@ -519,7 +526,8 @@ void dashboard_init() {
   for (auto& cache : bigCache) cache = CardCaches{};
   memset(g_barValue, 0, sizeof(g_barValue));
   memset(g_barColor, 0, sizeof(g_barColor));
-  liveCache[0] = clockCache[0] = '\0';
+  liveCache[0] = clockCache[0] = titleCache[0] = '\0';
+  titleColorCache = 0;
   footStrongCache[0] = footFramesCache[0] = footSyncCache[0] = footServicesCache[0] = hintCache[0] = '\0';
   liveDotColor = footDotColor = 0;
 }
@@ -793,6 +801,22 @@ void dashboard_update() {
     snprintf(clockBuf, sizeof(clockBuf), "%02u:%02u", clockMinutes / 60u, clockMinutes % 60u);
   }
   set_label_cached(hdr.clock, clockCache, sizeof(clockCache), clockBuf);
+
+  // The title names the most urgent window over all AIs, also those on another card page.
+  char titleBuf[64] = "Usage Dashboard";
+  uint32_t titleColor = C_TITLE;
+  const QuotaHeadline headline = quota_headline(snap, now);
+  if (headline.valid && recent) {
+    char percent[16];
+    format_percent(headline.remaining, true, percent, sizeof(percent));
+    snprintf(titleBuf, sizeof(titleBuf), "%s left / %s %s", percent, headline.provider, headline.window);
+    titleColor = headline.level == 2 ? C_RED : (headline.level == 1 ? C_AMBER : C_TITLE);
+  }
+  set_label_cached(hdr.title, titleCache, sizeof(titleCache), titleBuf);
+  if (titleColorCache != titleColor) {
+    titleColorCache = titleColor;
+    lv_obj_set_style_text_color(hdr.title, lv_color_hex(titleColor), 0);
+  }
 
   // ── collect entries ──
   struct Entry {

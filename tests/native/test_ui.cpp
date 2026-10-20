@@ -774,6 +774,47 @@ static void test_critical_alert_wakes_dimmed_screen() {
   idle_dim_touch(true); idle_dim_touch(false);
 }
 
+// The header names the most urgent window over every AI, including cards on another page.
+static void test_header_headline(const std::filesystem::path& screenshots) {
+  dashboard_show();
+  const auto titleIs = [](const char* expected) { return std::string(lv_label_get_text(hdr.title)) == expected; };
+  const auto titleColorIs = [](uint32_t color) {
+    return lv_color_eq(lv_obj_get_style_text_color(hdr.title, LV_PART_MAIN), lv_color_hex(color));
+  };
+
+  set_sample(4, 2);                               // lowest: view 3 (GEMINI), row 1 (Week) = 58 %
+  dashboard_update();
+  CHECK(titleIs("58% left / GEMINI Week"));
+  CHECK(titleColorIs(ui_theme::text));
+  screenshot(screenshots, "header-lowest-window");
+
+  set_sample(1, 1); sample.views[0].rows[0].usedPercent = 20;
+  dashboard_update();
+  CHECK(titleIs("20% left / CODEX Session") && titleColorIs(0xFFAA00));   // low = amber
+  sample.views[0].rows[0].usedPercent = 5;
+  dashboard_update();
+  CHECK(titleIs("5.0% left / CODEX Session") && titleColorIs(0xFF5252));  // critical = red
+  screenshot(screenshots, "header-critical-window");
+
+  // Long names never overlap the status dot; no data falls back to the static title.
+  set_sample(2, 1);
+  std::strcpy(sample.views[1].providerLabel, "ABCDEFGHIJKLMNO");
+  std::memset(sample.views[1].rows[0].title, 'W', 30);
+  sample.views[1].rows[0].title[30] = '\0';
+  sample.views[1].rows[0].usedPercent = 3;
+  dashboard_update(); lv_obj_update_layout(lv_screen_active());
+  lv_area_t title{}, dot{}; lv_obj_get_coords(hdr.title, &title); lv_obj_get_coords(hdr.halo, &dot);
+  CHECK(title.x2 < dot.x1);
+
+  set_sample(2, 2); sample.hostPresent = false;
+  dashboard_update(); CHECK(titleIs("Usage Dashboard") && titleColorIs(ui_theme::text));
+  set_sample(2, 2); sample.views[0].quotaReceivedMs = fakeTick - aim::kQuotaStaleMs - 1;
+  sample.views[1].notice = true;
+  dashboard_update(); CHECK(titleIs("Usage Dashboard"));                  // stale or failed data is not a headline
+  set_sample(2, 2);
+  dashboard_update();
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -1467,6 +1508,7 @@ int main(int argc, char** argv) {
   test_stable_touch_targets(screenshots);
   test_reported_session_poses(screenshots);
   test_critical_alert_wakes_dimmed_screen();
+  test_header_headline(screenshots);
   auto* rendered = lv_image_create(lv_screen_active());
   CompanionRenderer cropRenderer;
   const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,
