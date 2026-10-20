@@ -815,6 +815,40 @@ static void test_header_headline(const std::filesystem::path& screenshots) {
   dashboard_update();
 }
 
+// The status that matters (data age, refresh hints) must be readable at desk distance: the old 12 px
+// strip was 18 px tall, so the data age moves into the empty middle of the navigation row.
+static void test_status_line_is_readable(const std::filesystem::path& screenshots) {
+  dashboard_show();
+  set_sample(4, 2); sample.manualRefreshSupported = true;
+  dashboard_update(); lv_obj_update_layout(lv_screen_active());
+  const auto lineHeight = [](lv_obj_t* label) {
+    return lv_font_get_line_height(lv_obj_get_style_text_font(label, LV_PART_MAIN));
+  };
+  CHECK(lineHeight(footSync) >= 21);                                  // 18 px font
+  CHECK(lineHeight(footStrong) >= 16 && lineHeight(footServices) >= 16);  // 14 px at least, not 12
+
+  lv_area_t sync{}, page{};
+  lv_obj_get_coords(footSync, &sync); lv_obj_get_coords(pageButton, &page);
+  CHECK(sync.y1 >= 432 && sync.y2 <= 480);                            // inside the navigation row
+  CHECK(sync.x1 >= 376 + 12 && sync.x2 <= page.x1 - 8);               // between the tabs and the page selector
+
+  const uint32_t ages[] = {0, 7000, 59000, 61000, 3 * 3600000u + 1000, 23 * 3600000u};
+  for (const uint32_t age : ages) {
+    sample.lastFrameMs = fakeTick - age; dashboard_update(); check_line_fits(footSync);
+    CHECK(std::string(lv_label_get_text(footSync)).rfind("Updated", 0) == 0);
+  }
+  sample.lastFrameMs = fakeTick;
+  for (const auto state : {aim::RefreshState::waiting, aim::RefreshState::updating, aim::RefreshState::complete, aim::RefreshState::failed}) {
+    sample.refreshState = state; sample.refreshCompletedMs = fakeTick; dashboard_update(); check_line_fits(footSync);
+  }
+  sample.refreshState = aim::RefreshState::idle;
+  sample.manualRefreshSupported = false; dashboard_update(); check_line_fits(footSync);   // "Update PC host"
+  sample.hostPresent = false; dashboard_update(); check_line_fits(footSync);             // "PC host needed"
+  check_line_fits(footStrong); check_line_fits(footServices);
+  screenshot(screenshots, "status-line-readable");
+  set_sample(4, 2); dashboard_update();
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -1509,6 +1543,7 @@ int main(int argc, char** argv) {
   test_reported_session_poses(screenshots);
   test_critical_alert_wakes_dimmed_screen();
   test_header_headline(screenshots);
+  test_status_line_is_readable(screenshots);
   auto* rendered = lv_image_create(lv_screen_active());
   CompanionRenderer cropRenderer;
   const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,

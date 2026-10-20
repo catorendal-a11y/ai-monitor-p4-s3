@@ -500,10 +500,13 @@ void dashboard_init() {
   lv_obj_set_scrollable(footer, false);
   make_line(footer, 0, 0, 800, C_LINE);
   footDot = make_dot(scr, 21, 420, 8, C_GREEN);
-  footStrong = make_label(scr, 37, 415, 150, &lv_font_montserrat_12, C_FOOTER_STRONG, LV_TEXT_ALIGN_LEFT, "NO HOST");
+  // The strip above the navigation row is 18 px tall: 14 px is the largest font that fits it.
+  footStrong = make_label(scr, 37, 415, 150, &lv_font_montserrat_14, C_FOOTER_STRONG, LV_TEXT_ALIGN_LEFT, "NO HOST");
   footFrames = nullptr;  // frame counts remain in the protocol, outside the daily-use footer
-  footSync = make_label(scr, 196, 415, 220, &lv_font_montserrat_12, C_META, LV_TEXT_ALIGN_LEFT, "Updated -");
-  footServices = make_label(scr, 552, 415, 224, &lv_font_montserrat_12, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
+  // Data age and refresh hints matter most, so they sit in the empty middle of the navigation row
+  // (between the three tabs, ending at x 376, and the page selector, starting at x 628) in 18 px.
+  footSync = make_label(scr, 392, 445, 224, &lv_font_montserrat_18, C_META_BRIGHT, LV_TEXT_ALIGN_LEFT, "Updated -");
+  footServices = make_label(scr, 552, 415, 224, &lv_font_montserrat_14, C_FOOTER, LV_TEXT_ALIGN_RIGHT, "0 / 0 services online");
   ui_navigation::create(scr,ui_navigation::Page::usage);
   pageButton = lv_btn_create(footer);
   lv_obj_set_pos(pageButton, 628, 0);
