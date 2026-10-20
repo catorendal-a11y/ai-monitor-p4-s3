@@ -722,7 +722,13 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: needs you");
   screenshot(screenshots, "nova-session-waiting");
   agentSample.sessions[0] = agent::SessionCounts{0,0,1,0,4}; ui_nova_update();
-  CHECK(nova_ui::mood == NovaMood::completed); screenshot(screenshots, "nova-session-complete");
+  CHECK(nova_ui::mood == NovaMood::completed);
+  CHECK(!lv_obj_is_hidden(nova_ui::sparks[0]) && !lv_obj_is_hidden(nova_ui::sparks[5]));   // a burst starts with the new mood
+  screenshot(screenshots, "nova-session-complete");
+  ui_nova_update();
+  CHECK(!lv_obj_is_hidden(nova_ui::sparks[0]));                                            // and is not restarted by every tick
+  fakeTick += 1300; agentSample.sessionActivityMs = fakeTick; ui_nova_update();
+  CHECK(nova_ui::mood == NovaMood::completed && lv_obj_is_hidden(nova_ui::sparks[0]));      // over after 1.2 s
   agentSample.sessions[0] = agent::SessionCounts{0,0,0,1,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::session_error); screenshot(screenshots, "nova-session-error");
   CHECK(lv_obj_get_x(nova_ui::menuButton) == update_x && lv_obj_get_y(nova_ui::menuButton) == update_y);
@@ -772,6 +778,48 @@ static void test_critical_alert_wakes_dimmed_screen() {
   CHECK(std::string(lv_label_get_text(quota_banner::pending)).find("Resets in") == std::string::npos);
 
   idle_dim_touch(true); idle_dim_touch(false);
+}
+
+static void set_agent(size_t index, const char* provider, agent::State state, const char* label = nullptr, uint8_t hue = 0);
+// Avatar extras: mood aura, one dot per live session in its hue, and a hop plus greeting on a tap.
+static void test_avatar_extras(const std::filesystem::path& screenshots) {
+  set_sample(1, 1); keep_quota_fresh(); sample.hostPresent = true;
+  ui_nova_show();
+  const auto setUsed = [](float used) { sample.views[0].rows[0].usedPercent = used; keep_quota_fresh(); ui_nova_update(); };
+  setUsed(5);
+  CHECK(nova_ui::mood == NovaMood::critical && nova_ui::auraColor == 0xFF5252);
+  CHECK(lv_obj_get_style_bg_opa(nova_ui::aura[2], LV_PART_MAIN) == LV_OPA_30);              // the inner ring is the strongest
+  setUsed(20);
+  CHECK(nova_ui::mood == NovaMood::low && nova_ui::auraColor == 0xFFC857);
+
+  liveSample = live_agent::UsbLiveSnapshot{};
+  liveSample.fresh = true; liveSample.epoch = 9; liveSample.receivedAt = fakeTick; liveSample.count = 3;
+  set_agent(0, "codex", agent::State::WORKING, "Eager Badger", 3);          // a hue travels with a name
+  set_agent(1, "claude", agent::State::WAITING, "Jolly Beaver", 7);
+  set_agent(2, "codex", agent::State::THINKING, "Dusty Gecko", 11);
+  ui_nova_update();
+  for (int i = 0; i < 3; ++i) CHECK(!lv_obj_is_hidden(nova_ui::satellites[i]));
+  CHECK(lv_obj_is_hidden(nova_ui::satellites[3]));
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(nova_ui::satellites[0], LV_PART_MAIN), lv_color_hex(session_hue_colors[3])));
+  CHECK(lv_obj_get_style_border_width(nova_ui::satellites[1], LV_PART_MAIN) == 2 && lv_obj_get_style_border_width(nova_ui::satellites[0], LV_PART_MAIN) == 0);
+  for (auto* dot : nova_ui::satellites) check_inside(nova_ui::stage, dot);
+  lv_obj_set_hidden(quota_banner::banner, true);
+  screenshot(screenshots, "nova-avatar-extras");
+  fakeTick += live_agent::activity_lease_ms + 1000; keep_quota_fresh(); ui_nova_update();
+  CHECK(lv_obj_is_hidden(nova_ui::satellites[0]));                                          // a stale feed shows no sessions
+
+  setUsed(80);
+  CHECK(nova_ui::auraColor == 0 || nova_ui::mood != NovaMood::low);
+  lv_obj_send_event(nova_ui::stage, LV_EVENT_CLICKED, nullptr);
+  const auto greeting = [] { return std::string(nova_ui::kGreetings[(nova_ui::tapCount - 1) % 5]); };
+  CHECK(nova_ui::tapped && lv_label_get_text(nova_ui::hint) == greeting());
+  fakeTick += 200; ui_nova_update(); CHECK(nova_ui::tapped);                                 // mid-hop
+  fakeTick += 400; ui_nova_update(); CHECK(!nova_ui::tapped);                                // the hop is over after 480 ms
+  const std::string first = greeting();
+  fakeTick += 1200; ui_nova_update(); CHECK(lv_label_get_text(nova_ui::hint) != first);       // the greeting is over too
+  lv_obj_send_event(nova_ui::stage, LV_EVENT_CLICKED, nullptr);
+  CHECK(greeting() != first && lv_label_get_text(nova_ui::hint) == greeting());               // a second tap greets differently
+  dashboard_show();
 }
 
 // An even-burn marker on the bars and a ring for the most urgent window on the NOVA screen.
@@ -885,7 +933,7 @@ static void test_status_line_is_readable(const std::filesystem::path& screenshot
 }
 
 // Agents screen: a state summary instead of page counts, readable names, "8 of N" and why it is empty.
-static void set_agent(size_t index, const char* provider, agent::State state, const char* label = nullptr, uint8_t hue = 0) {
+static void set_agent(size_t index, const char* provider, agent::State state, const char* label, uint8_t hue) {
   auto& entry = liveSample.agents[index];
   entry = live_agent::AgentMetadata{};
   std::strcpy(entry.provider, provider);
@@ -1657,8 +1705,11 @@ int main(int argc, char** argv) {
   nightSettings = {true, 0, 0, 20}; dimMinutes = 0; fakeTick += 60000; settle_backlight();
   sample.tokenActivityMs = fakeTick; sample.tokenIdleSeconds = 0; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::working);  // night brightness must not put an active robot to sleep
+  CHECK(lv_obj_is_hidden(nova_ui::zzz));
   screenshot(screenshots, "nova-active-while-dimmed");
   sample.tokenIdleSeconds = 300; ui_nova_update(); CHECK(nova_ui::mood == NovaMood::resting);
+  CHECK(!lv_obj_is_hidden(nova_ui::zzz) && nova_ui::auraColor == 0);                        // asleep: a sleeping mark, no aura
+  CHECK(lv_obj_get_style_image_recolor_opa(nova_ui::figure, LV_PART_MAIN) == LV_OPA_30);
   screenshot(screenshots, "nova-resting");
   set_sample(2, 1);
   for (size_t i = 0; i < 2; ++i) {
@@ -1753,6 +1804,7 @@ int main(int argc, char** argv) {
   test_reported_session_poses(screenshots);
   test_critical_alert_wakes_dimmed_screen();
   test_pace_marker_and_urgent_dial(screenshots);
+  test_avatar_extras(screenshots);
   test_header_headline(screenshots);
   test_status_line_is_readable(screenshots);
   test_agents_screen_summary_and_names(screenshots);

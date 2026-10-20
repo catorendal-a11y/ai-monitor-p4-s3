@@ -19,6 +19,7 @@
 #include "ui/quota_alert.h"
 #include "ui/quota_window.h"
 #include "ui/quota_headline.h"
+#include "ui/session_hue.h"
 #include "ui/theme.h"
 #include "ui/interaction.h"
 #include "ui/navigation.h"
@@ -35,6 +36,16 @@ static lv_obj_t* companionLabel = nullptr;
 // The most urgent quota window as a ring, readable from across the desk.
 static lv_obj_t *dial = nullptr, *dialValue = nullptr, *dialName = nullptr, *dialWindow = nullptr;
 static uint32_t dialColor = UINT32_MAX;
+// Avatar extras, all bounded runtime objects (no new artwork, so no flash cost):
+//  aura: soft rings of mood colour behind the figure; satellites: one dot per live session in its hue;
+//  zzz: shown while resting; sparks: a short burst when a turn completes; tap: a hop and a greeting.
+static lv_obj_t *aura[3]{}, *satellites[8]{}, *zzz = nullptr, *sparks[6]{};
+static uint32_t auraColor = UINT32_MAX, tapMs = 0, celebrateMs = 0;
+static bool tapped = false, celebrating = false;
+static uint8_t tapCount = 0;
+static NovaMood previousMood = NovaMood::waiting;
+static constexpr uint32_t kHopMs = 480, kGreetMs = 1500, kBurstMs = 1200;
+static const char* const kGreetings[] = {"Hi!", "Hello again!", "Ready!", "Let's go!", "Still here"};
 static lv_obj_t *menuButton = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 static lv_obj_t *refreshButton = nullptr, *refreshLabel = nullptr;
 struct ProviderCard {
@@ -93,7 +104,7 @@ static void request_refresh(lv_event_t*) {
   if (snapshot.hostPresent && snapshot.manualRefreshSupported && !refresh_busy(snapshot.refreshState))
     aim::request_refresh();
 }
-static void say_hi(lv_event_t*) { state.greet(millis()); ui_nova_update(); }
+static void say_hi(lv_event_t*) { state.greet(millis()); tapMs = millis(); tapped = true; ++tapCount; ui_nova_update(); }
 static void next_page(lv_event_t*) { page = (page + 1) % pageCount; ui_nova_update(); }
 static void details(lv_event_t* event) {
   auto* card = static_cast<ProviderCard*>(lv_event_get_user_data(event));
@@ -138,6 +149,12 @@ void init() {
   lv_obj_set_style_clip_corner(stage, true, 0);
   lv_obj_add_event_cb(stage, say_hi, LV_EVENT_CLICKED, nullptr);
   ui_interaction::keep_target(stage);
+  for (int i = 0; i < 3; ++i) {   // behind the figure, so they are created first
+    const int size = 250 - i * 44;
+    aura[i] = lv_obj_create(stage); lv_obj_set_size(aura[i], size, size); lv_obj_set_pos(aura[i], 160 - size / 2, 150 - size / 2);
+    lv_obj_set_style_radius(aura[i], LV_RADIUS_CIRCLE, 0); lv_obj_set_style_border_width(aura[i], 0, 0);
+    lv_obj_set_style_bg_opa(aura[i], LV_OPA_TRANSP, 0); lv_obj_set_scrollable(aura[i], false); lv_obj_set_clickable(aura[i], false);
+  }
   figure = lv_image_create(stage); lv_obj_set_clickable(figure, false);
   // Keep the robot at its original size; trim only transparent canvas margins.
   lv_obj_set_x(figure, -55);
@@ -163,6 +180,20 @@ void init() {
   dialWindow = label(stage, 172, 33, 72, "", &lv_font_montserrat_14, ui_theme::muted);
   lv_obj_set_style_text_align(dialWindow, LV_TEXT_ALIGN_RIGHT, 0);
   lv_obj_set_hidden(dial, true); lv_obj_set_hidden(dialValue, true); lv_obj_set_hidden(dialName, true); lv_obj_set_hidden(dialWindow, true);
+  for (int i = 0; i < 8; ++i) {   // one dot per live session, top left, clear of the antenna and the ring
+    satellites[i] = lv_obj_create(stage); lv_obj_set_size(satellites[i], 12, 12); lv_obj_set_pos(satellites[i], 14 + i * 17, 14);
+    lv_obj_set_style_radius(satellites[i], LV_RADIUS_CIRCLE, 0); lv_obj_set_style_border_width(satellites[i], 0, 0);
+    lv_obj_set_style_bg_opa(satellites[i], LV_OPA_COVER, 0); lv_obj_set_scrollable(satellites[i], false);
+    lv_obj_set_clickable(satellites[i], false); lv_obj_set_hidden(satellites[i], true);
+  }
+  zzz = label(stage, 12, 40, 70, "z Z z", &lv_font_montserrat_18, ui_theme::muted); lv_obj_set_hidden(zzz, true);
+  static const uint32_t sparkColors[6] = {0xFFD166, 0x5CD68A, 0x5CC4F2, 0xF26BC8, 0xE8D55B, 0xFF9F43};
+  for (int i = 0; i < 6; ++i) {
+    sparks[i] = lv_obj_create(stage); lv_obj_set_size(sparks[i], 8, 8);
+    lv_obj_set_style_radius(sparks[i], LV_RADIUS_CIRCLE, 0); lv_obj_set_style_border_width(sparks[i], 0, 0);
+    lv_obj_set_style_bg_color(sparks[i], lv_color_hex(sparkColors[i]), 0); lv_obj_set_style_bg_opa(sparks[i], LV_OPA_COVER, 0);
+    lv_obj_set_scrollable(sparks[i], false); lv_obj_set_clickable(sparks[i], false); lv_obj_set_hidden(sparks[i], true);
+  }
   hint = label(stage, 12, 287, 296, "Tap to say hi", &lv_font_montserrat_18, ui_theme::muted);
   lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
   label(screen, 364, 94, 412, "RIGHT NOW", &lv_font_montserrat_18, ui_theme::accent);
@@ -282,6 +313,12 @@ void update() {
   const auto animationFrame=animation.frame(now);
   if(!external)pose=animatedPoses[animationFrame];
   // Small bounded motion: triangle-wave breathing, no image allocation per tick.
+  int hop = 0;   // a short jump after a tap, a triangle wave over kHopMs
+  if (tapped) {
+    const uint32_t t = now - tapMs;
+    if (t < kHopMs) hop = -static_cast<int>((t < kHopMs / 2 ? t : kHopMs - t) * 16u / (kHopMs / 2));
+    else tapped = false;
+  }
   if (now - previousMotion >= 160u) {
     previousMotion = now;
     const unsigned phase = now % 3200u;
@@ -292,8 +329,8 @@ void update() {
   const uint32_t switchStarted=micros();
 #endif
   if(!external || !renderer.render_external(figure,external->frames[animationFrame].frame,external->codec,
-      companions::runtime::frame(animationFrame),-55,motionY))
-    renderer.render(figure, static_cast<uint8_t>(companion), pose, -55, motionY);
+      companions::runtime::frame(animationFrame),-55,motionY + hop))
+    renderer.render(figure, static_cast<uint8_t>(companion), pose, -55, motionY + hop);
 #if defined(CONFIG_IDF_TARGET_ESP32P4)
   if (decodeCount!=renderer.decoded_frames() || failureCount!=renderer.decode_failures()) {
     cacheTelemetry.lastSwitchUs=micros()-switchStarted;
@@ -312,7 +349,54 @@ void update() {
   if(token_signal_fresh(snapshot,now) && snapshot.lastTokenDelta)
     snprintf(value,sizeof(value),"Tokens %llus ago",static_cast<unsigned long long>(token_idle_seconds(snapshot,now)));
   else snprintf(value,sizeof(value),"Tap to say hi");
-  text(hint, mood == NovaMood::attention || mood == NovaMood::session_error ? "Check AI on your PC" : value);
+  const bool greeting = tapCount && now - tapMs < kGreetMs;
+  text(hint, greeting ? kGreetings[(tapCount - 1) % (sizeof(kGreetings) / sizeof(kGreetings[0]))] :
+             (mood == NovaMood::attention || mood == NovaMood::session_error ? "Check AI on your PC" : value));
+  // Aura: a quiet ring of mood colour. Moods that carry no message, and rest, show none.
+  uint32_t glow = 0;
+  switch (mood) {
+    case NovaMood::working: case NovaMood::session_working: case NovaMood::completed: case NovaMood::updated: glow = ui_theme::accent; break;
+    case NovaMood::attention: case NovaMood::low: glow = 0xFFC857; break;
+    case NovaMood::critical: case NovaMood::session_error: case NovaMood::issue: glow = 0xFF5252; break;
+    default: break;
+  }
+  if (glow != auraColor) {
+    auraColor = glow;
+    static const lv_opa_t strength[3] = {LV_OPA_10, LV_OPA_20, LV_OPA_30};
+    for (int i = 0; i < 3; ++i) {
+      if (glow) lv_obj_set_style_bg_color(aura[i], lv_color_hex(glow), 0);
+      lv_obj_set_style_bg_opa(aura[i], glow ? strength[i] : LV_OPA_TRANSP, 0);
+    }
+  }
+  // Satellites: the sessions the PC reports right now, in the colour the Agents list gives them.
+  const unsigned liveCount = live.fresh && now - live.receivedAt < live_agent::activity_lease_ms ? (live.count < 8 ? live.count : 8) : 0;
+  for (unsigned i = 0; i < 8; ++i) {
+    lv_obj_set_hidden(satellites[i], i >= liveCount);
+    if (i >= liveCount) continue;
+    const auto& entry = live.agents[i];
+    const bool needsYou = entry.state == agent::State::WAITING || entry.state == agent::State::NEEDS_ATTENTION;
+    lv_obj_set_style_bg_color(satellites[i], lv_color_hex(session_hue_colors[entry.hue < 12 ? entry.hue : 0]), 0);
+    lv_obj_set_style_border_width(satellites[i], needsYou ? 2 : 0, 0);
+    lv_obj_set_style_border_color(satellites[i], lv_color_hex(0xFFC857), 0);
+  }
+  // Rest: dim the figure a little and show a sleeping mark.
+  const bool sleepy = mood == NovaMood::resting;   // night brightness alone does not put an active robot to sleep
+  lv_obj_set_hidden(zzz, !sleepy);
+  lv_obj_set_style_image_recolor(figure, lv_color_black(), 0);
+  lv_obj_set_style_image_recolor_opa(figure, sleepy ? LV_OPA_30 : LV_OPA_TRANSP, 0);
+  // Celebration: six sparks fly outward and fade once per completed turn.
+  if (mood == NovaMood::completed && previousMood != NovaMood::completed) { celebrating = true; celebrateMs = now; }
+  previousMood = mood;
+  const uint32_t burst = now - celebrateMs;
+  const bool bursting = celebrating && burst < kBurstMs;
+  if (celebrating && !bursting) celebrating = false;
+  for (int i = 0; i < 6; ++i) {
+    lv_obj_set_hidden(sparks[i], !bursting);
+    if (!bursting) continue;
+    const int angle = i * 60 + 20, radius = 50 + static_cast<int>(burst * 90u / kBurstMs);
+    lv_obj_set_pos(sparks[i], 160 + radius * lv_trigo_cos(angle) / 32768 - 4, 150 + radius * lv_trigo_sin(angle) / 32768 - 4);
+    lv_obj_set_style_opa(sparks[i], static_cast<lv_opa_t>(255u - burst * 255u / kBurstMs), 0);
+  }
   if (local_minutes(snapshot, now, minutes)) snprintf(value, sizeof(value), "%02u:%02u", minutes / 60, minutes % 60);
   else snprintf(value, sizeof(value), "--:--");
   text(clock, value);

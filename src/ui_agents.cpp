@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include "live_agent/activity_types.h"
+#include "ui/session_hue.h"
 #include "ai_monitor/ai_monitor.h"
 #include "ui_nova.h"
 #include "ui_settings.h"
@@ -18,8 +19,7 @@ static lv_obj_t *screen=nullptr,*empty=nullptr,*help=nullptr,*summary=nullptr,*p
 struct Row {lv_obj_t *card=nullptr,*chip=nullptr,*provider=nullptr,*identity=nullptr,*state=nullptr;};
 // One color per host-derived hue, evenly spaced around the wheel at similar brightness so the same
 // session is recognized at a glance; adjacent hues stay clearly different.
-static constexpr uint32_t hue_colors[live_agent::hue_count]={0xF26B6B,0xF2A25C,0xE8D55B,0xA5D96B,0x5CD68A,0x5CD6C0,
-                                                              0x5CC4F2,0x6B8CF2,0x8F6BF2,0xC06BF2,0xF26BC8,0xF26B94};
+static const auto& hue_colors=session_hue_colors;
 static Row rows[4];
 static uint8_t page=0;
 static uint8_t pages=1;
