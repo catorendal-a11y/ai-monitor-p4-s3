@@ -35,7 +35,8 @@ class TaskHistoryTests(unittest.TestCase):
         result=self.summary()
         self.assertEqual(result['completedTasks'],1)
         self.assertIsNone(result['failedTasks'])
-        raw=(self.root/'history.db').read_bytes()
+        # WAL keeps recent commits in history.db-wal until a checkpoint; inspect both files.
+        raw=b''.join(path.read_bytes() for path in (self.root/'history.db',self.root/'history.db-wal') if path.exists())
         for text in (b'private session',b'private task',b'NEVER STORE THIS'):self.assertNotIn(text,raw)
 
     def test_pre_veto_failure_mismatch_and_repeated_completed_status_do_not_count(self):

@@ -46,6 +46,9 @@ def connect(directory, create=False):
                     PRIMARY KEY(provider,minute,window,kind));
             ''')
         if create:
+            # WAL lets the terminal read while the host writes, and the reverse. The mode is stored
+            # in the file, so an existing database switches the next time a writer opens it.
+            database.execute('PRAGMA journal_mode=WAL')
             from agent_history import create_schema
             with database:
                 create_schema(database)
@@ -251,11 +254,14 @@ def clear_history(directory):
         database=connect(folder)
         if database is None:return
         database.close()
-        with closing(sqlite3.connect((folder/'history.db').resolve().as_uri()+'?mode=rw',uri=True,timeout=.5)) as database,database:
-            database.execute('PRAGMA trusted_schema=OFF')
-            for table in ('tokens','quota','agent_events','task_events'):
-                if database.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
-                    database.execute('DELETE FROM '+table)
+        with closing(sqlite3.connect((folder/'history.db').resolve().as_uri()+'?mode=rw',uri=True,timeout=.5)) as database:
+            with database:
+                database.execute('PRAGMA trusted_schema=OFF')
+                for table in ('tokens','quota','agent_events','task_events'):
+                    if database.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",(table,)).fetchone():
+                        database.execute('DELETE FROM '+table)
+            # In WAL mode the deleted rows stay in history.db-wal while any reader keeps it open.
+            database.execute('PRAGMA wal_checkpoint(TRUNCATE)')
 
 
 def read_history(directory, providers, days=7, now=None):

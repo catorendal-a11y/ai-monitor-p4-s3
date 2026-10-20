@@ -3,6 +3,7 @@ from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -48,10 +49,14 @@ class HistoryFixTests(unittest.TestCase):
         recorder=HistoryRecorder(self.folder,True);self.addCleanup(recorder.close)
         recorder.record_tokens({'claude':1})
         deadline=time.monotonic()+2
+        count=None
         while time.monotonic()<deadline:
-            with closing(connect(self.folder)) as db:
-                count=db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0]+db.execute('SELECT COUNT(*) FROM task_events').fetchone()[0]
-            if not count:break
+            try:
+                with closing(connect(self.folder)) as db:
+                    count=db.execute('SELECT COUNT(*) FROM agent_events').fetchone()[0]+db.execute('SELECT COUNT(*) FROM task_events').fetchone()[0]
+            except sqlite3.OperationalError:
+                count=None  # the maintenance writer held the lock; poll again instead of failing the test
+            if count==0:break
             time.sleep(.01)
         self.assertEqual(count,0)
     def test_enabled_marker_has_bounded_lease_and_expired_hooks_do_not_write(self):
