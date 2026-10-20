@@ -1,3 +1,20 @@
+# LimitBuddy v1.19.1-rc24
+
+## Sharper companions, a smarter display
+
+- **Redrawn companions, less cute:** NOVA is now a sentinel with slanted light slits and a blade
+  antenna, ORBIT a faceted sensor drone with one scanner lens, and CLAUDE keeps its pixel silhouette but
+  gets a dark visor, horns and a vent. **Two new companions, WRAITH and GLITCH**, are available on the P4
+  display (the S3 image has no room for more frames and shows NOVA if one is stored).
+- **NOVA screen:** a ring for the tightest quota window, a status tag (RUN / WAIT / FAULT / DONE), radar
+  rings in the mood colour, one chip per live session in its colour, corner brackets, a shockwave ring
+  when a turn completes, STANDBY at rest and terse tap replies.
+- **Usage cards:** gradient bars with a scale, a white even-burn marker that shows whether the quota is
+  going faster than its window, and an amber or red edge on a card that is low or critical.
+- **History:** a real chart with a baseline, weekday names, token counts above observed days and a solid
+  newest bar.
+- The PC terminal's summary line, session cards and clearer avatar from rc23 are included.
+
 # LimitBuddy v1.19.1-rc23
 
 ## A clearer PC terminal
