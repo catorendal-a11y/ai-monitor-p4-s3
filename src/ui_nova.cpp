@@ -223,7 +223,7 @@ void init() {
   }
   standby = label(stage, 24, 36, 90, "STANDBY", &lv_font_montserrat_14, ui_theme::muted);
   lv_obj_set_style_text_letter_space(standby, 2, 0); lv_obj_set_hidden(standby, true);
-  bubble = lv_obj_create(stage); lv_obj_set_size(bubble, 62, 24); lv_obj_set_pos(bubble, 90, 34);
+  bubble = lv_obj_create(stage); lv_obj_set_size(bubble, 62, 24); lv_obj_set_pos(bubble, 76, 34);
   lv_obj_set_style_radius(bubble, 3, 0); lv_obj_set_style_bg_color(bubble, lv_color_hex(ui_theme::background), 0);
   lv_obj_set_style_bg_opa(bubble, LV_OPA_COVER, 0); lv_obj_set_style_border_width(bubble, 1, 0);
   lv_obj_set_style_pad_all(bubble, 0, 0); lv_obj_set_scrollable(bubble, false); lv_obj_set_clickable(bubble, false);

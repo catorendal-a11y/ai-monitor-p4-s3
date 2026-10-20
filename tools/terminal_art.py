@@ -21,7 +21,7 @@ def pixels(pose):
     return width,height,raw
 
 
-LIFT=2.4        # how strongly the robot is pulled away from the panel colour it was drawn on
+LIFT=1.45       # how strongly the robot is pulled away from the panel colour it was drawn on
 LIFT_FLOOR=6    # colour distance below which a pixel is background glow and stays untouched
 
 

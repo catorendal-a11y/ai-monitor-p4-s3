@@ -2,7 +2,7 @@
 #include <lvgl.h>
 namespace nova_assets {
 inline constexpr int16_t nova_origin_x = 28;
-inline constexpr int16_t nova_origin_y = 0;
+inline constexpr int16_t nova_origin_y = 4;
 inline constexpr int16_t orbit_origin_x = 58;
 inline constexpr int16_t orbit_origin_y = 17;
 inline constexpr int16_t claude_origin_x = 44;
