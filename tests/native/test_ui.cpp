@@ -750,9 +750,9 @@ int main(int argc, char** argv) {
   display_apply_brightness(160, false); idle_dim_touch(true); idle_dim_touch(false);
   dashboard_init();
 #if defined(AIM_BOARD_WAVESHARE_S3)
-  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "AI MONITOR / S3") == 0);
+  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "LIMITBUDDY / S3") == 0);
 #else
-  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "AI MONITOR / P4") == 0);
+  CHECK(strcmp(lv_label_get_text(hdr.eyebrow), "LIMITBUDDY / P4") == 0);
 #endif
   ui_settings_init();
   ui_details_init();

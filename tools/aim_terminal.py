@@ -1,4 +1,4 @@
-"""AI Monitor terminal application with the shared desktop operations."""
+"""LimitBuddy terminal application with the shared desktop operations."""
 import argparse
 import asyncio
 from pathlib import Path
@@ -44,7 +44,7 @@ def configure_terminal_colors():
 
 
 class TerminalApp(App):
-    TITLE='AI Monitor — Terminal'
+    TITLE='LimitBuddy — Terminal'
     CSS='''
     Screen { background: #101519; color: #eff5f3; }
     #brand { height: 2; padding: 0 2; color: #95ffc2; text-style: bold; }
@@ -100,7 +100,7 @@ class TerminalApp(App):
                 for caption,identifier in items[index:index+2]:yield Button(caption,id=identifier)
 
     def compose(self)->ComposeResult:
-        brand=Text(' ▀▄  AI MONITOR ',style='bold #95ffc2 on #18382d')
+        brand=Text(' ▀▄  LIMITBUDDY ',style='bold #95ffc2 on #18382d')
         brand.append('   NOVA  /  USB companion',style='#a5adb7 on #101519')
         yield Static(brand,id='brand',markup=False)
         with TabbedContent(id='pages'):
@@ -358,7 +358,7 @@ def screen_text(pixels,width,height):
 def main(argv=None):
     parser=argparse.ArgumentParser(prog='nova',description=__doc__)
     parser.add_argument('--version',action='version',version=HOST_VERSION)
-    parser.add_argument('--root',type=Path,help='Existing AI Monitor application directory')
+    parser.add_argument('--root',type=Path,help='Existing LimitBuddy application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')
     bridge=parser.add_mutually_exclusive_group()
     bridge.add_argument('--ingest',choices=tuple(PROVIDERS),help='Read cumulative numeric provider telemetry from stdin')
@@ -377,7 +377,7 @@ def main(argv=None):
             return app.console.color_system
         colors=asyncio.run(check());print('Terminal UI check passed. Color: '+str(colors));return 0
     if not sys.stdin.isatty() or not sys.stdout.isatty():
-        print('Open AI Monitor Terminal in an interactive terminal (or use --check).');return 2
+        print('Open LimitBuddy Terminal in an interactive terminal (or use --check).');return 2
     TerminalApp(args.root.resolve() if args.root else default_root()).run();return 0
 
 

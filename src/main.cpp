@@ -107,7 +107,7 @@ void setup() {
 #endif
   delay(100);
 
-  LOG_I("AI Monitor P4 %s", FW_VERSION);
+  LOG_I("LimitBuddy %s", FW_VERSION);
   LOG_I("Hardware: %s", board_profile::name);
 
   diagnostics::capture_startup_memory(diagnostics::StartupStage::beforeDisplay);

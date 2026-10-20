@@ -26,7 +26,7 @@ The current unsigned releases should initially use stage 1. If the executable ha
 
 ## Fixed release source and metadata
 
-The updater's owner/repository must be compiled constants: `catorendal-a11y/ai-monitor-p4-s3`. The settings screen must not accept an arbitrary feed, executable URL, command, plugin or installation script.
+The updater's owner/repository must be compiled constants: `catorendal-a11y/limitbuddy`. The settings screen must not accept an arbitrary feed, executable URL, command, plugin or installation script.
 
 Use the public GitHub REST latest-release endpoint without a GitHub token. Validate the returned release rather than assuming that the endpoint means a higher version: accept only a strict stable `vMAJOR.MINOR.PATCH`, reject draft/prerelease flags, and numerically compare against the running version and the highest previously accepted verified version. Reject downgrades and unexpected asset names. Do not interpret `target_commitish` as a verified commit SHA; it can identify a branch. [GitHub release REST API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release).
 

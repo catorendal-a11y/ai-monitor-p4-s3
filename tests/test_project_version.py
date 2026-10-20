@@ -48,9 +48,10 @@ class ProjectVersionTests(unittest.TestCase):
         version = fw_version(ROOT)
         self.assertEqual(HOST_VERSION, version)
         heading = next((line.strip() for line in (ROOT / 'docs/RELEASE_NOTES.md').read_text(encoding='utf-8').splitlines()
-                        if line.startswith('# AI Monitor v')), None)
-        self.assertIsNotNone(heading, 'docs/RELEASE_NOTES.md must start with an "# AI Monitor vX.Y.Z" heading')
-        self.assertEqual(heading, '# AI Monitor ' + version)
+                        if line.startswith(('# AI Monitor v', '# LimitBuddy v'))), None)
+        self.assertIsNotNone(heading, 'docs/RELEASE_NOTES.md must start with a "# LimitBuddy vX.Y.Z" heading')
+        # Releases up to v1.19.1-rc18 were published as AI Monitor.
+        self.assertIn(heading, ('# AI Monitor ' + version, '# LimitBuddy ' + version))
 
     def test_windows_version_resource_is_generated_from_the_version(self):
         resource = windows_version_resource('v1.18.3')

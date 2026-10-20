@@ -517,7 +517,7 @@ void ui_settings_init() {
   lv_obj_set_style_radius(header, 0, 0);
   lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_scrollable(header, false);
-  make_label(header, 24, 12, 420, "AI MONITOR / DISPLAY " FW_VERSION, &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(header, 24, 12, 420, "LIMITBUDDY / DISPLAY " FW_VERSION, &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_label(header, 24, 34, 500, "Settings", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   alertsButton = make_button(header, 608, 16, 168, "ALERTS", open_alerts, nullptr);
 

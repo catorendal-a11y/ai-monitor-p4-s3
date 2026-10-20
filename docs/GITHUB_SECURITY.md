@@ -14,7 +14,7 @@ Public source does not grant a reader access to the maintainer's PC. Readers can
 
 The repository cannot protect against takeover of its owner's GitHub account. Keep two-factor authentication or a passkey enabled, keep recovery methods private, and review newly authorized GitHub applications/tokens. The current API connection does not expose the owner's two-factor status; it was not verified. Checksums alone do not authenticate an asset obtained with its checksum from a compromised account.
 
-For releases with attestations, verify the downloaded terminal ZIP with `gh attestation verify <file> --repo catorendal-a11y/ai-monitor-p4-s3`. This verifies GitHub workflow provenance, not Windows Authenticode publisher signing or a guarantee of safe source code. The publisher attests the verified artifacts passed by the isolated Windows build; generated executables are never executed in the privileged job. See [GitHub artifact attestation guidance](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
+For releases with attestations, verify the downloaded terminal ZIP with `gh attestation verify <file> --repo catorendal-a11y/limitbuddy`. This verifies GitHub workflow provenance, not Windows Authenticode publisher signing or a guarantee of safe source code. The publisher attests the verified artifacts passed by the isolated Windows build; generated executables are never executed in the privileged job. See [GitHub artifact attestation guidance](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
 
 ## Check for a path back to the maintainer's PC
 

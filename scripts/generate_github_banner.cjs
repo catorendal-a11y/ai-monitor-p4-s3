@@ -7,10 +7,10 @@ const root = path.resolve(__dirname, '..');
 const destination = path.join(root, 'docs/media');
 const picture = name => 'data:image/png;base64,' + fs.readFileSync(path.join(root, name)).toString('base64');
 const orbit = picture('docs/ui/orbit-ocean.png');
-const nova = picture('docs/nova-preview.png');
+const nova = picture('docs/ui/claude-amethyst.png');
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="640" viewBox="0 0 1280 640">
-<title>AI Monitor — ESP32-P4 and experimental ESP32-S3 desk companion</title>
-<desc>NOVA and ORBIT actual UI previews with synthetic data. Local token activity, readable provider quotas, USB touchscreen and a Windows installer.</desc>
+<title>LimitBuddy — ESP32 desk display for AI coding usage limits</title>
+<desc>ORBIT and CLAUDE actual UI previews with synthetic data. Local token activity, readable provider quotas, USB touchscreen and a Windows installer.</desc>
 <defs>
  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#08251d"/><stop offset="1" stop-color="#071420"/></linearGradient>
  <radialGradient id="glow"><stop stop-color="#0e8591" stop-opacity=".23"/><stop offset="1" stop-color="#0e8591" stop-opacity="0"/></radialGradient>
@@ -25,21 +25,22 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 <g font-family="Segoe UI,Arial,sans-serif">
  <rect x="64" y="72" width="6" height="20" rx="3" fill="#96f7ba"/>
  <text x="84" y="89" font-size="15" font-weight="700" letter-spacing="2" fill="#9af3bb">OPEN SOURCE · ESP32 · LVGL</text>
- <text x="64" y="167" font-size="54" font-weight="800" letter-spacing="-1" fill="#f1fff7">AI MONITOR</text>
- <text x="64" y="235" font-size="34" font-weight="600" fill="#d4eee5">A desk companion</text>
- <text x="64" y="279" font-size="34" font-weight="600" fill="#d4eee5">for your AI tools.</text>
+ <text x="64" y="167" font-size="54" font-weight="800" letter-spacing="-1" fill="#f1fff7">LIMITBUDDY</text>
+ <text x="64" y="235" font-size="34" font-weight="600" fill="#d4eee5">Your AI usage limits,</text>
+ <text x="64" y="279" font-size="34" font-weight="600" fill="#d4eee5">right on your desk.</text>
  <g fill="#0c3129" stroke="#2a564c">
   <rect x="64" y="320" width="94" height="36" rx="18"/><rect x="168" y="320" width="94" height="36" rx="18"/>
-  <rect x="272" y="320" width="139" height="36" rx="18"/><rect x="64" y="367" width="130" height="36" rx="18"/>
+  <rect x="272" y="320" width="139" height="36" rx="18"/><rect x="64" y="367" width="130" height="36" rx="18"/><rect x="204" y="367" width="118" height="36" rx="18"/>
  </g>
  <g font-size="15" font-weight="600" fill="#d7eee6" text-anchor="middle">
   <text x="111" y="343">Codex</text><text x="215" y="343">ZCode</text>
   <text x="341.5" y="343">Claude Code</text><text x="129" y="390">Gemini CLI</text>
+  <text x="263" y="390">+ 4 more</text>
  </g>
- <text x="64" y="453" font-size="20" fill="#f1fff7">Local token activity. Usage at a glance.</text>
- <text x="64" y="486" font-size="18" fill="#90b7aa">Connect by USB. Choose your providers.</text>
- <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">2 robots · 4 themes · Windows installer</text>
- <text x="64" y="603" font-size="14" fill="#87a89e">github.com/catorendal-a11y/ai-monitor-p4-s3</text>
+ <text x="64" y="453" font-size="20" fill="#f1fff7">Session and weekly quota at a glance.</text>
+ <text x="64" y="486" font-size="18" fill="#90b7aa">USB only. Keys stay on your PC.</text>
+ <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">3 companions · 4 themes · ESP32-P4 / S3 touchscreen</text>
+ <text x="64" y="603" font-size="14" fill="#87a89e">github.com/catorendal-a11y/limitbuddy</text>
 </g>
 <rect x="628" y="125" width="594" height="366" rx="21" fill="#03111b" stroke="#386272" stroke-width="2" filter="url(#shadow)"/>
 <image x="640" y="137" width="570" height="342" xlink:href="${orbit}" clip-path="url(#orbitClip)"/>

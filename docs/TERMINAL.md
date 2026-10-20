@@ -5,7 +5,7 @@ The distribution contains Python source and board firmware, without a NOVA appli
 
 ## Install on Windows
 
-1. Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases).
+1. Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases).
 2. Extract it into a permanent writable folder. Keep that folder after installation.
 3. Double-click **Install-Nova.cmd**. It verifies the included runtime and registers only this user's `nova` command. No administrator access is needed.
 4. Open a new terminal, from any folder, and type:

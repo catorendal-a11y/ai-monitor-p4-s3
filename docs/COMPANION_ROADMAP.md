@@ -50,4 +50,4 @@ the mere availability of P4 hardware features.
 
 Related examples: [Desktop Buddy](https://github.com/tech-nickk2/claude-desktop-buddy),
 [CodexBar](https://github.com/steipete/CodexBar) and
-[ESP32 AI Monitor](https://github.com/tobymarks/esp32-ai-monitor).
+[ESP32 LimitBuddy](https://github.com/tobymarks/esp32-ai-monitor).

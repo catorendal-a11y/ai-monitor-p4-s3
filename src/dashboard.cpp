@@ -436,9 +436,9 @@ void dashboard_init() {
   make_line(header, 0, 77, 800, C_LINE);
 
 #if defined(AIM_BOARD_WAVESHARE_S3)
-  const char* boardCaption = "AI MONITOR / S3";
+  const char* boardCaption = "LIMITBUDDY / S3";
 #else
-  const char* boardCaption = "AI MONITOR / P4";
+  const char* boardCaption = "LIMITBUDDY / P4";
 #endif
   hdr.eyebrow = make_label(header, 24, 13, 300, F_EYEBROW, C_EYEBROW, LV_TEXT_ALIGN_LEFT, boardCaption);
   lv_obj_set_style_text_letter_space(hdr.eyebrow, 2, 0);
@@ -847,7 +847,7 @@ void dashboard_update() {
 
   char hintBuf[96];
   if (used > 0 || snap.viewsConfigured) hintBuf[0] = '\0';
-  else if (!snap.hostPresent) snprintf(hintBuf, sizeof(hintBuf), "Waiting for the AI Monitor host on USB ...");
+  else if (!snap.hostPresent) snprintf(hintBuf, sizeof(hintBuf), "Waiting for the LimitBuddy host on USB ...");
   else snprintf(hintBuf, sizeof(hintBuf), "Connected - waiting for the first usage frame ...");
   set_label_cached(hintLabel, hintCache, sizeof(hintCache), hintBuf);
 

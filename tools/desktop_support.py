@@ -132,8 +132,8 @@ def check_connection(root: Path, emit) -> None:
         info = _wait_for_boot(read_identity)
         from board_profiles import matches_info
         if not matches_info(board, info):
-            raise control.SetupError('This port does not report the selected AI Monitor board. Check the port and board; a new factory display needs firmware installation.')
-        emit('Verified AI Monitor display: ' + board.name + ' on ' + port + '. No firmware or settings were changed.')
+            raise control.SetupError('This port does not report the selected LimitBuddy board. Check the port and board; a new factory display needs firmware installation.')
+        emit('Verified LimitBuddy display: ' + board.name + ' on ' + port + '. No firmware or settings were changed.')
     except (TimeoutError, OSError, RuntimeError, control.host.serial.SerialException):
         raise control.SetupError('The display did not respond. Check its USB data port/cable, close other serial tools, or install firmware on a new board.') from None
     finally:
@@ -211,7 +211,7 @@ def run_firmware_command(command, root, environment, emit, timeout_s=600, idle_s
             now = time.monotonic()
             if now - started >= timeout_s or now - last_output >= idle_s:
                 raise control.SetupError('Firmware tool timed out and was stopped. The write may be incomplete. '
-                    'Keep the display powered and check USB. If AI Monitor still boots, retry the update. '
+                    'Keep the display powered and check USB. If LimitBuddy still boots, retry the update. '
                     'If it no longer boots, use First installation; this resets display settings. PC provider settings are kept.')
             try:
                 line = lines.get(timeout=0.05)
@@ -286,7 +286,7 @@ def write_firmware(root: Path, board_id: str, kind: str, port: str, emit) -> Non
             time.sleep(0.5)
             _wait_for_boot(panel.heartbeat)
         except (RuntimeError, TimeoutError, OSError, control.host.serial.SerialException):
-            raise control.SetupError('Existing AI Monitor identity could not be verified. '
+            raise control.SetupError('Existing LimitBuddy identity could not be verified. '
                 'Check the board/port. A factory demo or another project requires First installation. '
                 'The host is stopped; no firmware was written.') from None
         finally:

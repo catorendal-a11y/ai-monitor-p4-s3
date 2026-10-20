@@ -1,7 +1,7 @@
 @echo off
-title AI Monitor Host
+title LimitBuddy Host
 setlocal
-echo Starting AI Monitor Host...
+echo Starting LimitBuddy Host...
 "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-aim-host.ps1"
 if errorlevel 1 (
   echo Host startup failed. Check Python and pyserial.

@@ -46,7 +46,7 @@ def build(robot,output):
     files['LICENSE']=(ROOT/'LICENSE').read_bytes()
     files['README.md']=(robot.upper()+' original companion export / '+fw_version(ROOT)+'\n'
         'Original project artwork, MIT license. Version-2 RGB565A8/LZ4 animations.\n'
-        'Import through the AI Monitor Companions tab on supported P4 firmware.\n').encode('ascii')
+        'Import through the LimitBuddy Companions tab on supported P4 firmware.\n').encode('ascii')
     output=Path(output);output.mkdir(parents=True,exist_ok=True)
     target=output/(robot+'-'+fw_version(ROOT)+'.aimcompanion')
     with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED) as archive:

@@ -21,7 +21,7 @@ PROVIDER_SETUP = {
               '5. Optional: Link Codex session events below. Review and trust the hooks using /hooks in a compatible '
               'Codex client, then restart the session. Events report waiting, editing and stopped turns; they never '
               'approve tools. Missing hook events remain unknown. Check Agent USB for confirmed display delivery.',
-              'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/CODEX_SETUP.md'),
+              'https://github.com/catorendal-a11y/limitbuddy/blob/main/docs/CODEX_SETUP.md'),
     'zcode': ('1. Install ZCode and sign in with your own account for local token activity.\n'
               '2. For quota percentages, create a Z.AI Coding Plan API key in your Z.AI account and paste it '
               'in the masked field below. Save settings.\n3. Without a key, local activity still works but quota '
@@ -50,7 +50,7 @@ PROVIDER_SETUP = {
               f'nova --ingest {key}, sending cumulative numeric token counters. '
               'See the bundled provider guide for the JSON format.\n3. This bridge shows LOCAL activity. '
               'Selecting the provider alone does not import editor activity or account quota.',
-              'https://github.com/catorendal-a11y/ai-monitor-p4-s3/blob/main/docs/PROVIDERS.md#external-numeric-bridge')
+              'https://github.com/catorendal-a11y/limitbuddy/blob/main/docs/PROVIDERS.md#external-numeric-bridge')
        for key, name in [('copilot', 'GitHub Copilot'), ('cursor', 'Cursor'),
                          ('antigravity', 'Antigravity')]},
 }

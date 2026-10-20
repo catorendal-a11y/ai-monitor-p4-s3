@@ -137,7 +137,7 @@ def _read_app_server(command, method, params, timeout):
             if not isinstance(message.get('result'), dict): raise ValueError('Invalid Codex account result')
             return message['result']
     try:
-        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'AI Monitor P4','version':numeric_version(HOST_VERSION)}}})
+        send({'method':'initialize','id':1,'params':{'clientInfo':{'name':'ai_monitor_p4','title':'LimitBuddy','version':numeric_version(HOST_VERSION)}}})
         response(1); send({'method':'initialized','params':{}})
         request={'method':method,'id':2}
         if params is not None:request['params']=params

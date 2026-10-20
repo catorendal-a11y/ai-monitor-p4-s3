@@ -12,10 +12,10 @@ You do not need Codex CLI installed in advance. In NOVA, choose **Settings > Edi
 | Node.js / npm / Git | Not needed for the monitor or its standalone Codex installation route. An existing npm-based CLI still uses its own Node installation. |
 | PowerShell | The Windows-provided PowerShell runs the official installer. Managed-PC policy can block this; consult the PC administrator if an error reports a restriction. |
 | Internet and browser | Needed for the download and your official account sign-in. |
-| Account | Your own ChatGPT account with Codex access. No OpenAI API key is pasted into AI Monitor for subscription quota. |
+| Account | Your own ChatGPT account with Codex access. No OpenAI API key is pasted into LimitBuddy for subscription quota. |
 | USB | A data-capable cable and supported display. If no COM port appears, check the cable/connector and the manufacturer's driver. |
 
-The Windows x64 release is installed for your own user without administrator access. GitHub's automatic source archives need Python 3.10+; source setup installs dependencies into `.venv`. Building firmware needs the [developer tools](DEVELOPMENT.md). Codex's requirements for actually coding/building another project depend on that project; AI Monitor only reads status and does not start coding tasks or provision a command sandbox. See [PC requirements](PC_REQUIREMENTS.md), [official CLI installation](https://learn.chatgpt.com/docs/cli) and [Windows support](https://learn.chatgpt.com/docs/windows/windows-sandbox).
+The Windows x64 release is installed for your own user without administrator access. GitHub's automatic source archives need Python 3.10+; source setup installs dependencies into `.venv`. Building firmware needs the [developer tools](DEVELOPMENT.md). Codex's requirements for actually coding/building another project depend on that project; LimitBuddy only reads status and does not start coding tasks or provision a command sandbox. See [PC requirements](PC_REQUIREMENTS.md), [official CLI installation](https://learn.chatgpt.com/docs/cli) and [Windows support](https://learn.chatgpt.com/docs/windows/windows-sandbox).
 
 ## First installation
 

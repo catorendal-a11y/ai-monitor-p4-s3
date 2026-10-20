@@ -54,7 +54,7 @@ def claude_statusline(payload, directory):
         if type(reset) not in (int, float) or not math.isfinite(reset) or not 0 <= reset <= 253402300799: continue
         rows.append({'title': title, 'usedPercent': percent, 'reset_epoch': reset, 'windowMinutes': minutes})
     write_record(Path(directory) / 'claude-quota.json', {'received_at': time.time(), 'rows': rows})
-    return 'AI Monitor: quota linked' if rows else 'AI Monitor: local activity only'
+    return 'LimitBuddy: quota linked' if rows else 'LimitBuddy: local activity only'
 
 
 def read_claude_quota(directory, now=None):

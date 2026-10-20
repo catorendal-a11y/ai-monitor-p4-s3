@@ -122,7 +122,7 @@ void init() {
   lv_obj_set_style_bg_color(header, lv_color_hex(ui_theme::header), 0);
   lv_obj_set_style_border_width(header, 0, 0); lv_obj_set_style_pad_all(header, 0, 0);
   lv_obj_set_style_radius(header, 0, 0); lv_obj_set_scrollable(header, false);
-  label(header, 24, 10, 500, "AI MONITOR", &lv_font_montserrat_18, ui_theme::muted);
+  label(header, 24, 10, 500, "LIMITBUDDY", &lv_font_montserrat_18, ui_theme::muted);
   companionLabel = label(header, 24, 34, 360, "NOVA", &lv_font_montserrat_26);
   clock = label(header, 548, 28, 92, "--:--", &lv_font_montserrat_26);
   menuButton = button(header, 656, 14, 120, "MENU", show_menu);

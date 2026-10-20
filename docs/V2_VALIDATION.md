@@ -1,4 +1,4 @@
-# AI Monitor v2 foundation validation
+# LimitBuddy v2 foundation validation
 
 Product direction: **Physical AI Agent Companion & Monitor**. Provider quota/activity,
 live agent interaction, companion rendering, transport and hardware capability remain separate domains.
@@ -277,11 +277,11 @@ runtime memory/USB latency and real-client validation remain pending. No release
 
 ## Correct local app/device deployment and updated direction
 
-The user identified that restarting EMBER was the wrong installation. The existing AI Monitor
+The user identified that restarting EMBER was the wrong installation. The existing LimitBuddy
 desktop shortcut targets AppData/Local/Programs/AI Monitor. A fresh complete Windows package was
 built locally, integrity checked and smoke tested, then its runtime installed at that existing target.
 The private monitor configuration stayed byte-identical; old runtimes were backed up privately.
-The fresh AI Monitor host was verified connected to COM6 by executable identity and fresh status;
+The fresh LimitBuddy host was verified connected to COM6 by executable identity and fresh status;
 EMBER was stopped. Codex observational hooks were explicitly prepared and the user confirmed
 their trust review. Genuine recent hook delivery has not yet been observed; that remains a gate.
 
@@ -314,7 +314,7 @@ features remain future phases, not claimed complete.
 - 355 Python tests, native protocol/settings/live tests and both native LVGL identities passed.
 - P4 and S3 production builds succeeded. S3 retains raw images without an unused compressed payload.
 - P4 COM6 was app-only flashed with full previous-app backup, ROM/partition checks, digest verification,
-  watchdog restart and read-only live/hardware handshake; the correct AI Monitor GUI/host was restored.
+  watchdog restart and read-only live/hardware handshake; the correct LimitBuddy GUI/host was restored.
 - Physical normal-UI report: cache active, 630,528 bytes, one verified startup decode, zero failures,
   20,513 us decode/bind. Actual app image fell from 4,611,328 to 2,347,328 bytes.
 - Installed flasher images/manifest updated for both boards and validated, configuration digest preserved.
@@ -337,7 +337,7 @@ features remain future phases, not claimed complete.
   with metadata capability 2, empty live handshake and active zero-failure companion cache telemetry.
 - All Windows executables were rebuilt; package integrity, corresponding Qt source and GUI/flasher
   checks passed. The correct installation was replaced with runtime backup and unchanged config digest.
-- Correct AI Monitor host reconnects to COM6. No real Codex hook event was observed in this check;
+- Correct LimitBuddy host reconnects to COM6. No real Codex hook event was observed in this check;
   synthetic tests and USB delivery are not presented as a provider-client validation.
 - No push/release, physical S3, interactive permission transmission or physical touch/soak claimed.
 

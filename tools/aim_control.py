@@ -293,7 +293,7 @@ def flash(root=ROOT, ask=input):
     print('\nFirmware target: ' + board.name)
     if board.experimental: print('EXPERIMENTAL S3: unverified on physical hardware. Use the USB TO UART port.')
     print("1. First installation (writes bootloader/partitions; resets display settings)")
-    print("2. Update an existing AI Monitor installation on this board (keeps its partition layout/settings)")
+    print("2. Update an existing LimitBuddy installation on this board (keeps its partition layout/settings)")
     choice = ask("Choose 1 or 2; Enter cancels: ").strip()
     if choice not in {"1", "2"}:
         return
@@ -468,7 +468,7 @@ def main(argv=None):
         return 1 if failed else 0
     actions = {"1": configure, "2": start_host, "3": stop_host, "4": flash, "5": status, "6": view_log, '7': integration_help}
     while True:
-        print("\nAI MONITOR\n1. First-time setup / choose board and AI providers\n2. Start host (hidden)\n3. Stop host\n4. Install / update display firmware\n5. Status / connection help\n6. View recent log\n7. Provider integration help\n0. Exit")
+        print("\nLIMITBUDDY\n1. First-time setup / choose board and AI providers\n2. Start host (hidden)\n3. Stop host\n4. Install / update display firmware\n5. Status / connection help\n6. View recent log\n7. Provider integration help\n0. Exit")
         try:
             choice = input("Choose: ").strip()
             if choice == "0":

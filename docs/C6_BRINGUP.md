@@ -2,7 +2,7 @@
 
 ## USB-only product decision (2026-10-13)
 
-Bluetooth is permanently excluded from AI Monitor. The current standalone probe is identity/version
+Bluetooth is permanently excluded from LimitBuddy. The current standalone probe is identity/version
 only (schema 2), with no Bluetooth controller initialization/enabling. Schema 1 measurements below
 are historical evidence from before this decision; the collector keeps them readable. The remaining
 controller-related procedure descriptions below apply only to that historical experiment.

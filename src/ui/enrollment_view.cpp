@@ -28,7 +28,7 @@ bool EnrollmentView::initialize() {
   lv_obj_add_event_cb(root_,deleted,LV_EVENT_DELETE,this);
   using namespace enrollment_widgets;
   label(root_,24,24,752,44,"CONNECT YOUR PC",&lv_font_montserrat_32);
-  label(root_,24,86,752,74,"Compare this code with AI Monitor on your PC.\nOnly confirm if every group matches.",&lv_font_montserrat_24);
+  label(root_,24,86,752,74,"Compare this code with LimitBuddy on your PC.\nOnly confirm if every group matches.",&lv_font_montserrat_24);
   code_=label(root_,24,180,752,64,"Waiting for PC...",&lv_font_montserrat_40);
   lv_obj_set_style_text_align(code_,LV_TEXT_ALIGN_CENTER,0);
   status_=label(root_,24,262,752,80,"",&lv_font_montserrat_22);

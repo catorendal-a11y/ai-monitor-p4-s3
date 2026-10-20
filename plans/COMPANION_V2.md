@@ -1,4 +1,4 @@
-# AI Monitor v2: physical AI agent companion and monitor
+# LimitBuddy v2: physical AI agent companion and monitor
 
 The user's updated repository review supersedes the earlier construction order. Inspect current
 main and the working tree before changes; preserve existing verified work and the mature USB/AIM1
@@ -29,7 +29,7 @@ Every major new subsystem gets synthetic/native tests before physical integratio
 
 USB/AIM1, quota/token tracking and PC history already exist. Claude observational hooks exist;
 the new local Codex/Claude lifecycle adapters, read-only USB metadata channel and agent/provider
-screen have synthetic/native validation. The correct AI Monitor Windows app is now locally rebuilt;
+screen have synthetic/native validation. The correct LimitBuddy Windows app is now locally rebuilt;
 real client compatibility remains a separate gate. Provider-status rows are not fabricated agents.
 
 NOVA/ORBIT union-alpha cropping saved 23.8%. P4 physically validated LZ4 across twelve poses
@@ -119,7 +119,7 @@ UI publication/final TX gates and opt-in remain required; no real approval is en
 See [authentication evidence](../docs/USB_INTERACTION_AUTH.md).
 
 Claude Code PermissionRequest -> AI-Monitor-Permission -> same-user local IPC ->
-validated AI Monitor host -> USB -> existing permission UI -> one decision back along the same path.
+validated LimitBuddy host -> USB -> existing permission UI -> one decision back along the same path.
 AI-Monitor-Events stays observational. Create a separate permission helper/executable and explicit
 setup; do not give the event observer interactive authority.
 

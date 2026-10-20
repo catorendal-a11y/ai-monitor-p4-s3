@@ -58,7 +58,7 @@
   extract/execute archives, format display storage, reuse active-bank bytes or add a serial owner.
   Read-only library checks cannot create directories. Rejected/incomplete transfers retain the previous pack.
   A missing activation acknowledgment is ambiguous; reconcile status without retrying activation writes.
-- `src/mirror/`, `tools/usb_mirror.py`, `mirror_service.py`, `desktop_mirror.py`: real read-only USB
+- `src/mirror/`, `tools/usb_mirror.py`, `mirror_service.py`: real read-only USB
   pixels through the existing serial owner. Bound coverage/RLE/nonce/leases and scrub/free buffers.
   Never expose protected screens, virtual touch or approval authority. Captures are not history.
 - `src/ui/companion_renderer.h`: preserve cropped frame origins across poses and companions;
@@ -86,7 +86,9 @@
 - `tools/terminal_presentation.py`: reference dashboard tables and NOVA presentation. Keep recorded quota age, unknown values and stale-event states truthful. Extra provider rows must remain scrollable; device-sync age is separate from last-observed hardware age.
 - Tests use synthetic configuration without provider requests or hardware writes.
 - `scripts/build_terminal_release.py`: reviewed source/notice and firmware ZIP; never bundle NOVA application EXEs, Qt or private runtime data. The normal Windows ZIP may vendor the hash-pinned official Python runtime and pinned dependencies under `runtime/`.
-- `assets/nova/`, `assets/orbit/`: original companion SVGs and logo attribution; generated transparent RGB565+A8 frames.
+- `assets/nova/`, `assets/orbit/`, `assets/claude/`: companion SVGs (NOVA/ORBIT original, CLAUDE a
+  Claude Code banner pixel rendition, see its SOURCES.md) and logo attribution; generated transparent
+  RGB565+A8 frames. Built-in companion order is app_settings::Companion (nova, orbit, claude).
 - `src/ui/theme.h`: four runtime palettes, applied to registered screens and overlays on the UI task.
 - `tests/`: synthetic Python/protocol/settings/native UI regressions.
 

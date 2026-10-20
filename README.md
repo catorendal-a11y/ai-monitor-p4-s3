@@ -1,14 +1,16 @@
-# AI Monitor — ESP32-P4 and ESP32-S3 AI Desk Companion
+# LimitBuddy — ESP32 desk display for AI coding usage limits
 
-A USB touchscreen AI usage monitor for **Codex, ZCode, Claude Code and Gemini CLI**. See supported account limits at a glance and let **NOVA** or **ORBIT** react to recorded token activity on your PC.
+**LimitBuddy** keeps your AI coding agents' usage limits on a 4.3-inch ESP32 touchscreen beside your keyboard: session and weekly quota, reset countdowns and low-limit alerts for **Claude Code, OpenAI Codex, Gemini CLI, Z.AI / ZCode, OpenCode, GitHub Copilot, Cursor and Antigravity**. An animated companion — **NOVA**, **ORBIT** or the Claude Code pixel critter **CLAUDE** — reacts to recorded token activity on your PC. USB only: no Wi-Fi, no cloud relay, keys stay on the PC.
 
-New candidate package: **[v1.19.1-rc18](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc18)**,
+*Formerly **AI Monitor P4** (`ai-monitor-p4-s3`); old links redirect here.*
+
+New candidate package: **[v1.19.1-rc18](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18)**,
 with a full-color terminal dashboard, direct device navigation, observed agent sessions,
 local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
 physical permission control remains disabled pending hardware/provider validation.
 
-![AI Monitor P4: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the NOVA terminal](docs/media/github-preview.png)
+![LimitBuddy: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the NOVA terminal](docs/media/github-preview.png)
 
 The [NOVA terminal application](docs/TERMINAL.md) is now the PC app. Download one
 Windows x64 terminal ZIP, extract it into a permanent writable folder, and double-click
@@ -29,11 +31,11 @@ Use `nova --version` or `nova --help` for command information.
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
 
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc18"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/ai-monitor-p4-s3?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;color=35d07f"></a>
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/ai-monitor-p4-s3/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/limitbuddy?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/limitbuddy?style=flat-square&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/limitbuddy/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/catorendal-a11y/ai-monitor-p4-s3?style=flat-square&amp;logo=github&amp;color=54c4f2"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/catorendal-a11y/limitbuddy?style=flat-square&amp;logo=github&amp;color=54c4f2"></a>
 </p>
 <p align="center">
   <a href="docs/BOARDS.md"><img alt="ESP32-P4 supported" src="https://img.shields.io/badge/ESP32--P4-supported-35d07f?style=flat-square"></a>
@@ -54,13 +56,13 @@ Use `nova --version` or `nova --help` for command information.
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode automatic local token activity" src="https://img.shields.io/badge/OpenCode-local%20activity-8b9ba8?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="#make-it-yours"><img alt="NOVA and ORBIT companions" src="https://img.shields.io/badge/companions-NOVA%20%2B%20ORBIT-35d07f?style=flat-square"></a>
+  <a href="#make-it-yours"><img alt="NOVA, ORBIT and CLAUDE companions" src="https://img.shields.io/badge/companions-NOVA%20%2B%20ORBIT%20%2B%20CLAUDE-35d07f?style=flat-square"></a>
   <a href="#make-it-yours"><img alt="Four saved color themes" src="https://img.shields.io/badge/themes-4%20saved%20palettes-c49aff?style=flat-square"></a>
   <a href="docs/QUICK_START.md#everyday-use"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc18"><img alt="NOVA terminal source" src="https://img.shields.io/badge/NOVA-Python%20terminal-54c4f2?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18"><img alt="NOVA terminal source" src="https://img.shields.io/badge/NOVA-Python%20terminal-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
   <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
@@ -73,25 +75,25 @@ Use `nova --version` or `nova --help` for command information.
 
 *Quota needs the provider's supported account/key/bridge. Gemini, OpenCode and external numeric bridges report activity only. S3 remains experimental. The graphical Windows app and EXE distribution are retired.*
 
-[![Support AI Monitor — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/ai-monitor-p4-s3)
+[![Support LimitBuddy — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/limitbuddy)
 
-**[Download NOVA terminal](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc18)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a)
+**[Download NOVA terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
-**Two board choices · Two animated robots · Four color themes · No AI preselected · NOVA terminal setup**
+**Two board choices · Three animated companions · Four color themes · No AI preselected · NOVA terminal setup**
 
 ## Watch the two-minute overview
 
-[![Watch AI Monitor: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
+[![Watch LimitBuddy: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
 
 **[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the NOVA terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
 
 ## Meet your desk companion
 
-| NOVA | ORBIT with the Ocean theme |
-| --- | --- |
-| ![NOVA showing AI activity and usage](docs/nova-preview.png) | ![ORBIT on the Ocean companion screen](docs/ui/orbit-ocean.png) |
+| NOVA | ORBIT with the Ocean theme | CLAUDE with the Amethyst theme |
+| --- | --- | --- |
+| ![NOVA showing AI activity and usage](docs/nova-preview.png) | ![ORBIT on the Ocean companion screen](docs/ui/orbit-ocean.png) | ![CLAUDE pixel companion on the Amethyst theme](docs/ui/claude-amethyst.png) |
 
 These previews are rendered from the actual LVGL interface using synthetic data. They are UI renders, not photographs of the display.
 
@@ -127,13 +129,13 @@ firmware updates, companion packs and screen capture through the existing USB ho
 
 The retired **AI-Monitor.exe** provided a native window with NOVA artwork, a NOVA program icon, board/provider controls and a terminal-style activity log. Each AI had visible setup instructions, including ZCode's optional Coding Plan key and the requirements for activity-only bridges. Users could save settings, start or stop the hidden host, or open the Firmware tab to install the verified board-specific image. The window read local status; it did not generate AI prompts.
 
-![AI Monitor desktop app with NOVA, setup controls and terminal-style logs](docs/media/desktop-app.png)
+![LimitBuddy desktop app with NOVA, setup controls and terminal-style logs](docs/media/desktop-app.png)
 
 *Actual desktop app rendered with synthetic saved settings. Fresh installations have no board or provider preselected.*
 
 [Preview AI setup and provider choices](docs/media/desktop-ai-setup.png). ZCode's masked key field appears only when it is selected; leave it blank to preserve an existing key.
 
-**Check AI setup** separates local activity, account quota, USB delivery and session events, with a 60-second observation test and the next action for each AI. Optional **History** shows local token increases, quota charts and cautious consumption estimates. Claude users can explicitly link session events so NOVA/ORBIT show **Working**, **Needs you** and **Turn complete**, alongside the separate subscription-quota link. [Checklist, history and session setup](docs/USAGE_INSIGHTS.md).
+**Check AI setup** separates local activity, account quota, USB delivery and session events, with a 60-second observation test and the next action for each AI. Optional **History** shows local token increases, quota charts and cautious consumption estimates. Claude users can explicitly link session events so your companion shows **Working**, **Needs you** and **Turn complete**, alongside the separate subscription-quota link. [Checklist, history and session setup](docs/USAGE_INSIGHTS.md).
 
 OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravity still require an advanced numeric bridge; selecting them alone cannot import editor usage. Session events currently support Claude Code only; the other AIs use recorded token activity.
 
@@ -151,15 +153,15 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 ## Get running on Windows
 
-1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/tag/v1.19.1-rc18) and extract it into a permanent writable folder.
+1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18) and extract it into a permanent writable folder.
 2. **Install the command once.** Double-click **Install-Nova.cmd**. It checks the bundled runtime and registers `nova` for your user. Open a new terminal and type `nova`. No separate Python, package downloads or administrator rights are needed.
 3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. **Agents** offers provider setup and explicit observational links.
-4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing AI Monitor boards can use the application update to preserve settings. Nothing is flashed automatically.
+4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
 5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it.
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc18/nova-v1.19.1-rc18-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases/download/v1.19.1-rc18/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
+**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc18/nova-v1.19.1-rc18-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc18/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
 
 The graphical Windows app and EXE distribution are retired. Existing rc14 display firmware works with the terminal-only PC change; updating the display is optional. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
 
@@ -190,13 +192,13 @@ Codex setup uses the official client and your own sign-in flow; the monitor does
 
 ## Make it yours
 
-On NOVA or ORBIT, open **SET > AI USAGE**. PREV/NEXT chooses an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
+On the companion screen, open **SET > AI USAGE**. PREV/NEXT chooses an AI. The screen explains its quota windows, how to enable quota in the PC app, the selected window, and the percentage remaining for each reported window.
 
 - **Codex:** **5 HOURS** is the short-term limit; **7 DAYS** is the weekly limit. Sign in to the official Codex CLI with ChatGPT from the PC app.
 - **ZCode:** **5 HOURS / 7 DAYS** are model quotas when supplied by the plan; **MONTHLY MCP** is the separate monthly tool-call quota, not a monthly model-token budget. Add your own ZAI Coding Plan key in the PC app. [Official ZCode usage guide](https://zcode.z.ai/en/docs/usage-stats).
 - **Claude Code:** optional statusline bridge for reported **5 HOURS / 7 DAYS**. **Gemini CLI:** local recorded activity only. External editor integrations explain their numeric bridge requirements.
 
-Known windows remain visible and can be selected before their data arrives. **NOT REPORTED** never means unused quota: NOVA/ORBIT shows unavailable until real data is received. Percentages update while Settings is open; **REFRESH** reloads the reported options and requests a host update. **AUTO / MOST URGENT** follows the most urgent quota. Choices are saved independently on the display, and alerts still check every window.
+Known windows remain visible and can be selected before their data arrives. **NOT REPORTED** never means unused quota: the companion shows unavailable until real data is received. Percentages update while Settings is open; **REFRESH** reloads the reported options and requests a host update. **AUTO / MOST URGENT** follows the most urgent quota. Choices are saved independently on the display, and alerts still check every window.
 
 | Codex window selection | ZCode window selection |
 | --- | --- |
@@ -256,7 +258,7 @@ No maintainer credentials are included in the source or release. Your optional Z
 
 ## Run from source or contribute
 
-Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/ai-monitor-p4-s3/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/ai-monitor-p4-s3/issues/new/choose). Keep keys, account data and private logs out of posts.
+Built one? [Share your display in Show and tell](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/show-and-tell). Have a setup question? Use [Q&A](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a). Suggest improvements in [Ideas](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/ideas), or [report a reproducible bug](https://github.com/catorendal-a11y/limitbuddy/issues/new/choose). Keep keys, account data and private logs out of posts.
 
 If the project helps your setup, a GitHub star makes it easier to find again. Follow the repository's releases to hear about updates.
 
@@ -269,6 +271,6 @@ sh setup.sh
 
 Firmware builds, serial permissions and test dependencies are covered in the [developer guide](docs/DEVELOPMENT.md). The [release guide](docs/RELEASING.md) explains the separate build/publish jobs and reviewed draft releases. Ordinary source pushes do not publish a release.
 
-[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/ai-monitor-p4-s3/releases)
+[Contributing](CONTRIBUTING.md) · [Provider roadmap](docs/PROVIDER_ROADMAP.md) · [All releases](https://github.com/catorendal-a11y/limitbuddy/releases)
 
 Project-owned code and original NOVA/ORBIT artwork use [MIT](LICENSE). Drivers, dependencies, fonts and provider marks retain their own terms: [third-party notices](THIRD_PARTY_NOTICES.md), [NOVA/logo sources](assets/nova/SOURCES.md) and [ORBIT artwork](assets/orbit/SOURCES.md). This is an independent project and is not endorsed by its AI providers.

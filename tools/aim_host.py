@@ -369,7 +369,7 @@ def fetch_codex():
         access = credential(access)
         req = urllib.request.Request("https://chatgpt.com/backend-api/wham/usage")
         req.add_header("Authorization", "Bearer " + access)
-        req.add_header("User-Agent", "AI-Monitor/" + numeric_version(HOST_VERSION))
+        req.add_header("User-Agent", "LimitBuddy/" + numeric_version(HOST_VERSION))
         with open_provider_request(req) as r:
             data = read_json_response(r)
         rl = data.get("rate_limit") or {}

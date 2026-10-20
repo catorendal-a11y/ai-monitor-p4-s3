@@ -13,7 +13,7 @@ Both builds use LVGL 9.6 and the same dashboard, provider choices, NOVA/ORBIT ar
 
 ## Waveshare S3 setup
 
-1. Connect a data cable to **USB TO UART**. Use this connector for both firmware installation and everyday host operation. The board's native USB connector is not the AI Monitor transport in this build.
+1. Connect a data cable to **USB TO UART**. Use this connector for both firmware installation and everyday host operation. The board's native USB connector is not the LimitBuddy transport in this build.
 2. Open **Settings > Edit settings**, choose **Waveshare ESP32-S3 4.3" (experimental)**, select your AI providers and the UART COM port, then save. Install the manufacturer's CH343 driver if Windows does not list the bridge.
 3. Open **Device > Firmware** and check the selected board again. Use **First installation / factory image** when replacing the manufacturer's demo or another project's firmware. Type `FLASH` only after checking the board and port.
 4. Open **Settings > Start host** after installation. If normal flashing cannot connect, follow Waveshare's BOOT/RESET recovery instructions for this exact model. Stop the host and close serial monitors before flashing.
