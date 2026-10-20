@@ -73,7 +73,11 @@ def _parse(value):
 def state(root, store=None):
     """off: no entry. on: starts this installation. other: ours, but starts another installation.
     foreign: an entry with our name that we did not write."""
-    value = (store if store is not None else RunKey()).read()
+    if store is None:
+        if not supported():
+            return 'off'  # no registry here, so nothing can be registered
+        store = RunKey()
+    value = store.read()
     if value is None:
         return 'off'
     parsed = _parse(value)
@@ -84,7 +88,10 @@ def state(root, store=None):
 
 
 def enable(root, store=None, python=None):
-    store = store if store is not None else RunKey()
+    if store is None:
+        if not supported():
+            raise AutostartError('Start at sign-in is available on Windows only.')
+        store = RunKey()
     if state(root, store) == 'foreign':
         raise AutostartError('Another program already uses the LimitBuddy startup entry. Nothing was changed.')
     command = command_for(root, python)
@@ -96,7 +103,10 @@ def enable(root, store=None, python=None):
 
 def disable(root, store=None):
     """Remove the entry only when it starts this installation."""
-    store = store if store is not None else RunKey()
+    if store is None:
+        if not supported():
+            return
+        store = RunKey()
     if state(root, store) != 'on':
         return
     try:

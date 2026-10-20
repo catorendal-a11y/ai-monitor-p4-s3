@@ -106,6 +106,23 @@ class EnableDisableTests(AutostartTestCase):
             autostart.apply(self.root, False)
 
 
+class UnsupportedPlatformTests(AutostartTestCase):
+    """Linux/macOS have no registry: uninstall preparation calls disable() without a store."""
+    def setUp(self):
+        super().setUp()
+        for name, replacement in (('supported', lambda: False),
+                                  ('RunKey', lambda: self.fail('the registry must not be touched on this platform'))):
+            patcher = patch.object(autostart, name, side_effect=replacement); patcher.start(); self.addCleanup(patcher.stop)
+
+    def test_nothing_is_registered_and_turning_it_off_is_a_no_op(self):
+        self.assertEqual(autostart.state(self.root), 'off')
+        autostart.disable(self.root)
+
+    def test_enabling_is_refused_with_a_reason(self):
+        with self.assertRaises(autostart.AutostartError):
+            autostart.enable(self.root)
+
+
 class SettingsIntegrationTests(AutostartTestCase):
     def setUp(self):
         super().setUp()
