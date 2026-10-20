@@ -9,6 +9,10 @@
 #include "ai_monitor/ai_monitor.h"
 #include "config.h"
 
+#if defined(CONFIG_IDF_TARGET_ESP32P4)
+static_assert(app_settings::companion_count == 5, "P4 must offer all five built-in companions");
+#endif
+
 namespace app_settings {
 
 static const char* NVS_NAMESPACE = "aimon";
