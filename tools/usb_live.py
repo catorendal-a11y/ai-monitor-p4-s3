@@ -13,13 +13,31 @@ def integer(value):
     return type(value) is int and 0 <= value <= MAX_VALUE
 
 
+LABEL = re.compile(r'[A-Za-z]+(?: [A-Za-z]+)*')
+MAX_LABEL = 15      # the device label buffer
+HUES = 12           # colors the device can draw
+SUMMARY_KEYS = frozenset(('total', 'selected', 'linked'))
+
+
+def validate_summary(summary, count):
+    """Totals beyond the eight listed agents, and which AIs have observers: small bounded integers."""
+    if not isinstance(summary, dict) or set(summary) != SUMMARY_KEYS:
+        raise ValueError('Live summary contains unsupported fields')
+    for key in SUMMARY_KEYS:
+        if type(summary[key]) is not int or not 0 <= summary[key] <= 255:
+            raise ValueError('Invalid live summary value')
+    if summary['total'] < count:
+        raise ValueError('Live summary total is smaller than the listed agents')
+    return dict(summary)
+
+
 def validate_agents(agents):
     if not isinstance(agents, list) or len(agents) > 8:
         raise ValueError('Live snapshots support at most eight agents')
     output, seen = [], set()
     for agent in agents:
         if (not isinstance(agent, dict) or not {'provider','id','state'} <= set(agent) or
-                set(agent)-{'provider','id','state','elapsedSeconds','observedAgeSeconds'}):
+                set(agent)-{'provider','id','state','elapsedSeconds','observedAgeSeconds','label','hue'}):
             raise ValueError('Live metadata contains unsupported fields')
         provider, identifier, state = agent['provider'], agent['id'], agent['state']
         if (not isinstance(provider, str) or provider not in PROVIDERS or
@@ -35,6 +53,13 @@ def validate_agents(agents):
             if key in agent:
                 if not integer(agent[key]) or agent[key]>limit:raise ValueError('Invalid live timing')
                 row[key]=agent[key]
+        if 'label' in agent:
+            label=agent['label']
+            if not isinstance(label,str) or len(label)>MAX_LABEL or not LABEL.fullmatch(label):raise ValueError('Invalid live name')
+            row['label']=label
+        if 'hue' in agent:
+            if type(agent['hue']) is not int or not 0<=agent['hue']<HUES:raise ValueError('Invalid live color')
+            row['hue']=agent['hue']
         output.append(row)
     return output
 
@@ -66,8 +91,14 @@ class UsbLiveClient:
             raise ValueError('Uncorrelated live session reply')
         self.epoch, self.sequence = reply['epoch'], 0
 
-    def send(self, agents):
+    def send(self, agents, summary=None):
         agents = validate_agents(agents)
+        summary = None if summary is None else validate_summary(summary, len(agents))
+        extended = self.panel.info.get('liveSummary') == 1
+        if not extended:
+            # Firmware without liveSummary rejects unknown fields and would drop the whole snapshot.
+            agents = [{key: value for key, value in row.items() if key not in ('label', 'hue')} for row in agents]
+            summary = None
         if self.panel.info.get('liveMetadata')!=2:
             legacy={'WORKING':'UNKNOWN','READING':'UNKNOWN','WRITING':'EDITING','RUNNING':'UNKNOWN',
                     'NEEDS_ATTENTION':'WAITING','ERROR':'FAILED','COMPLETED':'DONE'}
@@ -76,8 +107,10 @@ class UsbLiveClient:
             raise ValueError('Open a new USB live session before sending')
         epoch, sequence = self.epoch, self.sequence + 1
         try:
-            reply = self._exchange(dict(cmd='live_state', schema=1, bootId=self.boot_id,
-                                        epoch=epoch, sequence=sequence, agents=agents))
+            message = dict(cmd='live_state', schema=1, bootId=self.boot_id, epoch=epoch, sequence=sequence, agents=agents)
+            if summary is not None:
+                message.update(total=summary['total'], selectedMask=summary['selected'], linkedMask=summary['linked'])
+            reply = self._exchange(message)
             if reply['epoch'] != epoch or reply['sequence'] != sequence or reply['requestId'] != 0:
                 raise ValueError('Uncorrelated live snapshot reply')
         except (ValueError, OSError, TimeoutError, RuntimeError):

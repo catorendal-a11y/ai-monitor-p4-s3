@@ -14,8 +14,12 @@
 #include "ui/navigation.h"
 
 namespace agents_ui {
-static lv_obj_t *screen=nullptr,*empty=nullptr,*help=nullptr,*summary=nullptr,*next=nullptr;
-struct Row {lv_obj_t *card=nullptr,*provider=nullptr,*identity=nullptr,*state=nullptr;};
+static lv_obj_t *screen=nullptr,*empty=nullptr,*help=nullptr,*summary=nullptr,*pageInfo=nullptr,*next=nullptr;
+struct Row {lv_obj_t *card=nullptr,*chip=nullptr,*provider=nullptr,*identity=nullptr,*state=nullptr;};
+// One color per host-derived hue, evenly spaced around the wheel at similar brightness so the same
+// session is recognized at a glance; adjacent hues stay clearly different.
+static constexpr uint32_t hue_colors[live_agent::hue_count]={0xF26B6B,0xF2A25C,0xE8D55B,0xA5D96B,0x5CD68A,0x5CD6C0,
+                                                              0x5CC4F2,0x6B8CF2,0x8F6BF2,0xC06BF2,0xF26BC8,0xF26B94};
 static Row rows[4];
 static uint8_t page=0;
 static uint8_t pages=1;
@@ -56,19 +60,47 @@ void init() {
     lv_obj_set_style_pad_all(row.card,0,0);lv_obj_set_style_bg_color(row.card,lv_color_hex(ui_theme::surface),0);
     lv_obj_set_style_border_color(row.card,lv_color_hex(ui_theme::border),0);
     lv_obj_set_scrollable(row.card,false);lv_obj_set_clickable(row.card,false);
+    row.chip=lv_obj_create(row.card);lv_obj_set_pos(row.chip,0,0);lv_obj_set_size(row.chip,8,76);
+    lv_obj_set_style_radius(row.chip,0,0);lv_obj_set_style_border_width(row.chip,0,0);lv_obj_set_style_pad_all(row.chip,0,0);
+    lv_obj_set_scrollable(row.chip,false);lv_obj_set_clickable(row.chip,false);lv_obj_set_hidden(row.chip,true);
     row.provider=label(row.card,16,4,380,"",&lv_font_montserrat_22,ui_theme::text);
     row.identity=label(row.card,16,43,380,"",&lv_font_montserrat_16,ui_theme::muted);
     row.state=label(row.card,410,20,320,"",&lv_font_montserrat_24,ui_theme::accent);
   }
   empty=label(screen,24,112,752,"No observed agent sessions",&lv_font_montserrat_26,ui_theme::text);
   help=label(screen,24,162,752,"Check event observers in the PC app.",&lv_font_montserrat_24,ui_theme::muted);
-  summary=label(screen,24,56,600,"Waiting for USB live data",&lv_font_montserrat_20,ui_theme::muted);
+  // State counts on the left, session count and page on the right; MENU starts at x 656.
+  summary=label(screen,24,56,440,"Waiting for USB live data",&lv_font_montserrat_18,ui_theme::muted);
+  pageInfo=label(screen,450,56,200,"",&lv_font_montserrat_18,ui_theme::muted);
+  lv_obj_set_style_text_align(pageInfo,LV_TEXT_ALIGN_RIGHT,0);
   ui_navigation::create(screen,ui_navigation::Page::agents);
   next=button(552,224,"NEXT PAGE",next_page);lv_obj_set_y(next,432);
 }
 void show() {
   if(!screen)return;
   page=0;lv_screen_load(screen);ui_agents_update();
+}
+// Why the list is empty. A host that reports the observer masks lets the screen name what to link.
+static void empty_hint(const live_agent::UsbLiveSnapshot& snapshot,bool fresh,char* out,size_t capacity) {
+  if(!fresh) {snprintf(out,capacity,"Connect the PC app to receive session events.");return;}
+  if(!snapshot.hasSummary) {
+    snprintf(out,capacity,"Check event observers in the PC app.\nProvider quotas and token activity are on Usage.");return;
+  }
+  if(!snapshot.selectedMask) {
+    snprintf(out,capacity,"None of the selected AIs report sessions.\nSelect Codex, Claude Code or ZCode in the PC app.");return;
+  }
+  const uint8_t unlinked=snapshot.selectedMask&static_cast<uint8_t>(~snapshot.linkedMask);
+  if(!unlinked) {
+    snprintf(out,capacity,"Observers are linked. Start a session in a linked AI.\nProvider quotas and token activity are on Usage.");return;
+  }
+  char names[100]="";size_t length=0;
+  for(const char* key:{"codex","zcode","claude","gemini","copilot","cursor","antigravity","opencode"}) {
+    const auto* style=aim::provider_style(key);
+    if(!style || !(style->activityMask&unlinked))continue;
+    const int wrote=snprintf(names+length,sizeof(names)-length,"%s%s",length?", ":"",style->label);
+    if(wrote>0)length=length+static_cast<size_t>(wrote)<sizeof(names)?length+static_cast<size_t>(wrote):sizeof(names)-1;
+  }
+  snprintf(out,capacity,"Not linked: %s\nLink them in the PC app: Agents > Provider events.",names);
 }
 void update() {
   if(!screen || lv_screen_active()!=screen)return;
@@ -82,8 +114,8 @@ void update() {
   if(page>=pages)page=0;
   lv_obj_set_hidden(empty,count!=0);lv_obj_set_hidden(help,count!=0);
   text(empty,fresh?"No observed agent sessions":"Agent feed unavailable");
-  text(help,fresh?"Check event observers in the PC app.\nProvider quotas and token activity are on Usage.":
-      "Connect the PC app to receive session events.");
+  char hint[160];empty_hint(snapshot,fresh,hint,sizeof(hint));
+  text(help,hint);
   for(unsigned i=0;i<4;++i) {
     auto& row=rows[i];const unsigned index=page*4+i;
     lv_obj_set_hidden(row.card,index>=count);
@@ -92,8 +124,17 @@ void update() {
     const auto* style=aim::provider_style(entry.provider);
     const size_t idLength=strlen(entry.id);
     const char* shortId=entry.id+(idLength>8?idLength-8:0);
-    char heading[64];snprintf(heading,sizeof(heading),"%.24s / %.8s",style?style->label:"UNKNOWN",shortId);
+    // A host-derived name and color are recognizable at a glance; without them the id's tail is shown.
+    char heading[64];
+    if(entry.hasLabel)snprintf(heading,sizeof(heading),"%.24s / %.15s",style?style->label:"UNKNOWN",entry.label);
+    else snprintf(heading,sizeof(heading),"%.24s / %.8s",style?style->label:"UNKNOWN",shortId);
     text(row.provider,heading);
+    lv_obj_set_hidden(row.chip,!entry.hasLabel);
+    if(entry.hasLabel) {
+      const uint32_t chip=hue_colors[entry.hue<live_agent::hue_count?entry.hue:0];
+      if(!lv_color_eq(lv_obj_get_style_bg_color(row.chip,LV_PART_MAIN),lv_color_hex(chip)))
+        lv_obj_set_style_bg_color(row.chip,lv_color_hex(chip),0);
+    }
     char identifier[80];
     const auto observedAge=static_cast<unsigned long long>(live_agent::observed_age_ms(snapshot,entry,millis())/1000u);
     if(entry.hasElapsed)snprintf(identifier,sizeof(identifier),"Session %lu:%02lu:%02lu / event %llus ago",
@@ -115,14 +156,46 @@ void update() {
   }
   if(count>4)lv_obj_remove_state(next,LV_STATE_DISABLED);else lv_obj_add_state(next,LV_STATE_DISABLED);
   lv_obj_set_hidden(next,count<=4);
-  char status[100];
+  // Counts by state, the most urgent first, in the color of the most urgent one present: the whole
+  // screen is readable without reading a row. An old event no longer says what the agent is doing.
+  unsigned errors=0,attention=0,working=0,idle=0;
+  for(unsigned i=0;i<count;++i) {
+    const auto& entry=snapshot.agents[i];
+    if(live_agent::observed_age_ms(snapshot,entry,millis())>=live_agent::activity_lease_ms) {++idle;continue;}
+    switch(entry.state) {
+      case agent::State::ERROR:++errors;break;
+      case agent::State::WAITING:case agent::State::NEEDS_ATTENTION:++attention;break;
+      case agent::State::WORKING:case agent::State::THINKING:case agent::State::READING:case agent::State::SEARCHING:
+      case agent::State::EDITING:case agent::State::WRITING:case agent::State::RUNNING:case agent::State::BUILDING:
+      case agent::State::TESTING:++working;break;
+      default:++idle;break;
+    }
+  }
+  char status[100]="";size_t used=0;
+  const auto add=[&](unsigned number,const char* one,const char* many) {
+    if(!number)return;
+    const int wrote=snprintf(status+used,sizeof(status)-used,"%s%u %s",used?" / ":"",number,number==1?one:many);
+    if(wrote>0)used=used+static_cast<size_t>(wrote)<sizeof(status)?used+static_cast<size_t>(wrote):sizeof(status)-1;
+  };
+  add(errors,"error","errors");add(attention,"need you","need you");add(working,"working","working");add(idle,"idle","idle");
   if(!fresh)snprintf(status,sizeof(status),"Waiting for host / check the PC app");
   else if(!count)snprintf(status,sizeof(status),"0 sessions / USB live data received");
-  else snprintf(status,sizeof(status),"Page %u/%u / %u sessions / updated %lus ago",
-      page+1,pages,count,static_cast<unsigned long>(age/1000));
   text(summary,status);
+  const uint32_t summaryColor=(!fresh||!count)?ui_theme::muted:errors?0xFF6B6B:attention?0xFFCF66:working?ui_theme::accent:ui_theme::muted;
+  if(!lv_color_eq(lv_obj_get_style_text_color(summary,LV_PART_MAIN),lv_color_hex(summaryColor)))
+    lv_obj_set_style_text_color(summary,lv_color_hex(summaryColor),0);
+  // "8 of 11" when the host observes more sessions than it can list; a total below the list is ignored.
+  char info[48]="";
+  if(count) {
+    const unsigned total=snapshot.hasSummary&&snapshot.total>count?snapshot.total:count;
+    if(total>count)snprintf(info,sizeof(info),"%u of %u",count,total);
+    else snprintf(info,sizeof(info),"%u session%s",count,count==1?"":"s");
+    if(pages>1) {const size_t length=strlen(info);snprintf(info+length,sizeof(info)-length," / page %u/%u",page+1,pages);}
+  }
+  text(pageInfo,info);
 }
 }
 void ui_agents_init() {agents_ui::init();}
 void ui_agents_show() {agents_ui::show();}
 void ui_agents_update() {agents_ui::update();}
+bool ui_agents_is_active() {return agents_ui::screen && lv_screen_active()==agents_ui::screen;}

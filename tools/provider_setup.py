@@ -359,6 +359,23 @@ def setup_report(root, home=None):
     return results
 
 
+def observer_masks(root,providers,home=None):
+    """(selected, linked) provider bits for the selected AIs that can have session observers.
+
+    Only a verified hook installation counts as linked: an enabled marker left behind by a
+    migrated folder, or settings that cannot be read, say nothing about whether events will come."""
+    from provider_catalog import PROVIDERS
+    checks={'claude':claude_session_state,'codex':codex_session_state,'zcode':zcode_session_state}
+    selected=linked=0
+    for provider in providers:
+        check=checks.get(provider)
+        if check is None:continue
+        bit=PROVIDERS[provider][1]
+        selected|=bit
+        if check(root,home)=='installed':linked|=bit
+    return selected,linked
+
+
 def claude_session_state(root,home=None):
     settings=config_root(home)/'settings.json'
     try:

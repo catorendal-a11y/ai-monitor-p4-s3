@@ -5,7 +5,7 @@ import sys
 import unittest
 from unittest.mock import Mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from usb_live import UsbLiveClient, validate_agents
+from usb_live import UsbLiveClient, validate_agents, validate_summary
 
 
 class UsbLiveTests(unittest.TestCase):
@@ -21,6 +21,36 @@ class UsbLiveTests(unittest.TestCase):
         for key,value in [('elapsedSeconds',True),('elapsedSeconds',604801),
                           ('observedAgeSeconds',901),('observedAgeSeconds',-1)]:
             with self.assertRaises(ValueError):validate_agents([dict(row,**{key:value})])
+
+    def test_names_and_summary_need_the_summary_capability(self):
+        panel,client=self.fixture();client.open();panel.info['liveMetadata']=2
+        row=dict(provider='claude',id='opaque',state='WAITING',label='Eager Badger',hue=9)
+        summary=dict(total=11,selected=5,linked=1)
+        client.send([row],summary)                     # firmware without liveSummary rejects unknown fields
+        sent=json.loads(panel.send_line.call_args.args[0])
+        self.assertEqual(sent['agents'],[dict(provider='claude',id='opaque',state='WAITING')])
+        for key in ('total','selectedMask','linkedMask'):self.assertNotIn(key,sent)
+        panel.info['liveSummary']=1
+        client.send([row],summary)
+        sent=json.loads(panel.send_line.call_args.args[0])
+        self.assertEqual(sent['agents'],[row])
+        self.assertEqual((sent['total'],sent['selectedMask'],sent['linkedMask']),(11,5,1))
+        client.send([row])                              # no summary: the plain, old-shaped message
+        sent=json.loads(panel.send_line.call_args.args[0])
+        self.assertEqual(sent['agents'],[row])
+        for key in ('total','selectedMask','linkedMask'):self.assertNotIn(key,sent)
+
+    def test_names_and_summary_are_strictly_validated(self):
+        row=dict(provider='claude',id='opaque',state='WAITING',label='Eager Badger',hue=9)
+        self.assertEqual(validate_agents([row]),[row])
+        for bad in ({'label':'x'*16},{'label':'Bad<name'},{'label':''},{'label':' lead'},{'label':5},
+                    {'hue':12},{'hue':-1},{'hue':True},{'hue':'3'}):
+            with self.assertRaises(ValueError,msg=str(bad)):validate_agents([dict(row,**bad)])
+        good=dict(total=8,selected=7,linked=3)
+        self.assertEqual(validate_summary(good,8),good)
+        for bad in (dict(good,total=256),dict(good,total=7),dict(good,selected=256),dict(good,linked=-1),
+                    dict(good,total=True),dict(total=8,selected=7),dict(good,extra=1),[1,2,3]):
+            with self.assertRaises(ValueError,msg=str(bad)):validate_summary(bad,8)
 
     def fixture(self):
         panel = Mock()

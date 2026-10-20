@@ -5,6 +5,7 @@ import io
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 import os
 import subprocess
@@ -102,6 +103,40 @@ class LiveEventTests(unittest.TestCase):
         live.lifecycle_event('codex',self.event('Stop'),self.activity,17,100)
         write_record(self.activity/'codex-session-link.json',dict(enabled=False,generation=18))
         self.assertEqual(live.live_agents(self.activity,['codex'],101),[])
+
+    def test_snapshot_lists_eight_with_names_and_counts_the_rest(self):
+        from session_identity import identity
+        for number in range(11):
+            name='PermissionRequest' if number==0 else 'UserPromptSubmit'    # the oldest one waits for the user
+            live.lifecycle_event('claude',dict(session_id=f'fixture-session-{number}',hook_event_name=name),self.activity,17,100+number)
+        rows,total=live.live_snapshot(self.activity,['claude'],120)
+        self.assertEqual((len(rows),total),(8,11))
+        self.assertEqual(rows[0]['state'],'WAITING')                        # attention first, so it is never cut off
+        for row in rows:self.assertEqual((row['label'],row['hue']),identity(row['id']))
+        self.assertEqual([row['id'] for row in rows],[row['id'] for row in live.live_agents(self.activity,['claude'],120)])
+        self.assertTrue(all('label' not in row for row in live.live_agents(self.activity,['claude'],120)))
+        self.assertEqual(live.live_snapshot(self.activity,['claude'],5000),([],0))
+
+    def test_observer_masks_say_which_selected_ais_have_linked_observers(self):
+        with patch.object(setup,'claude_session_state',return_value='installed'),\
+             patch.object(setup,'codex_session_state',return_value='not linked'),\
+             patch.object(setup,'zcode_session_state',return_value='partial link'):
+            self.assertEqual(setup.observer_masks(self.root,['codex','claude','gemini','zcode']),(1|2|4,4))
+            self.assertEqual(setup.observer_masks(self.root,['gemini','copilot']),(0,0))   # no observers exist for these
+            self.assertEqual(setup.observer_masks(self.root,[]),(0,0))
+        with patch.object(setup,'claude_session_state',return_value='invalid'):
+            self.assertEqual(setup.observer_masks(self.root,['claude']),(4,0))             # unreadable is not linked
+
+    def test_sampler_collects_names_total_and_cached_observer_masks(self):
+        sampler=live.LiveSampler(self.activity,['claude'],root=self.root);self.addCleanup(sampler.close)
+        live.lifecycle_event('claude',dict(session_id='fixture-session-1',hook_event_name='UserPromptSubmit'),self.activity,17,time.time())
+        with patch.object(setup,'observer_masks',return_value=(4,0)) as masks:
+            value=sampler._collect(['claude']);again=sampler._collect(['claude'])
+        self.assertEqual((value['live_total'],value['live_observers']),(1,(4,0)))
+        self.assertEqual(value['live_agents'][0]['label'],again['live_agents'][0]['label'])
+        masks.assert_called_once()                                        # settings files are re-read at most every 30 s
+        plain=live.LiveSampler(self.activity,['claude']);self.addCleanup(plain.close)
+        self.assertIsNone(plain._collect(['claude'])['live_observers'])   # without an installation root
 
     def test_setup_report_never_calls_codex_live_events_unsupported_or_proves_trust_from_marker(self):
         with patch('aim_control.local_config',return_value=dict(providers=['codex'],board='guition-p4',port='COM6')),\

@@ -54,6 +54,57 @@ int main() {
       CHECK(!accept(timing,broken));
     }
   }
+  {
+    // Optional summary (total / observer masks) and per-session names, negotiated through liveSummary.
+    UsbLive extended;
+    CHECK(accept(extended,"{\"cmd\":\"live_open\",\"schema\":1,\"requestId\":1}"));
+    const uint32_t epoch=extended.snapshot().epoch;
+    uint32_t sequence=0;
+    const auto message=[&](const std::string& summary,const std::string& row,uint32_t seq) {
+      return "{\"cmd\":\"live_state\",\"schema\":1,\"bootId\":17,\"epoch\":"+std::to_string(epoch)+",\"sequence\":"+
+        std::to_string(seq)+summary+",\"agents\":[{\"provider\":\"claude\",\"id\":\"opaque_1\",\"state\":\"WAITING\""+row+"}]}";
+    };
+    const std::string goodSummary=",\"total\":11,\"selectedMask\":5,\"linkedMask\":1";
+    const std::string goodRow=",\"label\":\"Eager Badger\",\"hue\":9";
+    CHECK(accept(extended,message(goodSummary,goodRow,++sequence)));
+    const auto& live=extended.snapshot();
+    CHECK(live.hasSummary && live.total==11 && live.selectedMask==5 && live.linkedMask==1);
+    CHECK(live.count==1 && live.agents[0].hasLabel && !strcmp(live.agents[0].label,"Eager Badger") && live.agents[0].hue==9);
+    // The plain, old-shaped message still parses and carries no summary or names.
+    CHECK(accept(extended,message("","",++sequence)));
+    CHECK(!live.hasSummary && live.total==0 && !live.agents[0].hasLabel && live.agents[0].label[0]==0);
+    // Names and summary are independent of each other.
+    CHECK(accept(extended,message("",goodRow,++sequence)) && live.agents[0].hasLabel && !live.hasSummary);
+    CHECK(accept(extended,message(goodSummary,"",++sequence)) && live.hasSummary && !live.agents[0].hasLabel);
+    const std::string badSummaries[]={
+      ",\"total\":256,\"selectedMask\":5,\"linkedMask\":1",              // out of range
+      ",\"total\":11,\"selectedMask\":256,\"linkedMask\":1",
+      ",\"total\":11,\"selectedMask\":5,\"linkedMask\":-1",
+      ",\"total\":true,\"selectedMask\":5,\"linkedMask\":1",             // wrong type
+      ",\"total\":\"11\",\"selectedMask\":5,\"linkedMask\":1",
+      ",\"total\":0,\"selectedMask\":5,\"linkedMask\":1",                // fewer than the listed agents
+      ",\"total\":11,\"selectedMask\":5",                               // incomplete group
+      ",\"total\":11",
+      ",\"total\":11,\"selectedMask\":5,\"linkedMask\":1,\"extra\":1"};  // unknown field
+    for(const auto& summary:badSummaries)CHECK(!accept(extended,message(summary,"",++sequence)));
+    const std::string badRows[]={
+      ",\"label\":\"Abcdefgh Ijklmnop\",\"hue\":9",                      // 17 characters
+      ",\"label\":\"\",\"hue\":9",
+      ",\"label\":\" Eager\",\"hue\":9",                                   // stray spaces
+      ",\"label\":\"Eager  Badger\",\"hue\":9",
+      ",\"label\":\"Eager Badger \",\"hue\":9",
+      ",\"label\":\"Eager9\",\"hue\":9",                                   // not letters
+      ",\"label\":\"Eager<Badger\",\"hue\":9",
+      ",\"label\":5,\"hue\":9",
+      ",\"label\":\"Eager Badger\",\"hue\":12",                          // outside the 12 colors
+      ",\"label\":\"Eager Badger\",\"hue\":-1",
+      ",\"label\":\"Eager Badger\",\"hue\":true",
+      ",\"label\":\"Eager Badger\",\"hue\":\"3\"",
+      ",\"label\":\"Eager Badger\",\"hue\":9,\"extra\":1,\"more\":2"};
+    for(const auto& row:badRows)CHECK(!accept(extended,message("",row,++sequence)));
+    // Every rejected message clears the snapshot; a good one afterwards works again.
+    CHECK(accept(extended,message(goodSummary,goodRow,++sequence)) && extended.snapshot().hasSummary);
+  }
   aim::ProtoCore mux;mux.boot_id=17;mux.tick=[] {return 100u;};
   const auto quotaRevision=mux.snapshot_revision();
   const auto feed=[&](const std::string& line) {for(char ch:line+"\n")mux.feed_byte(ch);};
@@ -61,8 +112,11 @@ int main() {
   CHECK(mux.out().find("\"permissions\":false")!=std::string::npos);
   mux.clear_out();feed(batch(mux.live_snapshot().epoch));
   CHECK(mux.live_snapshot().fresh && mux.snapshot_revision()==quotaRevision);
-  feed("{\"cmd\":\"get_info\"}");
+  mux.clear_out();feed("{\"cmd\":\"get_info\"}");   // the reply alone, without the live_reply above
   CHECK(mux.out().find("\"liveProtocol\":1")!=std::string::npos);
+  CHECK(mux.out().find("\"liveSummary\":1")!=std::string::npos);   // hosts send names/summary only when advertised
+  // emitf drops a reply that does not fit its 1024 byte buffer, silently hiding the display from the host.
+  CHECK(mux.out().size()<=900);
   CHECK(mux.out().find("\"type\":\"info\"")!=std::string::npos && mux.live_snapshot().fresh);
   const std::string quota="{\"schemaVersion\":1,\"frameId\":7,\"displayTime\":\"14:30\","
       "\"data\":[{\"provider\":\"codex\",\"viewIndex\":0,\"usage\":{\"rows\":[{\"title\":\"Session\",\"usedPercent\":25}]}}]}\n";

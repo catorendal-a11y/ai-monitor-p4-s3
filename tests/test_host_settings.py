@@ -32,6 +32,30 @@ class HostSettingsTests(unittest.TestCase):
         client.return_value.send.assert_called_once_with(rows)
         self.assertEqual(json.loads(panel.send_line.call_args.args[0]),{'cmd':'token_activity','known':False})
 
+    def test_live_summary_follows_the_sample_and_is_omitted_when_stale_or_unknown(self):
+        panel=host.Panel.__new__(host.Panel)
+        panel.tokens_supported=False;panel.sessions_supported=False;panel.token_reporter=None
+        panel.info={'liveProtocol':1,'livePermissions':False,'liveSummary':1,'bootId':17}
+        panel.send_line=Mock()
+        rows=[{'provider':'codex','id':'opaque','state':'WAITING','label':'Eager Badger','hue':9}]
+        sampler=Mock();panel.live_sampler=sampler
+        sampler.poll.return_value={'live_agents':rows,'live_sampled_at':100,'live_total':11,'live_observers':(5,1)}
+        with patch('usb_live.UsbLiveClient') as client,patch.object(host.time,'monotonic',return_value=100):
+            panel.report_tokens()
+            client.return_value.send.assert_called_once_with(rows,{'total':11,'selected':5,'linked':1})
+            client.return_value.send.reset_mock()
+            sampler.poll.return_value=dict(sampler.poll.return_value,live_total=0)        # never below what is listed
+            panel.report_tokens()
+            client.return_value.send.assert_called_once_with(rows,{'total':1,'selected':5,'linked':1})
+            client.return_value.send.reset_mock()
+            sampler.poll.return_value={'live_agents':rows,'live_sampled_at':100}          # no totals: the plain call
+            panel.report_tokens()
+            client.return_value.send.assert_called_once_with(rows)
+            client.return_value.send.reset_mock()
+            sampler.poll.return_value={'live_agents':rows,'live_sampled_at':1,'live_total':11,'live_observers':(5,1)}
+            panel.report_tokens()                                                          # stale sample: empty, no summary
+            client.return_value.send.assert_called_once_with([])
+
     def test_stale_live_sample_is_cleared_and_telemetry_failure_preserves_quota_path(self):
         panel=host.Panel.__new__(host.Panel)
         panel.tokens_supported=True;panel.sessions_supported=False

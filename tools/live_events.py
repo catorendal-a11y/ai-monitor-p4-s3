@@ -11,6 +11,7 @@ import threading
 from host_security import read_local_json
 from session_activity import link_marker, MAX_SESSIONS
 from telemetry_bridge import write_record
+from session_identity import identity
 from usb_live import STATES
 
 SOURCES = frozenset(('codex', 'claude', 'zcode'))
@@ -18,6 +19,7 @@ ZCODE_EVENTS = frozenset(('SessionStart','UserPromptSubmit','PreToolUse','Permis
                          'PostToolUse','PostToolUseFailure','Stop'))
 LEASE_SECONDS = 900
 TERMINAL_SECONDS = 30
+OBSERVER_SECONDS = 30
 MAX_DURATION = 604800
 
 
@@ -173,6 +175,17 @@ def _read_record(path,generation):
 
 
 def live_agents(directory, providers, now=None):
+    return _observed(directory, providers, now)[:8]
+
+
+def live_snapshot(directory, providers, now=None):
+    """The eight sessions shown, each with a readable name and color, and how many are observed."""
+    rows=_observed(directory, providers, now)
+    return [dict(row,**dict(zip(('label','hue'),identity(row['id'])))) for row in rows[:8]],min(len(rows),255)
+
+
+def _observed(directory, providers, now=None):
+    """Every fresh observed session, attention first then newest."""
     timestamp=time.time() if now is None else now
     if type(timestamp) not in (int,float) or not math.isfinite(timestamp): return []
     rows=[]
@@ -198,14 +211,16 @@ def live_agents(directory, providers, now=None):
                 rows.append((value['received_at'],row))
             except (OSError,ValueError,TypeError,RecursionError): continue
     rows.sort(key=lambda row:(row[1]['state'] not in ('WAITING','FAILED','ERROR','NEEDS_ATTENTION'),-row[0],row[1]['provider'],row[1]['id']))
-    return [row[1] for row in rows[:8]]
+    return [row[1] for row in rows]
 
 
 class LiveSampler:
     """Independent bounded event reader; numeric source I/O never delays this worker."""
-    def __init__(self,directory,providers):
+    def __init__(self,directory,providers,root=None):
         self.directory=directory
         self.providers=list(providers)
+        self.root=None if root is None else Path(root)
+        self.observers=None;self.observers_at=float('-inf');self.observers_for=()
         self.condition=threading.Condition()
         self.result=None
         self.requested=self.busy=self.closed=False
@@ -238,14 +253,30 @@ class LiveSampler:
                 if self.closed:return
                 self.requested=False;self.busy=True
                 providers,generation=list(self.providers),self.generation
-            try:rows=live_agents(self.directory,providers)
-            except (OSError,ValueError,TypeError,RecursionError):rows=[]
-            value={'live_agents':rows,'live_sampled_at':time.monotonic()}
+            value=self._collect(providers)
             with self.condition:
                 self.busy=False
                 if self.closed:return
                 if generation==self.generation:self.result=value
                 self.condition.notify_all()
+
+    def _collect(self,providers):
+        try:rows,total=live_snapshot(self.directory,providers)
+        except (OSError,ValueError,TypeError,RecursionError):rows,total=[],0
+        return {'live_agents':rows,'live_total':total,'live_observers':self._observer_masks(providers),
+                'live_sampled_at':time.monotonic()}
+
+    def _observer_masks(self,providers):
+        """(selected, linked) provider bits; settings files are re-read at most every 30 seconds."""
+        if self.root is None:return None
+        now=time.monotonic();key=tuple(providers)
+        if key!=self.observers_for or now-self.observers_at>=OBSERVER_SECONDS:
+            try:
+                from provider_setup import observer_masks
+                self.observers=observer_masks(self.root,providers)
+            except (OSError,ValueError,TypeError,RecursionError):self.observers=None
+            self.observers_at=now;self.observers_for=key
+        return self.observers
 
     def close(self):
         with self.condition:

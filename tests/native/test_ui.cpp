@@ -849,6 +849,181 @@ static void test_status_line_is_readable(const std::filesystem::path& screenshot
   set_sample(4, 2); dashboard_update();
 }
 
+// Agents screen: a state summary instead of page counts, readable names, "8 of N" and why it is empty.
+static void set_agent(size_t index, const char* provider, agent::State state, const char* label = nullptr, uint8_t hue = 0) {
+  auto& entry = liveSample.agents[index];
+  entry = live_agent::AgentMetadata{};
+  std::strcpy(entry.provider, provider);
+  std::snprintf(entry.id, sizeof(entry.id), "synthetic_%zu", index);
+  entry.state = state;
+  if (label) { std::strcpy(entry.label, label); entry.hue = hue; entry.hasLabel = true; }
+}
+
+static void test_agents_screen_summary_and_names(const std::filesystem::path& screenshots) {
+  const auto text = [](lv_obj_t* label) { return std::string(lv_label_get_text(label)); };
+  const auto colorIs = [](lv_obj_t* label, uint32_t color) {
+    return lv_color_eq(lv_obj_get_style_text_color(label, LV_PART_MAIN), lv_color_hex(color));
+  };
+  quota_banner::policy = QuotaNotifications{}; quota_banner::displayed = QuotaNotifications::Alert{};
+  sample = aim::Snapshot{}; ui_notifications_update();                // earlier scenes leave a quota banner up
+  liveSample = live_agent::UsbLiveSnapshot{};
+  ui_agents_show();
+  liveSample.fresh = true; liveSample.epoch = 7; liveSample.receivedAt = fakeTick;
+
+  // The summary counts the most urgent states first and takes the color of the most urgent one present.
+  liveSample.count = 6;
+  set_agent(0, "codex", agent::State::ERROR);
+  set_agent(1, "claude", agent::State::WAITING);
+  set_agent(2, "codex", agent::State::NEEDS_ATTENTION);
+  set_agent(3, "claude", agent::State::THINKING);
+  set_agent(4, "codex", agent::State::EDITING);
+  set_agent(5, "claude", agent::State::COMPLETED);
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "1 error / 2 need you / 2 working / 1 idle");
+  CHECK(colorIs(agents_ui::summary, 0xFF6B6B));
+  CHECK(text(agents_ui::pageInfo) == "6 sessions / page 1/2");
+  liveSample.agents[3].observedAgeSeconds = 31;                       // an old event is idle, not working
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "1 error / 2 need you / 1 working / 2 idle");
+  liveSample.count = 2; set_agent(0, "codex", agent::State::ERROR); set_agent(1, "claude", agent::State::FAILED);
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "2 errors");
+  liveSample.count = 3;
+  set_agent(0, "codex", agent::State::WAITING); set_agent(1, "claude", agent::State::BUILDING); set_agent(2, "claude", agent::State::IDLE);
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "1 need you / 1 working / 1 idle" && colorIs(agents_ui::summary, 0xFFCF66));
+  CHECK(text(agents_ui::pageInfo) == "3 sessions");                  // one page: no page counter
+  liveSample.count = 2; set_agent(0, "codex", agent::State::TESTING); set_agent(1, "claude", agent::State::IDLE);
+  ui_agents_update();
+  CHECK(colorIs(agents_ui::summary, ui_theme::accent));
+  liveSample.count = 1; set_agent(0, "codex", agent::State::COMPLETED);
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "1 idle" && colorIs(agents_ui::summary, ui_theme::muted));
+
+  // A host-derived name and color replace the hex tail; sessions without one keep the tail and get no chip.
+  liveSample.count = 2;
+  set_agent(0, "codex", agent::State::WORKING, "Eager Badger", 9);
+  set_agent(1, "claude", agent::State::THINKING);
+  ui_agents_update(); lv_obj_update_layout(agents_ui::screen);
+  CHECK(text(agents_ui::rows[0].provider) == "CODEX / Eager Badger");
+  CHECK(!lv_obj_is_hidden(agents_ui::rows[0].chip));
+  CHECK(lv_color_eq(lv_obj_get_style_bg_color(agents_ui::rows[0].chip, LV_PART_MAIN), lv_color_hex(agents_ui::hue_colors[9])));
+  CHECK(text(agents_ui::rows[1].provider).find("thetic_1") != std::string::npos && lv_obj_is_hidden(agents_ui::rows[1].chip));
+  check_line_fits(agents_ui::rows[0].provider);
+  for (uint8_t hue = 0; hue < live_agent::hue_count; ++hue) {          // every color differs from its neighbours
+    CHECK(agents_ui::hue_colors[hue] != agents_ui::hue_colors[(hue + 1) % live_agent::hue_count]);
+  }
+  screenshot(screenshots, "agents-names-and-summary");
+
+  // The host's total shows when it lists fewer sessions than it observes.
+  liveSample.count = 8;
+  for (size_t i = 0; i < 8; ++i) set_agent(i, i % 2 ? "claude" : "codex", agent::State::WORKING, "Calm Otter", static_cast<uint8_t>(i));
+  liveSample.hasSummary = true; liveSample.total = 11; liveSample.selectedMask = 5; liveSample.linkedMask = 5;
+  ui_agents_update();
+  CHECK(text(agents_ui::pageInfo) == "8 of 11 / page 1/2");
+  liveSample.total = 8; ui_agents_update();
+  CHECK(text(agents_ui::pageInfo) == "8 sessions / page 1/2");
+  liveSample.total = 3; ui_agents_update();                            // a total below the list is ignored
+  CHECK(text(agents_ui::pageInfo) == "8 sessions / page 1/2");
+  check_line_fits(agents_ui::summary); check_line_fits(agents_ui::pageInfo);
+
+  // Why the list is empty: unlinked observers are named, with the place to link them.
+  liveSample.count = 0; liveSample.total = 0; liveSample.selectedMask = 1 | 4; liveSample.linkedMask = 0;
+  ui_agents_update();
+  CHECK(text(agents_ui::summary) == "0 sessions / USB live data received");
+  CHECK(text(agents_ui::help).find("Not linked: CODEX, CLAUDE") != std::string::npos);
+  CHECK(text(agents_ui::help).find("Provider events") != std::string::npos);
+  screenshot(screenshots, "agents-observers-not-linked");
+  liveSample.linkedMask = 4; ui_agents_update();
+  CHECK(text(agents_ui::help).find("Not linked: CODEX") != std::string::npos && text(agents_ui::help).find("CLAUDE") == std::string::npos);
+  liveSample.selectedMask = liveSample.linkedMask = 1 | 2 | 4; ui_agents_update();
+  CHECK(text(agents_ui::help).find("Start a session") != std::string::npos && text(agents_ui::help).find("Not linked") == std::string::npos);
+  liveSample.selectedMask = liveSample.linkedMask = 0; ui_agents_update();
+  CHECK(text(agents_ui::help).find("None of the selected AIs") != std::string::npos);
+  liveSample.hasSummary = false; ui_agents_update();                  // an older host keeps the generic hint
+  CHECK(text(agents_ui::help).find("Check event observers in the PC app.") != std::string::npos);
+  liveSample = live_agent::UsbLiveSnapshot{};
+  ui_agents_update();
+  CHECK(text(agents_ui::empty) == "Agent feed unavailable" && text(agents_ui::summary).find("Waiting for host") != std::string::npos);
+}
+
+// An agent that starts waiting for the user is an active alert: banner, wake, once per request.
+static void test_agent_attention_alert(const std::filesystem::path& screenshots) {
+  const auto text = [](lv_obj_t* label) { return std::string(lv_label_get_text(label)); };
+  const auto feed = [](std::initializer_list<std::pair<const char*, agent::State>> agents, const char* label = nullptr) {
+    liveSample = live_agent::UsbLiveSnapshot{};
+    liveSample.fresh = true; liveSample.epoch = 9; liveSample.receivedAt = fakeTick;
+    liveSample.count = static_cast<uint8_t>(agents.size());
+    size_t index = 0;
+    for (const auto& item : agents) { set_agent(index, item.first, item.second, index == 1 ? label : nullptr, 3); ++index; }
+  };
+  quota_banner::policy = QuotaNotifications{}; quota_banner::displayed = QuotaNotifications::Alert{};
+  quota_banner::agentPolicy = AgentAlerts{};
+  sample = aim::Snapshot{}; ui_notifications_update();
+  dashboard_show();
+  selectedBrightness = actualBrightness = brightness_raw(60); dimMinutes = 1;
+  idle_dim_touch(true); idle_dim_touch(false);
+  fakeTick += 120000; settle_backlight();
+  CHECK(actualBrightness < selectedBrightness);                       // the screen is dimmed
+
+  feed({{"codex", agent::State::WORKING}, {"claude", agent::State::THINKING}});
+  ui_notifications_update(); settle_backlight();
+  CHECK(lv_obj_is_hidden(quota_banner::banner) && actualBrightness < selectedBrightness);   // working is not a request
+
+  feed({{"codex", agent::State::WORKING}, {"claude", agent::State::WAITING}}, "Eager Badger");
+  ui_notifications_update(); settle_backlight();
+  CHECK(!lv_obj_is_hidden(quota_banner::banner));
+  CHECK(text(quota_banner::heading) == "AGENT NEEDS YOU / CLAUDE");
+  CHECK(text(quota_banner::body) == "Eager Badger is waiting for you");
+  CHECK(text(quota_banner::pending).find("Waiting 0:00") == 0);
+  CHECK(actualBrightness == selectedBrightness);                      // woken, so it can be read
+  check_line_fits(quota_banner::heading);
+  screenshot(screenshots, "agent-needs-you-banner");
+
+  fakeTick += 73800; liveSample.receivedAt = fakeTick; settle_backlight();   // settle adds 600 ms; 1:15 in total
+  ui_notifications_update();
+  CHECK(text(quota_banner::pending).find("Waiting 1:15") == 0);       // how long it has waited on the device
+  CHECK(actualBrightness < selectedBrightness);                       // the minute is over and it dims again
+  ui_notifications_update(); settle_backlight();
+  CHECK(actualBrightness < selectedBrightness);                       // the same request never wakes it twice
+
+  lv_obj_send_event(quota_banner::dismissButton, LV_EVENT_CLICKED, nullptr);
+  CHECK(lv_obj_is_hidden(quota_banner::banner));
+  fakeTick += 1000; liveSample.receivedAt = fakeTick; ui_notifications_update();
+  CHECK(lv_obj_is_hidden(quota_banner::banner));                      // acknowledged while it keeps waiting
+
+  feed({{"codex", agent::State::WORKING}, {"claude", agent::State::THINKING}});
+  ui_notifications_update();
+  feed({{"codex", agent::State::WORKING}, {"claude", agent::State::WAITING}}, "Eager Badger");
+  ui_notifications_update();
+  CHECK(!lv_obj_is_hidden(quota_banner::banner));                     // a new request is a new alert
+
+  // Without a name the id's tail identifies the session; an old event or a stale feed is no request.
+  feed({{"codex", agent::State::NEEDS_ATTENTION}});
+  ui_notifications_update();
+  CHECK(text(quota_banner::heading) == "AGENT NEEDS YOU / CODEX" && text(quota_banner::body) == "Session thetic_0 is waiting for you");
+  liveSample.agents[0].observedAgeSeconds = 31; ui_notifications_update();
+  CHECK(lv_obj_is_hidden(quota_banner::banner));
+  feed({{"codex", agent::State::NEEDS_ATTENTION}});
+  fakeTick += live_agent::activity_lease_ms + 1000; ui_notifications_update();
+  CHECK(lv_obj_is_hidden(quota_banner::banner));
+
+  // A critical quota alert goes first; the agent waits behind it. The Agents screen needs no banner.
+  fakeTick += 1000; feed({{"codex", agent::State::WAITING}});
+  set_sample(1, 1); sample.views[0].rows[0].usedPercent = 5; sample.lastFrameMs = fakeTick; sample.views[0].quotaReceivedMs = fakeTick;
+  ui_notifications_update();
+  CHECK(text(quota_banner::heading) == "CRITICAL QUOTA / CODEX");
+  lv_obj_send_event(quota_banner::dismissButton, LV_EVENT_CLICKED, nullptr);
+  CHECK(text(quota_banner::heading) == "AGENT NEEDS YOU / CODEX" && !lv_obj_is_hidden(quota_banner::banner));
+  ui_agents_show(); ui_notifications_update();
+  CHECK(lv_obj_is_hidden(quota_banner::banner));
+  dashboard_show();
+  liveSample = live_agent::UsbLiveSnapshot{}; sample = aim::Snapshot{};
+  quota_banner::policy = QuotaNotifications{}; quota_banner::agentPolicy = AgentAlerts{};
+  ui_notifications_update();
+  idle_dim_touch(true); idle_dim_touch(false);
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -1544,6 +1719,8 @@ int main(int argc, char** argv) {
   test_critical_alert_wakes_dimmed_screen();
   test_header_headline(screenshots);
   test_status_line_is_readable(screenshots);
+  test_agents_screen_summary_and_names(screenshots);
+  test_agent_attention_alert(screenshots);
   auto* rendered = lv_image_create(lv_screen_active());
   CompanionRenderer cropRenderer;
   const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,

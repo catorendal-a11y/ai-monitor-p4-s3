@@ -677,13 +677,22 @@ class Panel:
             sampled=live_message.get('live_sampled_at')
             fresh_sample=type(sampled) in (int,float) and 0<=time.monotonic()-sampled<=10
             agents=live_message['live_agents'] if fresh_sample else []
-            self.live_client.send(agents)
+            summary=self.live_summary(live_message,len(agents)) if fresh_sample else None
+            if summary is None:self.live_client.send(agents)
+            else:self.live_client.send(agents,summary)
             self.live_health('acknowledged' if fresh_sample else 'stale',len(agents))
         except (ValueError,TimeoutError,RuntimeError):
             # Optional telemetry failure is visible but never takes down quota monitoring.
             self.live_client=None;self.live_retry_at=time.monotonic()+30
             self.live_health('error',0)
         # Serial I/O errors still propagate to the existing reconnect path.
+
+    @staticmethod
+    def live_summary(message,count):
+        """Sessions beyond the eight listed and which AIs have observers; None when the sample has neither."""
+        total,observers=message.get('live_total'),message.get('live_observers')
+        if type(total) is not int or not isinstance(observers,(tuple,list)) or len(observers)!=2:return None
+        return {'total':max(total,count),'selected':observers[0],'linked':observers[1]}
 
     def live_health(self,state,count):
         health=getattr(self,'health',None)
@@ -1015,7 +1024,7 @@ def _run_loop(cfg, interval, zai_key, views):
     permissions.configure(permission_selected(cfg))
     tokens = TokenSampler(providers=views, activity_dir=HERE / 'activity', history=history, include_live=False)
     from live_events import LiveSampler
-    live_sampler=LiveSampler(HERE/'activity',views)
+    live_sampler=LiveSampler(HERE/'activity',views,root=HERE.parent)
     from companion_service import CompanionService
     companions=CompanionService(HERE.parent)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
