@@ -12,6 +12,9 @@ class QuotaNotifications {
     uint32_t window = 0;
     float remaining = 0;
     uint8_t severity = 0;  // 1 = low, 2 = critical
+    // When the window resets, as last reported: seconds counted from the frame's arrival time.
+    bool hasReset = false;
+    uint32_t resetSeconds = 0, receivedMs = 0;
   };
   template<typename Threshold>
   void update(const aim::Snapshot& snapshot, uint32_t now, Threshold threshold) {
@@ -44,6 +47,9 @@ class QuotaNotifications {
         if (remaining > warning + 2) state->acknowledged &= ~3u;
         else if (remaining > critical + 2) state->acknowledged &= ~2u;
         state->alert.remaining = remaining;
+        state->alert.hasReset = row.hasResetCountdown;
+        state->alert.resetSeconds = row.resetSeconds;
+        state->alert.receivedMs = view.quotaReceivedMs;
         state->alert.severity = remaining <= critical && !(state->acknowledged & 2) ? 2 :
                                 (remaining <= warning && !(state->acknowledged & 1) ? 1 : 0);
         state->fresh = true;

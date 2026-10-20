@@ -35,3 +35,4 @@ bool idle_dim_touch(bool pressed) {
   return accepted;
 }
 void idle_dim_preview() { policy.preview(); idle_dim_update(); }
+void idle_dim_alert() { policy.alert(millis()); idle_dim_update(); }

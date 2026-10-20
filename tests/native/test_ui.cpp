@@ -732,6 +732,48 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   agentSample.sessionCount = 0;
 }
 
+// Idle dimming must not hide a new critical quota alert on a screen nobody is touching.
+static void keep_quota_fresh() {
+  sample.lastFrameMs = fakeTick;
+  sample.views[0].quotaReceivedMs = fakeTick;
+}
+
+static void test_critical_alert_wakes_dimmed_screen() {
+  dashboard_show();
+  selectedBrightness = actualBrightness = brightness_raw(60);
+  dimMinutes = 1;
+  idle_dim_touch(true); idle_dim_touch(false);
+  fakeTick += 120000;
+  settle_backlight();
+  CHECK(actualBrightness < selectedBrightness);  // dimmed after one idle minute
+
+  quota_banner::policy = QuotaNotifications{}; quota_banner::displayed = QuotaNotifications::Alert{};
+  set_sample(1, 1); keep_quota_fresh();
+  sample.views[0].rows[0].usedPercent = 20;       // low (below the 25 % warning), not critical
+  ui_notifications_update(); settle_backlight();
+  CHECK(actualBrightness < selectedBrightness);
+
+  sample.views[0].rows[0].usedPercent = 5;        // critical
+  sample.views[0].rows[0].hasResetCountdown = true;
+  sample.views[0].rows[0].resetSeconds = 2 * 3600 + 5 * 60;
+  ui_notifications_update(); settle_backlight();
+  CHECK(actualBrightness == selectedBrightness);  // woken by the new critical alert
+  CHECK(std::string(lv_label_get_text(quota_banner::pending)).find("Resets in 2 h 5 m") != std::string::npos);
+
+  fakeTick += 58000; keep_quota_fresh(); settle_backlight();
+  CHECK(actualBrightness == selectedBrightness);  // held for a minute
+  fakeTick += 3000; keep_quota_fresh(); settle_backlight();
+  CHECK(actualBrightness < selectedBrightness);   // then idle dimming resumes while the alert stays
+
+  // An alert without a reset time says nothing about one.
+  quota_banner::policy = QuotaNotifications{}; quota_banner::displayed = QuotaNotifications::Alert{};
+  sample.views[0].rows[0].hasResetCountdown = false;
+  ui_notifications_update();
+  CHECK(std::string(lv_label_get_text(quota_banner::pending)).find("Resets in") == std::string::npos);
+
+  idle_dim_touch(true); idle_dim_touch(false);
+}
+
 int main(int argc, char** argv) {
   const std::filesystem::path screenshots = argc > 1 ? argv[1] : "";
   lv_init();
@@ -1424,6 +1466,7 @@ int main(int argc, char** argv) {
   test_nova_readability(screenshots);
   test_stable_touch_targets(screenshots);
   test_reported_session_poses(screenshots);
+  test_critical_alert_wakes_dimmed_screen();
   auto* rendered = lv_image_create(lv_screen_active());
   CompanionRenderer cropRenderer;
   const lv_image_dsc_t* poses[] = {&nova_assets::work, &nova_assets::done, &nova_assets::low,

@@ -11,9 +11,14 @@ inline void format_percent(float value, bool showsRemaining, char* text, size_t 
   else snprintf(text, capacity, "%.0f%%", static_cast<double>(value));
 }
 
-inline uint32_t reset_remaining(const aim::Row& row, uint32_t receivedMs, uint32_t now) {
+// Seconds left of a reset countdown that was reported at receivedMs; unsigned math survives rollover.
+inline uint32_t seconds_until(uint32_t resetSeconds, uint32_t receivedMs, uint32_t now) {
   const uint32_t elapsed = (now - receivedMs) / 1000u;
-  return elapsed < row.resetSeconds ? row.resetSeconds - elapsed : 0;
+  return elapsed < resetSeconds ? resetSeconds - elapsed : 0;
+}
+
+inline uint32_t reset_remaining(const aim::Row& row, uint32_t receivedMs, uint32_t now) {
+  return seconds_until(row.resetSeconds, receivedMs, now);
 }
 
 inline void format_countdown(uint32_t seconds, char* out, size_t capacity) {

@@ -3,6 +3,7 @@
 #include <lvgl.h>
 #include <cstdio>
 #include <cstring>
+#include "ui/idle_dim.h"
 #include "ui/quota_notifications.h"
 #include "ui/usage_format.h"
 #include "ui/theme.h"
@@ -49,7 +50,7 @@ void ui_notifications_init() {
   body = label(banner, 20, 53, 530, &lv_font_montserrat_20);
   lv_label_set_long_mode(body, LV_LABEL_LONG_MODE_WRAP);
   lv_obj_set_height(body, 48);
-  pending = label(banner, 20, 108, 530, &lv_font_montserrat_14);
+  pending = label(banner, 20, 108, 530, &lv_font_montserrat_16);
   lv_obj_set_style_text_color(pending, lv_color_hex(ui_theme::muted), 0);
   dismissButton = lv_btn_create(banner);
   lv_obj_set_pos(dismissButton, 578, 38); lv_obj_set_size(dismissButton, 152, 60);
@@ -79,6 +80,8 @@ void ui_notifications_update() {
   if(!alert)recorded={};
   if(alert && (recorded.severity!=alert->severity || strcmp(recorded.provider,alert->provider) || strcmp(recorded.title,alert->title))) {
     ui_event_center_quota(alert->provider,alert->severity==2);recorded=*alert;
+    // A critical alert must be readable on a dimmed screen; a low one waits for the next touch.
+    if(alert->severity==2)idle_dim_alert();
   }
   if (!alert || ui_settings_is_active() || ui_event_center_is_active() || ui_menu_is_active() || ui_enrollment_is_active() || ui_history_is_active() || ui_permission_is_active() || ui_connection_is_active()) { lv_obj_set_hidden(banner, true); return; }
   // Dismiss exactly the alert whose text was visible when this tap began.
@@ -97,7 +100,16 @@ void ui_notifications_update() {
   format_percent(alert->remaining, true, percent, sizeof(percent));
   snprintf(value, sizeof(value), "%s: %s remaining", alert->title[0] ? alert->title : "Quota", percent);
   text(body, value);
-  snprintf(value, sizeof(value), "%u pending alert%s / all quota windows monitored", policy.count(), policy.count() == 1 ? "" : "s");
+  if (alert->hasReset) {
+    // Whether to wait or switch tools depends on when the window comes back.
+    char countdown[32];
+    const uint32_t left = seconds_until(alert->resetSeconds, alert->receivedMs, millis());
+    format_countdown(left, countdown, sizeof(countdown));
+    if (left) snprintf(value, sizeof(value), "Resets in %s / %u pending alert%s", countdown, policy.count(), policy.count() == 1 ? "" : "s");
+    else snprintf(value, sizeof(value), "%s / %u pending alert%s", countdown, policy.count(), policy.count() == 1 ? "" : "s");
+  } else {
+    snprintf(value, sizeof(value), "%u pending alert%s / all quota windows monitored", policy.count(), policy.count() == 1 ? "" : "s");
+  }
   text(pending, value);
   lv_obj_set_hidden(banner, false);
 }
