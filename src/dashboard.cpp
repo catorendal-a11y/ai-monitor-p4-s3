@@ -188,6 +188,8 @@ struct CardCaches {
   char badgeLetter[2];
   uint32_t spine;
   bool spineKnown;
+  uint8_t glow = 0xFF;          // 0 healthy, 1 low, 2 critical; 0xFF = not applied yet
+  uint32_t glowTheme = UINT32_MAX;
   char name[16];
   char vendor[48];
   char remaining[12];
@@ -222,10 +224,22 @@ static void set_label_cached(lv_obj_t* lbl, char* cache, size_t cap, const char*
   lv_label_set_text(lbl, cache);
 }
 
+// A bar that ends lighter than it starts reads as filled with light, not as a flat strip.
+static uint32_t toward_white(uint32_t color, unsigned percent) {
+  uint32_t out = 0;
+  for (int shift = 16; shift >= 0; shift -= 8) {
+    const uint32_t channel = (color >> shift) & 0xFF;
+    out |= (channel + (255 - channel) * percent / 100) << shift;
+  }
+  return out;
+}
+
 static void set_bar_cached(lv_obj_t* bar, size_t slot, size_t row, float pct, uint32_t base) {
   if (!bar) return;
   if (g_barColor[slot][row] != base) {
     lv_obj_set_style_bg_color(bar, lv_color_hex(base), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_color(bar, lv_color_hex(toward_white(base, 38)), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_grad_dir(bar, LV_GRAD_DIR_HOR, LV_PART_INDICATOR);
     g_barColor[slot][row] = base;
   }
   if (pct < 0.0f) pct = 0.0f;
@@ -248,7 +262,7 @@ static void set_knob(lv_obj_t* knob, RowCaches& rc, float pct, uint32_t light) {
   int32_t x = (int32_t)(327.0f * pct / 100.0f) - 4;
   if (x < 0) x = 0;
   if (x > 319) x = 319;
-  lv_obj_set_pos(knob, x, 1);  // parented to the 10 px bar
+  lv_obj_set_pos(knob, x, 2);  // parented to the 12 px bar
 }
 
 // ───────────────────────────────────────────────────────────────────────────────
@@ -332,18 +346,24 @@ static void build_row(CardWidgets& c, size_t r, lv_coord_t yTop, bool withDivide
   w.unit = make_label(c.card, 236, yTop + 41, 110, F_META, C_UNIT, LV_TEXT_ALIGN_RIGHT, "");
   lv_obj_set_style_text_letter_space(w.unit, 1, 0);
   w.bar = lv_bar_create(c.card);
-  lv_obj_set_size(w.bar, 327, 10);
+  lv_obj_set_size(w.bar, 327, 12);
   lv_obj_set_pos(w.bar, 18, yTop + 62);
   lv_bar_set_range(w.bar, 0, 100);
   lv_obj_set_style_bg_color(w.bar, lv_color_hex(C_BAR_TRACK), LV_PART_MAIN);
   lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_border_width(w.bar, 0, LV_PART_MAIN);
-  lv_obj_set_style_radius(w.bar, 5, LV_PART_MAIN);
+  lv_obj_set_style_radius(w.bar, 6, LV_PART_MAIN);
   lv_obj_set_style_pad_all(w.bar, 0, LV_PART_MAIN);
   lv_obj_set_style_bg_color(w.bar, lv_color_hex(C_GREEN), LV_PART_INDICATOR);
   lv_obj_set_style_bg_opa(w.bar, LV_OPA_COVER, LV_PART_INDICATOR);
-  lv_obj_set_style_radius(w.bar, 5, LV_PART_INDICATOR);
-  w.knob = make_dot(w.bar, 314, 1, 8, C_GREEN);  // child of the bar; x set per value
+  lv_obj_set_style_radius(w.bar, 6, LV_PART_INDICATOR);
+  // Quartile ticks are a scale, not thresholds (those are configurable per provider).
+  for (int quarter = 1; quarter <= 3; ++quarter) {
+    lv_obj_t* tick = make_line(w.bar, 327 * quarter / 4, 2, 2, C_CARD);
+    lv_obj_set_height(tick, 8);
+    lv_obj_set_style_bg_opa(tick, LV_OPA_60, 0);
+  }
+  w.knob = make_dot(w.bar, 314, 2, 8, C_GREEN);  // child of the bar; x set per value
   w.reset = make_label(c.card, 18, yTop + 82, 330, &lv_font_montserrat_18, C_RESET, LV_TEXT_ALIGN_LEFT, "");
   // One line with an ellipsis: a retained provider error must never end mid-word.
   lv_obj_set_height(w.reset, lv_font_get_line_height(&lv_font_montserrat_18));
@@ -642,6 +662,18 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
     }
   }
   const quota_state::State quota = quota_state::classify(view, hostConnected, fresh, critical, low);
+  // A card that needs attention says so with its own edge, not only with a number's color.
+  const uint8_t glow = critical ? 2 : low ? 1 : 0;
+  if (cache.glow != glow || cache.glowTheme != ui_theme::revision) {
+    const uint32_t edge = glow == 2 ? C_RED : C_AMBER;
+    lv_obj_set_style_border_color(c.card, lv_color_hex(glow ? edge : C_LINE), 0);
+    lv_obj_set_style_border_width(c.card, glow ? 2 : 1, 0);
+    lv_obj_set_style_shadow_width(c.card, glow ? 24 : 0, 0);
+    lv_obj_set_style_shadow_color(c.card, lv_color_hex(edge), 0);
+    lv_obj_set_style_shadow_opa(c.card, LV_OPA_30, 0);
+    cache.glow = glow;
+    cache.glowTheme = ui_theme::revision;
+  }
   char vendorBuf[sizeof(cache.vendor)];
   snprintf(vendorBuf, sizeof(vendorBuf), "%s - %s", vendor, quota_state::label(quota, false));
   if (hostConnected && sessions.known && (sessions.waiting || sessions.running || sessions.error || sessions.completed)) {

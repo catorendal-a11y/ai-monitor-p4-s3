@@ -4,6 +4,7 @@
 #include "ui/theme.h"
 #include "ui/interaction.h"
 #include "ui/quota_window.h"
+#include "ui/weekday.h"
 #include "ui_menu.h"
 #include <Arduino.h>
 #include <lvgl.h>
@@ -15,6 +16,14 @@ namespace history_ui {
 static lv_obj_t *screen=nullptr,*returnScreen=nullptr,*provider=nullptr,*total=nullptr,*status=nullptr,*quota=nullptr,*metrics=nullptr,*period=nullptr,*graphLabel=nullptr;
 static lv_obj_t* taskMetrics=nullptr;
 static lv_obj_t* bars[24]{};static uint8_t mode=0,selected=0,count=0;static char keys[8][16]{};
+// Chart: bars grow up from a baseline; weekday names sit below, tokens above (7-day view only).
+static constexpr int chartBase=380,chartHeight=56,labelGap=17;
+static lv_obj_t *dayLabels[7]{},*valueLabels[7]{},*baseline=nullptr;
+static uint32_t darker(uint32_t color,unsigned percent) {
+  uint32_t out=0;
+  for(int shift=16;shift>=0;shift-=8)out|=(((color>>shift)&0xFF)*percent/100)<<shift;
+  return out;
+}
 static uint32_t drawnRevision=UINT32_MAX,drawnTheme=UINT32_MAX;static uint8_t drawnMode=255,drawnProvider=255;static bool drawnStale=false;
 static lv_obj_t* label(int x,int y,int w,const char* text,const lv_font_t* font,uint32_t color=ui_theme::text) {
   auto* result=lv_label_create(screen);lv_obj_set_pos(result,x,y);lv_obj_set_width(result,w);lv_label_set_text(result,text);
@@ -56,10 +65,18 @@ void ui_history_init() {
   metrics=label(24,246,752,"Agent history: no observed session events",&lv_font_montserrat_22,ui_theme::muted);
   graphLabel=label(24,281,752,"24 HOURLY BUCKETS / GAPS UNKNOWN",&lv_font_montserrat_18,ui_theme::accent);
   taskMetrics=label(24,405,752,"Client tasks: outcomes not observed",&lv_font_montserrat_18,ui_theme::muted);
+  baseline=lv_obj_create(screen);lv_obj_set_pos(baseline,24,chartBase+1);lv_obj_set_size(baseline,752,1);
+  lv_obj_set_style_bg_color(baseline,lv_color_hex(ui_theme::border),0);lv_obj_set_style_border_width(baseline,0,0);lv_obj_set_style_radius(baseline,0,0);
+  lv_obj_set_scrollable(baseline,false);lv_obj_set_clickable(baseline,false);
   for(unsigned i=0;i<24;++i) {
-    bars[i]=lv_obj_create(screen);lv_obj_set_pos(bars[i],24+i*31,397);lv_obj_set_size(bars[i],23,3);
-    lv_obj_set_style_border_width(bars[i],0,0);lv_obj_set_style_radius(bars[i],3,0);lv_obj_set_scrollable(bars[i],false);lv_obj_set_clickable(bars[i],false);
+    bars[i]=lv_obj_create(screen);lv_obj_set_pos(bars[i],24+i*31,chartBase-3);lv_obj_set_size(bars[i],23,3);
+    lv_obj_set_style_border_width(bars[i],0,0);lv_obj_set_style_radius(bars[i],5,0);lv_obj_set_scrollable(bars[i],false);lv_obj_set_clickable(bars[i],false);
     lv_obj_set_style_bg_color(bars[i],lv_color_hex(ui_theme::muted),0);
+  }
+  for(unsigned i=0;i<7;++i) {
+    dayLabels[i]=label(24+i*107,chartBase+4,86,"",&lv_font_montserrat_14,ui_theme::muted);lv_obj_set_style_text_align(dayLabels[i],LV_TEXT_ALIGN_CENTER,0);
+    valueLabels[i]=label(24+i*107,chartBase-chartHeight-labelGap,86,"",&lv_font_montserrat_14,ui_theme::text);lv_obj_set_style_text_align(valueLabels[i],LV_TEXT_ALIGN_CENTER,0);
+    lv_obj_set_hidden(valueLabels[i],true);
   }
   button(24,432,224,"BACK",back);period=button(280,432,240,"SHOW 7 DAYS",change_period);
   label(552,442,224,"-- = unobserved",&lv_font_montserrat_18,ui_theme::muted);
@@ -126,12 +143,37 @@ void ui_history_update() {
   const unsigned bins=mode?7:24;const uint64_t* values=available?(mode?row->daily:row->hourly):nullptr;
   const uint32_t known=available?(mode?row->dailyKnown:row->hourlyKnown):0;
   uint64_t maximum=1;for(unsigned i=0;i<bins;++i)if((known&(1u<<i)) && values[i]>maximum)maximum=values[i];
+  int heights[24]{};
   for(unsigned i=0;i<24;++i) {
     lv_obj_set_hidden(bars[i],i>=bins);if(i>=bins)continue;
     const bool observed=known&(1u<<i);
-    const int height=observed?std::max(3,static_cast<int>(static_cast<double>(values[i])/maximum*100)):3;
-    lv_obj_set_pos(bars[i],24+i*(mode?107:31),400-height);lv_obj_set_size(bars[i],mode?86:23,height);
+    const int height=observed?std::max(3,static_cast<int>(static_cast<double>(values[i])/maximum*chartHeight)):3;
+    heights[i]=height;lv_obj_set_pos(bars[i],24+i*(mode?107:31),chartBase-height);lv_obj_set_size(bars[i],mode?86:23,height);
     lv_obj_set_style_bg_color(bars[i],lv_color_hex(observed?ui_theme::accent:ui_theme::muted),0);
+    // Observed bars fade toward the baseline; the newest one is solid so "now" is easy to find.
+    lv_obj_set_style_bg_grad_color(bars[i],lv_color_hex(darker(ui_theme::accent,45)),0);
+    lv_obj_set_style_bg_grad_dir(bars[i],observed?LV_GRAD_DIR_VER:LV_GRAD_DIR_NONE,0);
+    lv_obj_set_style_bg_opa(bars[i],i+1==bins||!observed?LV_OPA_COVER:LV_OPA_70,0);
+  }
+  const uint8_t today=weekday_from_iso(data.date);
+  for(unsigned i=0;i<7;++i) {
+    if(!mode) {   // 24 hours: only the two ends are named
+      lv_obj_set_hidden(dayLabels[i],i!=0 && i!=6);lv_obj_set_hidden(valueLabels[i],true);
+      if(i==0){lv_obj_set_pos(dayLabels[i],24,chartBase+4);lv_obj_set_width(dayLabels[i],120);lv_obj_set_style_text_align(dayLabels[i],LV_TEXT_ALIGN_LEFT,0);text(dayLabels[i],"24 h ago");}
+      if(i==6){lv_obj_set_pos(dayLabels[i],640,chartBase+4);lv_obj_set_width(dayLabels[i],120);lv_obj_set_style_text_align(dayLabels[i],LV_TEXT_ALIGN_RIGHT,0);text(dayLabels[i],"now");}
+      lv_obj_set_style_text_color(dayLabels[i],lv_color_hex(ui_theme::muted),0);
+      continue;
+    }
+    lv_obj_set_pos(dayLabels[i],24+i*107,chartBase+4);lv_obj_set_width(dayLabels[i],86);lv_obj_set_style_text_align(dayLabels[i],LV_TEXT_ALIGN_CENTER,0);
+    lv_obj_set_hidden(dayLabels[i],false);
+    char day[8];
+    if(today==0xFF)snprintf(day,sizeof(day),i==6?"today":"-%ud",6-i);else snprintf(day,sizeof(day),"%s",weekday_name((today+7-(6-i))%7));
+    text(dayLabels[i],day);lv_obj_set_style_text_color(dayLabels[i],lv_color_hex(i==6?ui_theme::accent:ui_theme::muted),0);
+    const bool observed=known&(1u<<i);lv_obj_set_hidden(valueLabels[i],!observed);
+    if(observed) {
+      char amount[16];number(values[i],amount,sizeof(amount));text(valueLabels[i],amount);
+      lv_obj_set_y(valueLabels[i],chartBase-heights[i]-labelGap);
+    }
   }
   drawnRevision=data.revision;drawnMode=mode;drawnProvider=selected;drawnTheme=ui_theme::revision;drawnStale=stale;
   lv_obj_update_layout(screen);

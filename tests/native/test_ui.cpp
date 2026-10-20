@@ -2319,7 +2319,9 @@ int main(int argc, char** argv) {
     check_readable_text(history_ui::taskMetrics);
     CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"done 2"));
     CHECK(strstr(lv_label_get_text(history_ui::taskMetrics),"failed --"));
-    CHECK(lv_obj_get_height(history_ui::bars[23])==100 && lv_obj_get_height(history_ui::bars[0])==3);
+    CHECK(lv_obj_get_height(history_ui::bars[23])==history_ui::chartHeight && lv_obj_get_height(history_ui::bars[0])==3);
+    CHECK(!strcmp(lv_label_get_text(history_ui::dayLabels[0]),"24 h ago") && !strcmp(lv_label_get_text(history_ui::dayLabels[6]),"now"));
+    CHECK(lv_obj_is_hidden(history_ui::dayLabels[3]) && lv_obj_is_hidden(history_ui::valueLabels[6]));
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[0],LV_PART_MAIN),lv_color_hex(ui_theme::muted)));
     CHECK(lv_color_eq(lv_obj_get_style_bg_color(history_ui::bars[23],LV_PART_MAIN),lv_color_hex(ui_theme::accent)));
     for(auto* bar:history_ui::bars)check_inside(history_ui::screen,bar);
@@ -2327,6 +2329,13 @@ int main(int argc, char** argv) {
     screenshot(screenshots,"history-today-24h");
     lv_obj_send_event(history_ui::period,LV_EVENT_CLICKED,nullptr);CHECK(history_ui::mode==1);
     CHECK(lv_obj_is_hidden(history_ui::bars[7]) && !lv_obj_is_hidden(history_ui::bars[6]));
+    // 2026-10-14 is a Wednesday: the seven columns read Thu..Wed, ending on today.
+    const char* expectedDays[7]={"Thu","Fri","Sat","Sun","Mon","Tue","Wed"};
+    for(unsigned i=0;i<7;++i)CHECK(!strcmp(lv_label_get_text(history_ui::dayLabels[i]),expectedDays[i]));
+    CHECK(!lv_obj_is_hidden(history_ui::valueLabels[6]) && !strcmp(lv_label_get_text(history_ui::valueLabels[6]),"12.3K"));
+    CHECK(lv_obj_is_hidden(history_ui::valueLabels[0]));           // an unobserved day carries no number
+    CHECK(weekday_from_iso("2026-10-14")==3 && weekday_from_iso("2026-1-14")==0xFF && weekday_from_iso("")==0xFF && weekday_from_iso("2026-13-01")==0xFF);
+    for(auto* label:history_ui::dayLabels)check_inside(history_ui::screen,label);
     screenshot(screenshots,"history-today-7d");
     lv_dropdown_set_selected(history_ui::provider,1);lv_obj_send_event(history_ui::provider,LV_EVENT_VALUE_CHANGED,nullptr);
     CHECK(!strcmp(lv_label_get_text(history_ui::total),"--"));
