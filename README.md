@@ -4,7 +4,7 @@
 
 *Formerly **AI Monitor P4** (`ai-monitor-p4-s3`); old links redirect here.*
 
-New candidate package: **[v1.19.1-rc24](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24)**,
+New candidate package: **[v1.19.1-rc25](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25)**,
 with a full-color terminal dashboard, direct device navigation, observed agent sessions,
 local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
@@ -33,7 +33,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 ![The Agents page: one card per session, in the same colour as on the display](docs/media/terminal-agents.png)
 
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/limitbuddy?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/limitbuddy?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/limitbuddy/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/catorendal-a11y/limitbuddy?style=flat-square&amp;color=35d07f"></a>
   <a href="https://github.com/catorendal-a11y/limitbuddy/actions/workflows/ci.yml"><img alt="Build and test status" src="https://img.shields.io/github/actions/workflow/status/catorendal-a11y/limitbuddy/ci.yml?branch=main&amp;style=flat-square&amp;label=build%20%2B%20tests"></a>
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-35d07f?style=flat-square"></a>
@@ -64,7 +64,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24"><img alt="LimitBuddy terminal source" src="https://img.shields.io/badge/LimitBuddy-Python%20terminal-54c4f2?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25"><img alt="LimitBuddy terminal source" src="https://img.shields.io/badge/LimitBuddy-Python%20terminal-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
   <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
@@ -79,7 +79,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 
 [![Support LimitBuddy — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/limitbuddy)
 
-**[Download LimitBuddy terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
+**[Download LimitBuddy terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
@@ -169,7 +169,7 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 **Steps**
 
-1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24) and extract it into a permanent writable folder.
+1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc25) and extract it into a permanent writable folder.
 2. **Install the command once.** Double-click **Install-LimitBuddy.cmd**. It checks the bundled runtime and registers `limitbuddy` for your user (the older `nova` command keeps working as an alias). Open a new terminal and type `limitbuddy`. No separate Python, package downloads or administrator rights are needed.
 3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. To see sessions on the **Agents** screen and get the "agent needs you" alert, open **Agents > Provider events** in the terminal and link Claude Code and/or Codex; nothing is linked automatically.
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
@@ -193,7 +193,7 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
-**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc24/nova-v1.19.1-rc24-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc24/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
+**[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/nova-v1.19.1-rc25-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc25/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)
 
 The graphical Windows app and EXE distribution are retired. Existing rc14 display firmware works with the terminal-only PC change; updating the display is optional. Preserve settings/history and retarget existing hooks before removing an old EXE installation; see the migration guide above.
 

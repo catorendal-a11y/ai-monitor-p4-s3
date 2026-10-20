@@ -1,4 +1,10 @@
-# LimitBuddy v1.19.1-rc24
+# LimitBuddy v1.19.1-rc25
+
+## Fix: WRAITH and GLITCH on the P4 display
+
+- **WRAITH and GLITCH now work on the P4.** The rc24 image left both out of its assets, and choosing one
+  was saved and then turned back into NOVA. The build now counts all five companions, and a compile-time
+  check keeps it that way. Everything else is as described under rc24 below.
 
 ## Sharper companions, a smarter display
 
