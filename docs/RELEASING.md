@@ -1,9 +1,9 @@
-# Release the NOVA terminal
+# Release the LimitBuddy terminal
 
 The distributed product is Python source plus verified board firmware. No NOVA application EXE, Qt runtime, PyInstaller or Inno installer is built.
 Windows releases include the official hash-verified Python embeddable runtime and hash-locked
 Python dependency wheels, with retained original license files, under runtime/. The consumer
-installs offline by double-clicking Install-Nova.cmd; source-only setup still uses pip.
+installs offline by double-clicking Install-LimitBuddy.cmd; source-only setup still uses pip.
 
 Synchronize src/config.h, tools/project_version.py and the top RELEASE_NOTES.md heading.
 Build both boards sequentially locally and collect matching images (see DEVELOPMENT.md), then:
@@ -29,7 +29,7 @@ On a disposable Windows directory, test the exact extracted package with:
 .\.venv\Scripts\python.exe scripts/test_terminal_package.py --package PATH_TO_CLEAN_PACKAGE
 ```
 
-This tests the real CMD installer without external Python or package downloads, then bare nova from
+This tests the real CMD installer without external Python or package downloads, then bare limitbuddy and nova from
 another folder, verifies no Qt/freezer runtime, and tests idempotent registration/unregistration.
 It does not read credentials, link provider hooks or flash hardware. The resulting test directory
 contains generated private setup data; do not republish it. Publish the original clean ZIP only.

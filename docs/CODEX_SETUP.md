@@ -19,7 +19,7 @@ The Windows x64 release is installed for your own user without administrator acc
 
 ## First installation
 
-1. Extract the complete Windows x64 terminal ZIP and double-click **Install-Nova.cmd**. Open a new terminal and type `nova`.
+1. Extract the complete Windows x64 terminal ZIP and double-click **Install-LimitBuddy.cmd**. Open a new terminal and type `limitbuddy`.
 2. In **Settings > Edit settings**, explicitly select your board, USB port and Codex, then save.
 3. Open **Agents**, select the Codex setup action and review the prompts. If the official CLI is missing, accept **Install the official Codex CLI now?** and follow the vendor installer prompts. You can decline and finish later; existing clients are reused.
 4. Setup checks sign-in quietly. If needed, it offers **official Codex sign-in**. Accept and finish the vendor's browser/terminal flow with your own ChatGPT account. The monitor never asks for or copies your OpenAI password/access token.

@@ -10,14 +10,14 @@ local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
 physical permission control remains disabled pending hardware/provider validation.
 
-![LimitBuddy: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the NOVA terminal](docs/media/github-preview.png)
+![LimitBuddy: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the LimitBuddy terminal](docs/media/github-preview.png)
 
-The [NOVA terminal application](docs/TERMINAL.md) is now the PC app. Download one
+The [LimitBuddy terminal application](docs/TERMINAL.md) is now the PC app. Download one
 Windows x64 terminal ZIP, extract it into a permanent writable folder, and double-click
-**Install-Nova.cmd** once. Open a new terminal and type:
+**Install-LimitBuddy.cmd** once. Open a new terminal and type:
 
 ```powershell
-nova
+limitbuddy
 ```
 
 Python and the required libraries are included, so installation needs no additional
@@ -26,7 +26,7 @@ there is no separate NOVA EXE or Qt application.
 NOVA provides setup, host controls, integrations, history, firmware and companion
 operations through the shared backend. **1–5** changes page, **Tab/Enter** uses
 controls, **?** opens help and **Q** quits. Use a 120 × 30 character window or larger.
-Use `nova --version` or `nova --help` for command information.
+Use `limitbuddy --version` or `limitbuddy --help` for command information.
 
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
 
@@ -62,7 +62,7 @@ Use `nova --version` or `nova --help` for command information.
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18"><img alt="NOVA terminal source" src="https://img.shields.io/badge/NOVA-Python%20terminal-54c4f2?style=flat-square"></a>
+  <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18"><img alt="LimitBuddy terminal source" src="https://img.shields.io/badge/LimitBuddy-Python%20terminal-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="No AI preselected" src="https://img.shields.io/badge/AI%20preselection-none-35d07f?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Host stays running when window closes" src="https://img.shields.io/badge/close%20app-host%20stays%20running-35d07f?style=flat-square"></a>
   <a href="docs/DEVELOPMENT.md"><img alt="Python source requires 3.10 or later" src="https://img.shields.io/badge/Python%20source-3.10%2B-3776ab?style=flat-square&amp;logo=python&amp;logoColor=white"></a>
@@ -77,17 +77,17 @@ Use `nova --version` or `nova --help` for command information.
 
 [![Support LimitBuddy — give this project a star on GitHub](docs/media/star-project.svg)](https://github.com/catorendal-a11y/limitbuddy)
 
-**[Download NOVA terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
+**[Download LimitBuddy terminal](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18)** · [Quick Start](docs/QUICK_START.md) · [Provider setup](docs/PROVIDERS.md) · [Ask a question](https://github.com/catorendal-a11y/limitbuddy/discussions/categories/q-a)
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
-**Two board choices · Three animated companions · Four color themes · No AI preselected · NOVA terminal setup**
+**Two board choices · Three animated companions · Four color themes · No AI preselected · LimitBuddy terminal setup**
 
 ## Watch the two-minute overview
 
 [![Watch LimitBuddy: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
 
-**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the NOVA terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the LimitBuddy terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
 
 ## Meet your desk companion
 
@@ -114,9 +114,9 @@ The S3 target is the original CH422G model, **not B or C**. [Board compatibility
 - A **USB data cable** connected to the board's USB data port.
 - A **Windows 10/11 x64 PC**, plus your own AI account or local CLI installation.
 
-The terminal ZIP includes PC source, a verified private Python runtime with hash-locked libraries, and both boards' prebuilt firmware. Install-Nova.cmd registers `nova` without extra downloads. No PlatformIO or Arduino IDE is needed for ordinary use. Linux/macOS users can run the terminal from source.
+The terminal ZIP includes PC source, a verified private Python runtime with hash-locked libraries, and both boards' prebuilt firmware. Install-LimitBuddy.cmd registers `limitbuddy` without extra downloads. No PlatformIO or Arduino IDE is needed for ordinary use. Linux/macOS users can run the terminal from source.
 
-## PC companion: NOVA terminal
+## PC companion: LimitBuddy terminal
 
 Use the five terminal pages for Overview, Agents, History, Device and Settings. Quota
 age, observed sessions and USB status remain separate. Device provides confirmed
@@ -154,17 +154,17 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 ## Get running on Windows
 
 1. **Download and prepare.** Download the Windows x64 terminal ZIP from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc18) and extract it into a permanent writable folder.
-2. **Install the command once.** Double-click **Install-Nova.cmd**. It checks the bundled runtime and registers `nova` for your user. Open a new terminal and type `nova`. No separate Python, package downloads or administrator rights are needed.
+2. **Install the command once.** Double-click **Install-LimitBuddy.cmd**. It checks the bundled runtime and registers `limitbuddy` for your user (the older `nova` command keeps working as an alias). Open a new terminal and type `limitbuddy`. No separate Python, package downloads or administrator rights are needed.
 3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. **Agents** offers provider setup and explicit observational links.
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
 5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it.
 
 **Upgrading from an earlier release?** Each release lives in its own folder, and your settings stay in the old one until you move them:
 
-1. Extract the new ZIP into a new permanent folder (for example `NOVA Terminal\app-rc19`) and double-click its **Install-Nova.cmd**. `nova` now opens the new version.
+1. Extract the new ZIP into a new permanent folder (for example `LimitBuddy\app-rc19`) and double-click its **Install-LimitBuddy.cmd**. `limitbuddy` now opens the new version.
 2. In the **old** version, use **Settings > Stop host**.
 3. Copy `tools\aim_host.json` (board, port, providers and keys) and, if you use history, the `tools\activity` folder from the old folder into the new one.
-4. Run `nova`, check **Settings**, then **Settings > Start host**.
+4. Run `limitbuddy`, check **Settings**, then **Settings > Start host**.
 5. Update the display from the new version: **Device > Firmware > Application update** keeps display settings.
 6. If you linked provider events or the Claude quota bridge, re-link them from **Agents**. Keep the old folder until everything works.
 
@@ -240,7 +240,7 @@ The display also includes reset countdowns, manual refresh, low/critical quota w
 | **Settings / Recent host log** | Read bounded local messages; API keys and control sequences are filtered. |
 | **? Help** | Show terminal navigation and keyboard help. |
 
-Use `nova --version` and `nova --help` for command information. `nova --check` uses synthetic data; check the live USB connection on the Device page.
+Use `limitbuddy --version` and `limitbuddy --help` for command information. `limitbuddy --check` uses synthetic data; check the live USB connection on the Device page.
 
 When upgrading, stop the old host before opening a newly extracted package. Preserve private configuration/history and retarget existing integrations before removing the old runtime. [Upgrade instructions](docs/TERMINAL.md#upgrade-and-migrate).
 

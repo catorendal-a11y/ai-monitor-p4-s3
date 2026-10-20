@@ -42,7 +42,7 @@ Local activity uses assistant `message.usage` numeric fields from recent default
 
 For quota display, select Claude Code in **Settings > Edit settings**, save, then open **Agents > Claude quota link**. This adds a command to `~/.claude/settings.json` only when no custom statusline exists. Existing settings are backed up; existing statuslines are preserved. Restart Claude Code afterward. The bridge extracts only `rate_limits.five_hour` and `rate_limits.seven_day`, with their used percentages/reset epochs. Missing fields produce activity-only status; data expires after five minutes. An API key alone is not treated as a Claude subscription quota.
 
-If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `nova --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an owned link, open **Agents > Claude quota link**, enable Remove and type `LINK`; other settings are preserved. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it. Source-only checkouts can use `python tools/aim_terminal.py --claude-statusline`.
+If you already have a custom statusline, retain it and pipe a copy of its original JSON input into `limitbuddy --claude-statusline` from your script. The bridge prints a short status string; discard or incorporate that output as preferred. It does not use `context_window.used_percentage` or `total_input_tokens` as plan consumption. To remove an owned link, open **Agents > Claude quota link**, enable Remove and type `LINK`; other settings are preserved. Installing twice is harmless. Each real change keeps a private backup. If another app has replaced the statusline, removal refuses to change it. Source-only checkouts can use `python tools/aim_terminal.py --claude-statusline`.
 
 Primary references: [Claude statusline fields](https://code.claude.com/docs/en/statusline), [CLI session storage](https://code.claude.com/docs/en/sessions), [usage monitoring](https://code.claude.com/docs/en/monitoring-usage). The numeric transcript adapter uses a version-sensitive local format; unsupported records remain unavailable.
 
@@ -65,7 +65,7 @@ Primary references: [official database location](https://docs.opencode.ai/docs/c
 Cursor, Copilot and Antigravity need an external integration that reports usage. OpenCode automatically reads its supported local numeric database; an external bridge is an optional alternative. This release does not log into their websites, copy browser cookies or guess private endpoints. Send a JSON record on stdin to the installed terminal command, for example:
 
 ```text
-nova --ingest copilot
+limitbuddy --ingest copilot
 ```
 
 Input:
@@ -74,7 +74,7 @@ Input:
 {"session_id":"your-local-session-id","total_tokens":12345}
 ```
 
-`total_tokens` must be a nonnegative, cumulative integer for that session. The bridge stores only that number, a receive timestamp and a hashed session identifier under ignored `tools/activity/<provider>/`. Prompts, responses, credentials and unrelated fields are discarded. The host detects increases after its startup baseline. The same payload can be supplied with `nova --ingest cursor`, `nova --ingest antigravity` or `nova --ingest opencode`. Source-only checkouts can use `python tools/aim_terminal.py --ingest <provider>`.
+`total_tokens` must be a nonnegative, cumulative integer for that session. The bridge stores only that number, a receive timestamp and a hashed session identifier under ignored `tools/activity/<provider>/`. Prompts, responses, credentials and unrelated fields are discarded. The host detects increases after its startup baseline. The same payload can be supplied with `limitbuddy --ingest cursor`, `limitbuddy --ingest antigravity` or `limitbuddy --ingest opencode`. Source-only checkouts can use `python tools/aim_terminal.py --ingest <provider>`.
 
 Copilot SDK exposes live `assistant.usage` events with input/output token counts, while some events are ephemeral and are not replayed on resume. Accumulate the counts in your SDK application and forward the running total. This does not monitor all VS Code Copilot use automatically. [Official Copilot SDK usage guide](https://github.com/github/copilot-sdk/blob/main/docs/features/usage-and-billing.md).
 

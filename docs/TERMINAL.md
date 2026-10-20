@@ -1,17 +1,17 @@
-# NOVA terminal
+# LimitBuddy terminal
 
-NOVA is the PC application. Start it by typing `nova`; it runs in the current terminal.
+NOVA is the PC application. Start it by typing `limitbuddy`; it runs in the current terminal.
 The distribution contains Python source and board firmware, without a NOVA application EXE or Qt.
 
 ## Install on Windows
 
 1. Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` from [Releases](https://github.com/catorendal-a11y/limitbuddy/releases).
 2. Extract it into a permanent writable folder. Keep that folder after installation.
-3. Double-click **Install-Nova.cmd**. It verifies the included runtime and registers only this user's `nova` command. No administrator access is needed.
+3. Double-click **Install-LimitBuddy.cmd**. It verifies the included runtime and registers only this user's `limitbuddy` command. No administrator access is needed.
 4. Open a new terminal, from any folder, and type:
 
 ```powershell
-nova
+limitbuddy
 ```
 
 One ZIP contains Python 3.13.16, hash-locked dependencies, NOVA source and both firmware
@@ -25,7 +25,7 @@ interpreter and dependency DLLs are vendor components under `runtime/`, with ori
 license files and a per-file manifest. The installer checks hashes before running Python.
 Missing or changed files fail with a request to extract the complete release again.
 
-Advanced source-only users can still run `Install-Nova.ps1` directly. A Git checkout or
+Advanced source-only users can still run `Install-LimitBuddy.ps1` directly. A Git checkout or
 GitHub's automatic source archive has no bundled runtime and requires Python 3.10+ plus
 internet for setup. The normal Windows x64 release needs neither prerequisite. Setup does
 not select providers, sign into an AI account, flash hardware or enable physical approvals.
@@ -33,9 +33,9 @@ not select providers, sign into an AI account, flash hardware or enable physical
 ## Commands and navigation
 
 ```powershell
-nova --version
-nova --help
-nova --check
+limitbuddy --version
+limitbuddy --help
+limitbuddy --check
 ```
 
 `--check` renders synthetic data; it does not establish a real USB/provider connection.
@@ -56,10 +56,10 @@ explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experim
 
 ## Upgrade and migrate
 
-Extract a new release to a new permanent folder and run `Install-Nova.cmd`, then stop the old
+Extract a new release to a new permanent folder and run `Install-LimitBuddy.cmd`, then stop the old
 host before moving private settings/history: copy `tools\aim_host.json` (settings and keys) and,
 when history is enabled, the `tools\activity` folder into the new folder's `tools`. Keep the original folder until the new host,
-USB connection and observational hooks have been checked. Re-run `Install-Nova.cmd` from the new
+USB connection and observational hooks have been checked. Re-run `Install-LimitBuddy.cmd` from the new
 folder to retarget the owned command. Re-link only previously opted-in provider integrations
 from Agents; provider selection alone is not permission to install hooks. An old EXE installation
 must be migrated before uninstalling it because its host/hooks use the old runtime paths.
@@ -69,12 +69,12 @@ must be migrated before uninstalling it because its host/hooks use the old runti
 From the installed folder:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1 -Uninstall
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-LimitBuddy.ps1 -Uninstall
 ```
 
 This removes only the owned shim and its PATH entry. It retains settings, history and the
 folder, and does not stop the host. Stop the host and unlink this installation's integrations
-before deleting its folder. Other users' PATH and unrelated `nova` commands are preserved.
+before deleting its folder. Other users' PATH and unrelated `limitbuddy` commands are preserved.
 
 ## Development and Linux/macOS
 

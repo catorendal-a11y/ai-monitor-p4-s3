@@ -62,6 +62,6 @@ $taskLocalConfig = Join-Path $taskProjectRoot 'tools\aim_host.json'
 if (-not (Test-Path -LiteralPath $taskLocalConfig)) {
     Copy-Item -LiteralPath (Join-Path $taskProjectRoot 'tools\aim_host.example.json') -Destination $taskLocalConfig
 }
-Write-Output 'Setup complete. Run Install-Nova.ps1 once, then open a new terminal and type nova.'
+Write-Output 'Setup complete. Run Install-LimitBuddy.ps1 once, then open a new terminal and type limitbuddy.'
 Write-Output 'For the terminal dashboard, double-click AI-Monitor-Terminal.bat. See docs/TERMINAL.md.'
 Write-Output 'Local settings and keys were preserved. No hardware was flashed.'

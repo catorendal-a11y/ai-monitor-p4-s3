@@ -356,7 +356,7 @@ def screen_text(pixels,width,height):
 
 
 def main(argv=None):
-    parser=argparse.ArgumentParser(prog='nova',description=__doc__)
+    parser=argparse.ArgumentParser(prog='limitbuddy',description=__doc__)
     parser.add_argument('--version',action='version',version=HOST_VERSION)
     parser.add_argument('--root',type=Path,help='Existing LimitBuddy application directory')
     parser.add_argument('--check',action='store_true',help='Headless UI smoke check using synthetic data')

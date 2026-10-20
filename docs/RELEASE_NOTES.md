@@ -6,7 +6,10 @@
   `catorendal-a11y/limitbuddy`; old links redirect. Installed paths, executables, the
   scheduled task and USB pairing labels keep their old identifiers, so existing
   installations and paired displays continue to work.
-- NOVA terminal shows live provider quota without enabling history: every reported
+- Start the PC app with `limitbuddy`, installed by **Install-LimitBuddy.cmd**. The older
+  `nova` command is still registered as an alias, so existing statusline and telemetry
+  bridges keep working.
+- The LimitBuddy terminal shows live provider quota without enabling history: every reported
   window (session, week, monthly), percent left, a reset countdown and the age of the
   last update. A failed provider keeps its last known value, labeled as such.
 - New built-in **CLAUDE** companion: the Claude Code banner critter as pixel art, with

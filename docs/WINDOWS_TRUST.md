@@ -1,6 +1,6 @@
 # Windows installation and terminal trust
 
-Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases. Compare the ZIP's SHA-256, extract the complete archive into a permanent writable folder and double-click **Install-Nova.cmd**. It verifies the bundled runtime before registering `nova` for the current user. Open a new terminal and type `nova`.
+Download `nova-v1.19.1-rc18-windows-x64-terminal.zip` and `SHA256SUMS.txt` from this repository's Releases. Compare the ZIP's SHA-256, extract the complete archive into a permanent writable folder and double-click **Install-LimitBuddy.cmd**. It verifies the bundled runtime before registering `limitbuddy` for the current user. Open a new terminal and type `limitbuddy`.
 
 The release includes NOVA Python source, the official CPython 3.13.16 embeddable runtime, hash-locked dependency wheels and both boards' firmware. It contains the upstream `python.exe` and `pythonw.exe` interpreters under `runtime/`, but no compiled NOVA application EXE, Qt frontend, PyInstaller package or Inno installer. Keep the complete extracted folder; the registered command points to it. No separate Python, pip, Node.js, PlatformIO or administrator access is required. Installing from the extracted ZIP works offline; provider requests and optional AI-client installation/sign-in still need internet.
 
@@ -16,10 +16,10 @@ Microsoft Security Intelligence can review a specific submitted file for incorre
 
 ## What is tested
 
-Release checks build both firmware targets and the exact Windows x64 terminal ZIP. They verify the pinned CPython archive and runtime wheel hashes, runtime manifest, retained licenses, absence of a NOVA EXE/Qt runtime, clean extraction, the real CMD installer and bare `nova` with external Python and package downloads unavailable. Native and Python tests use synthetic settings and do not flash hardware or sign into provider accounts. The isolated publisher only verifies and attests the completed ZIP/checksum before creating a draft; it does not execute repository code.
+Release checks build both firmware targets and the exact Windows x64 terminal ZIP. They verify the pinned CPython archive and runtime wheel hashes, runtime manifest, retained licenses, absence of a NOVA EXE/Qt runtime, clean extraction, the real CMD installer and bare `limitbuddy` with external Python and package downloads unavailable. Native and Python tests use synthetic settings and do not flash hardware or sign into provider accounts. The isolated publisher only verifies and attests the completed ZIP/checksum before creating a draft; it does not execute repository code.
 
 Real P4 flashing is checked separately when the board is connected. The original S3 remains experimental until tested on physical S3 hardware. Physical approvals, unplug/suspend behavior and long-duration stability remain separate validation gates.
 
 These checks cannot guarantee every PC, USB cable, board variant, security policy or external provider version. Unsupported integrations stay visibly unavailable rather than report fabricated quotas.
 
-Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-Nova.ps1 -Uninstall` from the extracted folder to remove only that installation's owned `nova` command and PATH entry. It retains the extracted application files, private `tools/aim_host.json`, logs and activity records. Stop the host and unlink this installation's observational integrations before deleting its folder. Remove private data yourself if you want to erase it; never upload it to GitHub.
+Run `powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-LimitBuddy.ps1 -Uninstall` from the extracted folder to remove only that installation's owned `limitbuddy` command and PATH entry. It retains the extracted application files, private `tools/aim_host.json`, logs and activity records. Stop the host and unlink this installation's observational integrations before deleting its folder. Remove private data yourself if you want to erase it; never upload it to GitHub.

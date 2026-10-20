@@ -1,9 +1,9 @@
 # Current distribution
 
-rc18 ships `nova-v1.19.1-rc18-windows-x64-terminal.zip`: NOVA terminal source with a
+rc18 ships `nova-v1.19.1-rc18-windows-x64-terminal.zip`: LimitBuddy terminal source with a
 verified private Python runtime and hash-locked dependencies for offline Windows setup.
-It replaces the graphical app and NOVA EXE distribution; double-click `Install-Nova.cmd`, then
-open a new terminal and type `nova`.
+It replaces the graphical app and NOVA EXE distribution; double-click `Install-LimitBuddy.cmd`, then
+open a new terminal and type `limitbuddy`.
 See TERMINAL.md and RELEASE_NOTES.md. Physical approval stays disabled.
 
 ## Historical development evidence
@@ -17,7 +17,7 @@ older downloads. Source, PC executables and normal firmware share v1.19.1-rc14.
 Rc14 packages the interactive terminal with full-color quota bars, original NOVA
 cell artwork, observed sessions, history trends and the shared desktop operations.
 It fixes monochrome startup, short-window layouts and invalid draft handling.
-See [terminal installation and startup](TERMINAL.md). Install once and type `nova`.
+See [terminal installation and startup](TERMINAL.md). Install once and type `limitbuddy`.
 The full Windows package uses its existing console helper's bundled runtime;
 source-only installs prepare a Python environment. No sixth executable is introduced.
 

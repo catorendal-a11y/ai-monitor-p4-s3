@@ -1,6 +1,6 @@
-# Current distribution: NOVA terminal
+# Current distribution: LimitBuddy terminal
 
-Run `Install-Nova.ps1` once, then `nova`. The graphical app and EXE build are retired.
+Run `Install-LimitBuddy.ps1` once, then `limitbuddy`. The graphical app and EXE build are retired.
 Build source/firmware ZIPs using `scripts/build_terminal_release.py`; see RELEASING.md.
 The older architectural notes below include historical desktop details and are not install instructions.
 

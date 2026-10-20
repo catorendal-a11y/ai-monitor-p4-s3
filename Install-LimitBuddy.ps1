@@ -7,8 +7,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $taskRoot = $PSScriptRoot
 $taskBin = [IO.Path]::GetFullPath($CommandDirectory).TrimEnd('\')
-$taskCmd = Join-Path $taskBin 'nova.cmd'
-$taskPs = Join-Path $taskBin 'nova-launcher.ps1'
+# limitbuddy is the command; nova stays as an alias for existing hooks and statuslines.
+$taskCommands = @('limitbuddy','nova')
+$taskFiles = @($taskCommands | ForEach-Object { (Join-Path $taskBin ($_ + '.cmd')), (Join-Path $taskBin ($_ + '-launcher.ps1')) })
 $taskOwner = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($taskRoot))
 $taskMarker = 'AI_MONITOR_TERMINAL_OWNER=' + $taskOwner
 
@@ -47,26 +48,26 @@ namespace AiMonitorTerminal {
 if ($Uninstall) {
     # Remove each surviving file owned by this exact installation. A partial install
     # must be repairable without touching another installation or a custom command.
-    $taskOwned = @($taskCmd,$taskPs | Where-Object {
+    $taskOwned = @($taskFiles | Where-Object {
         (Test-Path -LiteralPath $_) -and
         (Get-Content -LiteralPath $_ -Raw).Contains($taskMarker)
     })
     if ($taskOwned.Count -gt 0) {
         foreach ($taskFile in $taskOwned) { Remove-Item -LiteralPath $taskFile }
-        $taskForeign = @($taskCmd,$taskPs | Where-Object { Test-Path -LiteralPath $_ })
+        $taskForeign = @($taskFiles | Where-Object { Test-Path -LiteralPath $_ })
         if ($taskForeign.Count -eq 0) { Update-TerminalPath $true }
-        Write-Output 'Removed this installation''s nova command.'
+        Write-Output 'Removed this installation''s limitbuddy and nova commands.'
     }
     exit 0
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $taskRoot 'AI-Monitor-Terminal.bat'))) {
-    throw 'The complete LimitBuddy package is required. Keep Install-Nova.ps1 beside the launcher.'
+    throw 'The complete LimitBuddy package is required. Keep Install-LimitBuddy.ps1 beside the launcher.'
 }
-foreach ($taskFile in @($taskCmd,$taskPs)) {
+foreach ($taskFile in $taskFiles) {
     if ((Test-Path -LiteralPath $taskFile) -and
         -not (Get-Content -LiteralPath $taskFile -Raw).Contains('AI_MONITOR_TERMINAL_OWNER=')) {
-        throw 'An unrelated nova command exists. No command or PATH entry was changed.'
+        throw ('An unrelated command exists: ' + (Split-Path -Leaf $taskFile) + '. No command or PATH entry was changed.')
     }
 }
 if (-not $RegisterOnly) {
@@ -74,20 +75,22 @@ if (-not $RegisterOnly) {
     if ($LASTEXITCODE -ne 0) { throw 'Terminal dependency setup failed. No command was installed.' }
 }
 New-Item -ItemType Directory -Path $taskBin -Force | Out-Null
-$taskCmdText = @"
+foreach ($taskName in $taskCommands) {
+    $taskCmdText = @"
 @echo off
 rem $taskMarker
 setlocal DisableDelayedExpansion
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0nova-launcher.ps1" %*
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0$taskName-launcher.ps1" %*
 exit /b %errorlevel%
 "@
-$taskPsText = @"
+    $taskPsText = @"
 # $taskMarker
 `$taskRoot = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$taskOwner'))
 & (Join-Path `$taskRoot 'AI-Monitor-Terminal.bat') @args
 exit `$LASTEXITCODE
 "@
-[IO.File]::WriteAllText($taskPs,$taskPsText,[Text.Encoding]::ASCII)
-[IO.File]::WriteAllText($taskCmd,$taskCmdText,[Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText((Join-Path $taskBin ($taskName + '-launcher.ps1')),$taskPsText,[Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText((Join-Path $taskBin ($taskName + '.cmd')),$taskCmdText,[Text.Encoding]::ASCII)
+}
 Update-TerminalPath $false
-Write-Output 'Installed nova for this Windows user. Open a new terminal and run: nova'
+Write-Output 'Installed limitbuddy for this Windows user (nova still works). Open a new terminal and run: limitbuddy'
