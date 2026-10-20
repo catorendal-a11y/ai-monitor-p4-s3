@@ -1,4 +1,5 @@
 #pragma once
+#include "companion_features.h"
 // AI Monitor P4 - device settings (NVS-backed, owned by the UI task).
 // Display backends apply brightness; this module owns confirmed persistence
 // for brightness and the remaining on-device settings.
@@ -29,8 +30,9 @@ enum class SaveStatus : uint8_t { idle, saved, failed };
 void report_save(bool success);
 SaveStatus save_status();
 uint32_t save_revision();
-enum class Companion : uint8_t { nova, orbit, claude };
-inline constexpr uint8_t companion_count = 3;
+enum class Companion : uint8_t { nova, orbit, claude, wraith, glitch };
+// WRAITH and GLITCH exist only where flash allows (see companion_features.h); elsewhere a stored 3 or 4 is NOVA.
+inline constexpr uint8_t companion_count = AIM_BUILTIN_COMPANIONS;
 enum class Theme : uint8_t { forest, ocean, amethyst, ember };
 struct Appearance { Companion companion = Companion::nova; Theme theme = Theme::forest; };
 inline Appearance normalize_appearance(Appearance value) {
@@ -48,7 +50,8 @@ inline constexpr const char* nova_window_keys[] = {
 NovaWindow nova_window(const char* provider);
 void set_nova_window(const char* provider, NovaWindow value);
 inline const char* companion_name(Companion value) {
-  return value == Companion::orbit ? "ORBIT" : value == Companion::claude ? "CLAUDE" : "NOVA";
+  return value == Companion::orbit ? "ORBIT" : value == Companion::claude ? "CLAUDE" :
+         value == Companion::wraith ? "WRAITH" : value == Companion::glitch ? "GLITCH" : "NOVA";
 }
 inline const char* theme_name(Theme value) {
   static const char* names[] = {"Forest", "Ocean", "Amethyst", "Ember"};

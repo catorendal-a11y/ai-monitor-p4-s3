@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="284" viewBox="0 0 430 284"><title>WRAITH low</title>
+<defs><linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2E2450"/><stop offset=".5" stop-color="#18112F"/><stop offset="1" stop-color="#090611"/></linearGradient>
+<radialGradient id="halo"><stop stop-color="#FFAA00" stop-opacity=".13"/><stop offset="1" stop-color="#FFAA00" stop-opacity="0"/></radialGradient>
+<radialGradient id="eg"><stop stop-color="#FFAA00" stop-opacity=".3"/><stop offset="1" stop-color="#FFAA00" stop-opacity="0"/></radialGradient></defs>
+<ellipse cx="215" cy="145" rx="160" ry="130" fill="url(#halo)"/><ellipse cx="215" cy="264" rx="91" ry="11" fill="#050E18" fill-opacity=".55"/>
+<ellipse cx="215" cy="258" rx="52" ry="6" fill="none" stroke="#FFAA00" stroke-opacity=".3" stroke-width="2"/>
+<polygon points="104,105 109,112 104,119 99,112" fill="#FFAA00" opacity=".5"/><polygon points="322,85 327,92 322,99 317,92" fill="#FFAA00" opacity=".5"/><polygon points="304,207 309,214 304,221 299,214" fill="#FFAA00" opacity=".5"/><polygon points="118,219 123,226 118,233 113,226" fill="#FFAA00" opacity=".5"/><path d="M176 148 L146 196 M254 148 L284 196" stroke="#FFAA00" stroke-opacity=".45" stroke-width="2" stroke-dasharray="2 5" fill="none"/>
+<polygon points="122,194 142,198 146,216 132,226 120,214" fill="#1C1533" stroke="#FFAA00" stroke-opacity=".7" stroke-width="1.5"/><g transform="translate(430 0) scale(-1 1)"><polygon points="122,194 142,198 146,216 132,226 120,214" fill="#1C1533" stroke="#FFAA00" stroke-opacity=".7" stroke-width="1.5"/></g>
+<polygon points="215,24 172,62 152,118 140,176 128,238 160,226 180,252 200,232 215,248 230,232 250,252 270,226 302,238 290,176 278,118 258,62" fill="url(#cloak)" stroke="#FFAA00" stroke-opacity=".5" stroke-width="1.5"/>
+<path d="M172 62 L215 24 L258 62" fill="none" stroke="#FFAA00" stroke-opacity=".5" stroke-width="2"/>
+<path d="M160 170 L152 118 M270 170 L278 118" stroke="#000" stroke-opacity=".25" stroke-width="3"/>
+<polygon points="215,48 188,80 184,120 198,146 215,154 232,146 246,120 242,80" fill="#040208" stroke="#FFAA00" stroke-opacity=".35" stroke-width="1.5"/>
+<polygon points="198,103 212,106 212,110 198,109" fill="#FFAA00" opacity="0.85"/><polygon points="232,103 218,106 218,110 232,109" fill="#FFAA00" opacity="0.85"/>
+<polygon points="215,176 231,198 215,220 199,198" fill="#05030B" stroke="#FFAA00" stroke-opacity=".85"/><polygon points="215,192 223,198 215,204 207,198" fill="#FFAA00" opacity=".45"/>
+<path d="M170 232 L158 226 M260 232 L272 226" stroke="#FFAA00" stroke-opacity=".3" stroke-width="2"/>
+</svg>

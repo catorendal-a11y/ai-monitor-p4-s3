@@ -1803,6 +1803,32 @@ int main(int argc, char** argv) {
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "CLAUDE");
   CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::claude_work || lv_image_get_src(nova_ui::figure) == &nova_assets::claude_blink);
   screenshot(screenshots, "claude-amethyst");
+#if defined(AIM_EXTRA_COMPANIONS)
+  // WRAITH and GLITCH: on a second row of choices, each with its own thumbnail and six poses.
+  for (uint8_t extra : {3, 4}) {
+    ui_settings_show(); open_appearance(nullptr);
+    lv_obj_update_layout(lv_screen_active());
+    lv_area_t firstRow{}, secondRow{}, themeRow{};
+    lv_obj_get_coords(companionButtons[0], &firstRow); lv_obj_get_coords(companionButtons[extra], &secondRow);
+    lv_obj_get_coords(themeButtons[0], &themeRow);
+    CHECK(secondRow.y1 > firstRow.y2 && secondRow.y2 < themeRow.y1);   // below the first row, above the themes
+    lv_obj_send_event(companionButtons[extra], LV_EVENT_CLICKED, nullptr);
+    const bool wraith = extra == 3;
+    CHECK(app_settings::appearance().companion == (wraith ? app_settings::Companion::wraith : app_settings::Companion::glitch));
+    CHECK(lv_image_get_src(companionPreview) == (wraith ? &nova_assets::wraith_thumb : &nova_assets::glitch_thumb));
+    screenshot(screenshots, wraith ? "settings-appearance-wraith" : "settings-appearance-glitch");
+    close_appearance(nullptr); ui_settings_hide(); ui_nova_show(); ui_nova_update();
+    CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == (wraith ? "WRAITH" : "GLITCH"));
+    const auto* shown = lv_image_get_src(nova_ui::figure);
+    CHECK(shown == (wraith ? &nova_assets::wraith_work : &nova_assets::glitch_work) || shown == (wraith ? &nova_assets::wraith_blink : &nova_assets::glitch_blink));
+    screenshot(screenshots, wraith ? "nova-wraith" : "nova-glitch");
+  }
+  CHECK(app_settings::normalize_appearance({static_cast<app_settings::Companion>(5), app_settings::Theme::forest}).companion == app_settings::Companion::nova);
+#else
+  // Without flash for them (the S3 image) a stored WRAITH or GLITCH choice falls back to NOVA.
+  CHECK(app_settings::normalize_appearance({app_settings::Companion::wraith, app_settings::Theme::forest}).companion == app_settings::Companion::nova);
+  CHECK(app_settings::normalize_appearance({app_settings::Companion::glitch, app_settings::Theme::forest}).companion == app_settings::Companion::nova);
+#endif
   ui_settings_show(); open_appearance(nullptr);
   lv_obj_send_event(companionButtons[1], LV_EVENT_CLICKED, nullptr);  // restore ORBIT for later checks
   close_appearance(nullptr); ui_settings_hide(); ui_nova_show();
@@ -1868,8 +1894,14 @@ int main(int argc, char** argv) {
         &nova_assets::orbit_done,&nova_assets::orbit_low,&nova_assets::orbit_critical,
         &nova_assets::orbit_sleep,&nova_assets::orbit_blink,&nova_assets::claude_work,
         &nova_assets::claude_done,&nova_assets::claude_low,&nova_assets::claude_critical,
-        &nova_assets::claude_sleep,&nova_assets::claude_blink};
-      for (unsigned i=0;i<18;++i) {
+        &nova_assets::claude_sleep,&nova_assets::claude_blink
+#if defined(AIM_EXTRA_COMPANIONS)
+        ,&nova_assets::wraith_work,&nova_assets::wraith_done,&nova_assets::wraith_low,&nova_assets::wraith_critical,
+        &nova_assets::wraith_sleep,&nova_assets::wraith_blink,&nova_assets::glitch_work,&nova_assets::glitch_done,
+        &nova_assets::glitch_low,&nova_assets::glitch_critical,&nova_assets::glitch_sleep,&nova_assets::glitch_blink
+#endif
+        };
+      for (unsigned i=0;i<companions::builtin_frame_count;++i) {
         const auto& frame=companions::builtin_frames[i];
         if (!strcmp(expected,frame.frame.encodedSha256))
           return size==frame.frame.encodedBytes && !memcmp(data,frame.encoded,size);
@@ -1885,7 +1917,7 @@ int main(int argc, char** argv) {
     {
       CompanionRenderer cached;
       cached.initialize(cache,hash,decode);
-      for (uint8_t companion:{0,1,2})for (const auto* pose:poses) {
+      for (uint8_t companion=0;companion<app_settings::companion_count;++companion)for (const auto* pose:poses) {
         const auto expected=builtin_companion_view(companion,pose);
         cached.render(target,companion,pose,-40,-2);
         CHECK(cached.cache_active());

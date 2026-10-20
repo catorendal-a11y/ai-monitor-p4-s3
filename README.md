@@ -1,6 +1,6 @@
 # LimitBuddy — ESP32 desk display for AI coding usage limits
 
-**LimitBuddy** keeps your AI coding agents' usage limits on a 4.3-inch ESP32 touchscreen beside your keyboard: session and weekly quota, reset countdowns and low-limit alerts for **Claude Code, OpenAI Codex, Gemini CLI, Z.AI / ZCode, OpenCode, GitHub Copilot, Cursor and Antigravity**. An animated companion — **NOVA**, **ORBIT** or the Claude Code pixel critter **CLAUDE** — reacts to recorded token activity on your PC. USB only: no Wi-Fi, no cloud relay, keys stay on the PC.
+**LimitBuddy** keeps your AI coding agents' usage limits on a 4.3-inch ESP32 touchscreen beside your keyboard: session and weekly quota, reset countdowns and low-limit alerts for **Claude Code, OpenAI Codex, Gemini CLI, Z.AI / ZCode, OpenCode, GitHub Copilot, Cursor and Antigravity**. An animated companion — **NOVA**, **ORBIT**, the Claude Code pixel critter **CLAUDE**, and on the P4 also **WRAITH** and **GLITCH** — reacts to recorded token activity on your PC. They are sharp and a little menacing on purpose, not mascots. USB only: no Wi-Fi, no cloud relay, keys stay on the PC.
 
 *Formerly **AI Monitor P4** (`ai-monitor-p4-s3`); old links redirect here.*
 
@@ -56,7 +56,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode automatic local token activity" src="https://img.shields.io/badge/OpenCode-local%20activity-8b9ba8?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="#make-it-yours"><img alt="NOVA, ORBIT and CLAUDE companions" src="https://img.shields.io/badge/companions-NOVA%20%2B%20ORBIT%20%2B%20CLAUDE-35d07f?style=flat-square"></a>
+  <a href="#make-it-yours"><img alt="NOVA, ORBIT and CLAUDE companions" src="https://img.shields.io/badge/companions-5%20to%20choose%20from-35d07f?style=flat-square"></a>
   <a href="#make-it-yours"><img alt="Four saved color themes" src="https://img.shields.io/badge/themes-4%20saved%20palettes-c49aff?style=flat-square"></a>
   <a href="docs/QUICK_START.md#everyday-use"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>

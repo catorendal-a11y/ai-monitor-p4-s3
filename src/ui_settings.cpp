@@ -646,15 +646,16 @@ void ui_settings_init() {
   lv_obj_set_scrollable(appearanceCard, false);
   make_label(appearanceCard, 24, 18, 700, "Make it yours", &lv_font_montserrat_26, ui_theme::text, LV_TEXT_ALIGN_LEFT);
   make_label(appearanceCard, 24, 58, 400, "COMPANION", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  // Three choices end before the 144 px preview at x 546.
-  for (size_t i = 0; i < app_settings::companion_count; ++i) companionButtons[i] = make_button(appearanceCard, 24 + i * 172, 86, 160,
+  // Three choices per row end before the 144 px preview at x 546; a second row appears with more than three.
+  const int extraRow = app_settings::companion_count > 3 ? 54 : 0;
+  for (size_t i = 0; i < app_settings::companion_count; ++i) companionButtons[i] = make_button(appearanceCard, 24 + (i % 3) * 172, 86 + (i / 3) * 54, 160,
       app_settings::companion_name(static_cast<app_settings::Companion>(i)), companion_select, reinterpret_cast<void*>(i), &companionCaptions[i]);
   companionPreview = lv_image_create(appearanceCard); lv_obj_set_pos(companionPreview, 546, 54); lv_obj_set_clickable(companionPreview, false);
-  make_label(appearanceCard, 24, 160, 700, "UI COLOR THEME", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  for (size_t i = 0; i < 4; ++i) themeButtons[i] = make_button(appearanceCard, 24 + i * 178, 192, 166,
+  make_label(appearanceCard, 24, 160 + extraRow, 700, "UI COLOR THEME", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  for (size_t i = 0; i < 4; ++i) themeButtons[i] = make_button(appearanceCard, 24 + i * 178, 192 + extraRow, 166,
       app_settings::theme_name(static_cast<app_settings::Theme>(i)), theme_select, reinterpret_cast<void*>(i), &themeCaptions[i]);
-  make_label(appearanceCard, 24, 260, 700, "Changes apply now and are saved on this display.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
-  make_label(appearanceCard, 24, 286, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(appearanceCard, 24, 260 + extraRow, 700, "Changes apply now and are saved on this display.", &lv_font_montserrat_14, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
+  make_label(appearanceCard, 24, 286 + extraRow, 500, "Provider logos and warning colors stay consistent.", &lv_font_montserrat_12, ui_theme::muted, LV_TEXT_ALIGN_LEFT);
   make_button(appearanceOverlay, 616, 406, 136, "DONE", close_appearance, nullptr);
   lv_obj_set_hidden(appearanceOverlay, true);
   quotaOverlay = lv_obj_create(lv_layer_top());

@@ -9,10 +9,15 @@ struct CompanionFrameView {
   const lv_image_dsc_t* descriptor = nullptr;
   int16_t originX = 0, originY = 0;
 };
-// Built-in companion index: 0 NOVA, 1 ORBIT, 2 CLAUDE (app_settings::Companion order).
+// Built-in companion index: 0 NOVA, 1 ORBIT, 2 CLAUDE, 3 WRAITH, 4 GLITCH (app_settings::Companion order);
+// the last two exist only where AIM_EXTRA_COMPANIONS is set.
 inline CompanionFrameView builtin_companion_view(uint8_t companion, const lv_image_dsc_t* pose) {
   if (companion == 1) return {nova_assets::companion_pose(1, pose), nova_assets::orbit_origin_x, nova_assets::orbit_origin_y};
   if (companion == 2) return {nova_assets::companion_pose(2, pose), nova_assets::claude_origin_x, nova_assets::claude_origin_y};
+#if defined(AIM_EXTRA_COMPANIONS)
+  if (companion == 3) return {nova_assets::companion_pose(3, pose), nova_assets::wraith_origin_x, nova_assets::wraith_origin_y};
+  if (companion == 4) return {nova_assets::companion_pose(4, pose), nova_assets::glitch_origin_x, nova_assets::glitch_origin_y};
+#endif
   return {pose, nova_assets::nova_origin_x, nova_assets::nova_origin_y};
 }
 class CompanionRenderer {
@@ -56,7 +61,7 @@ class CompanionRenderer {
     return true;
   }
   void render(lv_obj_t* image, uint8_t companion, const lv_image_dsc_t* pose, int x, int y) {
-    if (companion > 2) companion = 0;
+    if (companion >= AIM_BUILTIN_COMPANIONS) companion = 0;   // an unavailable choice shows NOVA
 #if !defined(AIM_BOARD_WAVESHARE_S3) || defined(AIM_COMPANION_CACHE_TEST)
     if (cache_) {
       unsigned index=0;

@@ -20,3 +20,11 @@ node scripts/generate_nova_assets.cjs
 .venv/Scripts/python.exe scripts/generate_companion_lz4.py --cc gcc
 .venv/Scripts/python.exe scripts/generate_terminal_assets.py
 ```
+
+## Other companions
+
+ORBIT (`scripts/generate_orbit_svg.cjs`), CLAUDE (`scripts/generate_claude_svg.cjs`), WRAITH
+(`scripts/generate_wraith_svg.cjs`) and GLITCH (`scripts/generate_glitch_svg.cjs`) are drawn the same way into
+`assets/orbit`, `assets/claude`, `assets/wraith` and `assets/glitch`. All five are original artwork (CLAUDE is a pixel
+rendition of the Claude Code banner critter, see `assets/claude/SOURCES.md`). WRAITH and GLITCH exist only on the P4
+build (`src/companion_features.h`): the S3 image has no flash for more frames and treats a stored choice of them as NOVA.

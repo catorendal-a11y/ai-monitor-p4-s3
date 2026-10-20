@@ -1,6 +1,12 @@
-// CLAUDE companion: the Claude Code banner critter as pixel art, with six expressions.
-// The banner draws it with quadrant block characters, so one source pixel is half a
-// terminal cell: twice as tall as wide. Each source pixel here is U wide and 2U tall.
+// CLAUDE companion: the Claude Code banner critter as pixel art, armoured. The silhouette and the
+// orange stay (it is still that critter); the face becomes a dark visor with lit slits instead of
+// two black dots, it gets short horns, a vent on the chest and a belt line, and the cute extras
+// (sparks, sleeping letters) are gone. The banner draws the critter with quadrant block characters,
+// so one source pixel is half a terminal cell: twice as tall as wide. Each source pixel here is U
+// wide and 2U tall. The halo and ground-shadow ellipses stay exactly as before: the firmware crops
+// frames to the union of every pose, so changing them would change image sizes and flash use.
+//
+//   node scripts/generate_claude_svg.cjs        then        node scripts/generate_nova_assets.cjs
 const fs = require('fs');
 const path = require('path');
 const directory = path.resolve(__dirname, '../assets/claude');
@@ -8,7 +14,8 @@ fs.mkdirSync(directory, {recursive:true});
 
 const U = 18;                 // one square sub-pixel; a source pixel is U x 2U
 const X0 = 53, Y0 = 40;       // 18 columns x 12 sub-rows, centered on the 430 x 284 canvas
-const BODY = '#D77757', SHADE = '#B95F42', EYE = '#141414';
+const BODY = '#D77757', SHADE = '#B95F42', DARK = '#120D0B', PLATE = '#3A241C';
+const HOT = '#FFF1E6', AMBER = '#FFC857', RED = '#FF6572', DIM = '#A08E82';
 
 // Source rows from the banner (columns 0..17); every row is two sub-rows tall.
 const base = [
@@ -24,10 +31,20 @@ function rect(col, sub, w, h, fill, opacity) {
     (opacity ? ` opacity="${opacity}"` : '') + ' shape-rendering="crispEdges"/>';
 }
 
+// Lit eye cells as [column, sub-row] for the left eye; the right eye mirrors around the centre (17 - column).
+const EYES = {
+  work:     { cells: [[5,2],[6,2],[7,3]], color: HOT },       // a slit sloping toward the centre
+  low:      { cells: [[5,3],[6,3]], color: AMBER },
+  critical: { cells: [[5,2],[6,3],[7,3]], color: RED },
+  done:     { cells: [[5,3],[6,2],[7,3]], color: HOT },       // a raised chevron
+  sleep:    { cells: [[5,3],[6,3]], color: DIM, opacity: .6 },
+  blink:    { cells: [[5,3],[6,3]], color: HOT },
+};
+
 for (const pose of ['work','done','low','critical','sleep','blink']) {
   const glow = pose === 'critical' ? '#FF6572' : pose === 'low' ? '#FFBE6E' : BODY;
   const rows = base.map(row => row.slice());
-  rows[1].push(5, 12);  // fill the banner's eye holes; each pose draws its own eyes below
+  rows[1].push(5, 12);  // fill the banner's eye holes; the visor is drawn over them below
   const extra = [];
   // Arms live on source row 2 at columns 1-2 and 15-16.
   const armless = row => row.filter(col => col > 2 && col < 15);
@@ -42,33 +59,28 @@ for (const pose of ['work','done','low','critical','sleep','blink']) {
   }
   const body = [];
   rows.forEach((row, index) => row.forEach(col => body.push(rect(col, index * 2, 1, 2, BODY))));
-  // A one-sub-pixel shade on the lower body edge keeps the flat banner look readable on dark themes.
-  body.push(rect(3, 7, 12, 1, SHADE, '.55'));
-  // Eye holes are column 5 and 12 of source row 1 (sub-rows 2-3).
-  const eyes = [];
-  for (const col of [5, 12]) {
-    if (pose === 'blink' || pose === 'sleep') eyes.push(rect(col, 3.5, 1, 0.5, EYE));                // closed
-    else if (pose === 'low') eyes.push(rect(col, 3, 1, 1, EYE));                                     // tired, half open
-    else if (pose === 'done') eyes.push(rect(col, 2, 1, 1, EYE));                                    // squint smile
-    else eyes.push(rect(col, 2, 1, 2, EYE));                                                         // open
+  // A shade on the lower body edge and a darker belt line keep the flat banner look readable on dark themes.
+  body.push(rect(3, 7, 12, 1, SHADE, '.55'), rect(3, 6, 12, 1, PLATE, '.55'));
+  // Horns: two short spikes on top of the head.
+  body.push(rect(3, -1, 1, 1, BODY), rect(14, -1, 1, 1, BODY), rect(3, -2, 1, 1, SHADE), rect(14, -2, 1, 1, SHADE));
+  // The visor: a dark band across the face with the lit slits inside it.
+  body.push(rect(4, 2, 10, 2, DARK));
+  const eye = EYES[pose];
+  const lit = [];
+  for (const [col, sub] of eye.cells) {
+    lit.push(rect(col, sub, 1, 1, eye.color, eye.opacity), rect(17 - col, sub, 1, 1, eye.color, eye.opacity));
   }
+  // The chest vent, with two lit cells when the critter is awake.
+  lit.push(rect(7, 5, 4, 1, DARK));
+  if (pose !== 'sleep') lit.push(rect(8, 5, 1, 1, eye.color, '.9'), rect(9, 5, 1, 1, eye.color, '.9'));
   if (pose === 'critical') {
     // Alarm mark above the head.
-    extra.push(rect(8.5, -2, 1, 2, '#FF6572'), rect(8.5, 0.5, 1, 0.6, '#FF6572'));
+    extra.push(rect(8.5, -2, 1, 2, RED), rect(8.5, 0.5, 1, 0.6, RED));
   }
-  if (pose === 'done') {
-    // Two small celebration sparks.
-    for (const [cx, cy] of [[0, -1.5], [17, -1.5]]) {
-      extra.push(rect(cx, cy - 0.5, 0.5, 1.5, '#FFD6C2'), rect(cx - 0.5, cy, 1.5, 0.5, '#FFD6C2'));
-    }
-  }
-  const zs = pose === 'sleep' ?
-    `<g fill="#E9D9C6" shape-rendering="crispEdges"><path opacity=".55" d="M${X0+15*U} ${Y0-0.2*U}h${U*0.9}v${U*0.3}l-${U*0.6} ${U*0.6}h${U*0.6}v${U*0.3}h-${U*0.9}v-${U*0.3}l${U*0.6}-${U*0.6}h-${U*0.6}z"/>` +
-    `<path opacity=".8" d="M${X0+16.4*U} ${Y0-1.9*U}h${U*1.3}v${U*0.4}l-${U*0.9} ${U*0.9}h${U*0.9}v${U*0.4}h-${U*1.3}v-${U*0.4}l${U*0.9}-${U*0.9}h-${U*0.9}z"/></g>` : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="430" height="284" viewBox="0 0 430 284"><title>CLAUDE ${pose}</title>
 <defs><radialGradient id="halo"><stop stop-color="${glow}" stop-opacity="${pose === 'sleep' ? '.07' : '.16'}"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient></defs>
 <ellipse cx="215" cy="140" rx="170" ry="130" fill="url(#halo)"/><ellipse cx="215" cy="${Y0 + 10 * U + 22}" rx="120" ry="11" fill="#0B0705" fill-opacity=".55"/>
-${body.join('')}${eyes.join('')}${extra.join('')}${zs}</svg>`;
+${body.join('')}${lit.join('')}${extra.join('')}</svg>`;
   fs.writeFileSync(path.join(directory, pose + '.svg'), svg + '\n');
 }
 console.log('Generated six CLAUDE pixel-art poses.');

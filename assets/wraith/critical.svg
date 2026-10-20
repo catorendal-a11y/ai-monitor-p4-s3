@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="430" height="284" viewBox="0 0 430 284"><title>WRAITH critical</title>
+<defs><linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#2E2450"/><stop offset=".5" stop-color="#18112F"/><stop offset="1" stop-color="#090611"/></linearGradient>
+<radialGradient id="halo"><stop stop-color="#FF5252" stop-opacity=".13"/><stop offset="1" stop-color="#FF5252" stop-opacity="0"/></radialGradient>
+<radialGradient id="eg"><stop stop-color="#FF5252" stop-opacity=".3"/><stop offset="1" stop-color="#FF5252" stop-opacity="0"/></radialGradient></defs>
+<ellipse cx="215" cy="145" rx="160" ry="130" fill="url(#halo)"/><ellipse cx="215" cy="264" rx="91" ry="11" fill="#050E18" fill-opacity=".55"/>
+<ellipse cx="215" cy="258" rx="52" ry="6" fill="none" stroke="#FF5252" stroke-opacity=".3" stroke-width="2"/>
+<polygon points="104,105 109,112 104,119 99,112" fill="#FF5252" opacity=".5"/><polygon points="322,85 327,92 322,99 317,92" fill="#FF5252" opacity=".5"/><polygon points="304,207 309,214 304,221 299,214" fill="#FF5252" opacity=".5"/><polygon points="118,219 123,226 118,233 113,226" fill="#FF5252" opacity=".5"/><path d="M176 148 L146 160 M254 148 L284 160" stroke="#FF5252" stroke-opacity=".45" stroke-width="2" stroke-dasharray="2 5" fill="none"/>
+<polygon points="122,158 142,162 146,180 132,190 120,178" fill="#1C1533" stroke="#FF5252" stroke-opacity=".7" stroke-width="1.5"/><g transform="translate(430 0) scale(-1 1)"><polygon points="122,158 142,162 146,180 132,190 120,178" fill="#1C1533" stroke="#FF5252" stroke-opacity=".7" stroke-width="1.5"/></g>
+<polygon points="215,24 172,62 152,118 140,176 128,238 160,226 180,252 200,232 215,248 230,232 250,252 270,226 302,238 290,176 278,118 258,62" fill="url(#cloak)" stroke="#FF5252" stroke-opacity=".5" stroke-width="1.5"/>
+<path d="M172 62 L215 24 L258 62" fill="none" stroke="#FF5252" stroke-opacity=".5" stroke-width="2"/>
+<path d="M160 170 L152 118 M270 170 L278 118" stroke="#000" stroke-opacity=".25" stroke-width="3"/>
+<polygon points="215,48 188,80 184,120 198,146 215,154 232,146 246,120 242,80" fill="#040208" stroke="#FF5252" stroke-opacity=".35" stroke-width="1.5"/>
+<g transform="translate(4 2)"><polygon points="194,96 212,106 212,113 194,104" fill="#79D5E8" opacity="0.28"/><polygon points="236,96 218,106 218,113 236,104" fill="#79D5E8" opacity="0.28"/></g><ellipse cx="204" cy="104" rx="26" ry="16" fill="url(#eg)"/><ellipse cx="226" cy="104" rx="26" ry="16" fill="url(#eg)"/><polygon points="194,96 212,106 212,113 194,104" fill="#FF5252"/><polygon points="236,96 218,106 218,113 236,104" fill="#FF5252"/>
+<polygon points="215,176 231,198 215,220 199,198" fill="#05030B" stroke="#FF5252" stroke-opacity=".85"/><path d="M207 190 L223 206 M223 190 L207 206" stroke="#FF5252" stroke-width="4"/>
+<path d="M170 232 L158 226 M260 232 L272 226" stroke="#FF5252" stroke-opacity=".3" stroke-width="2"/>
+</svg>

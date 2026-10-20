@@ -8,12 +8,14 @@ const source = path.join(root, 'assets/nova');
 const destination = path.join(root, 'src/ui');
 const names = ['work', 'done', 'low', 'critical', 'sleep', 'blink'];
 // Index order is the firmware's app_settings::Companion value.
-const ROBOTS = ['nova', 'orbit', 'claude'];
-const header = ['#pragma once', '#include <lvgl.h>', 'namespace nova_assets {'];
+const ROBOTS = ['nova', 'orbit', 'claude', 'wraith', 'glitch'];
+// These two exist only where flash allows it (src/companion_features.h): everything generated for them is guarded.
+const EXTRA = new Set(['wraith', 'glitch']);
+const header = ['#pragma once', '#include <lvgl.h>', '#include "../companion_features.h"', 'namespace nova_assets {'];
 const cpp = ['// Generated from assets/nova/*.svg by scripts/generate_nova_assets.cjs.', '#include "nova_assets.h"', 'namespace nova_assets {'];
 function emit(name, pixels, width, height, format, stride) {
   header.push(`extern const lv_image_dsc_t ${name};`);
-  const pose = name.replace(/^(orbit|claude)_/, '');
+  const pose = name.replace(/^(orbit|claude|wraith|glitch)_/, '');
   // P4 decodes non-work poses from LZ4; only the raw work pose stays as a fallback.
   const compressedPose = ['done','low','critical','sleep','blink'].includes(pose);
   if (compressedPose) cpp.push('#if !defined(CONFIG_IDF_TARGET_ESP32P4)');
@@ -22,7 +24,7 @@ function emit(name, pixels, width, height, format, stride) {
     cpp.push('  ' + [...pixels.subarray(i, i + 24)].map(value => '0x' + value.toString(16).padStart(2, '0')).join(',') + ',');
   cpp.push('};', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${name}_pixels), ${name}_pixels, nullptr, nullptr };`);
   if (compressedPose) {
-    const prefix = name.match(/^(orbit|claude)_/);
+    const prefix = name.match(/^(orbit|claude|wraith|glitch)_/);
     const fallback = prefix ? prefix[1] + '_work' : 'work';
     cpp.push('#else', `const lv_image_dsc_t ${name} = { {LV_IMAGE_HEADER_MAGIC, ${format}, 0, ${width}, ${height}, ${stride}, 0}, sizeof(${fallback}_pixels), ${fallback}_pixels, nullptr, nullptr };`, '#endif');
   }
@@ -41,7 +43,9 @@ function emit(name, pixels, width, height, format, stride) {
     crops[robot]={left,top,width:right-left+1,height:bottom-top+1};
     header.push(`inline constexpr int16_t ${robot}_origin_x = ${left};`, `inline constexpr int16_t ${robot}_origin_y = ${top};`);
   }
-  for (const robot of ROBOTS) for (const pose of [...names,'thumb']) {
+  for (const robot of ROBOTS) {
+  const headerStart = header.length, sourceStart = cpp.length;
+  for (const pose of [...names,'thumb']) {
     const name = robot === 'nova' && pose !== 'thumb' ? pose : robot + '_' + pose;
     const file = path.resolve(source,'..',robot, (pose === 'thumb' ? 'work' : pose) + '.svg');
     let pipeline = sharp(file);
@@ -57,6 +61,11 @@ function emit(name, pixels, width, height, format, stride) {
       rgb565[pixelCount * 2 + i] = data[offset + 3];
     }
     emit(name, rgb565, info.width, info.height, 'LV_COLOR_FORMAT_RGB565A8', info.width * 2);
+  }
+  if (EXTRA.has(robot)) {
+    header.splice(headerStart, 0, '#if defined(AIM_EXTRA_COMPANIONS)'); header.push('#endif');
+    cpp.splice(sourceStart, 0, '#if defined(AIM_EXTRA_COMPANIONS)'); cpp.push('#endif');
+  }
   }
   for (const brand of ['openai', 'zcode']) for (const size of [24, 42, 48]) {
     const inner = brand === 'zcode' ? Math.round(size * 2 / 3) : size;
@@ -76,13 +85,19 @@ function emit(name, pixels, width, height, format, stride) {
     '  return nullptr;', '}');
   cpp.push('const lv_image_dsc_t* companion_pose(uint8_t companion, const lv_image_dsc_t* novaPose) {');
   for (const [index, robot] of ROBOTS.entries()) if (index > 0) {
+    if (EXTRA.has(robot)) cpp.push('#if defined(AIM_EXTRA_COMPANIONS)');
     cpp.push(`  if (companion == ${index}) {`);
     for (const name of names) cpp.push(`    if (novaPose == &${name}) return &${robot}_${name};`);
     cpp.push(`    return &${robot}_work;`, '  }');
+    if (EXTRA.has(robot)) cpp.push('#endif');
   }
   cpp.push('  return novaPose;', '}');
   cpp.push('const lv_image_dsc_t* companion_thumb(uint8_t companion) {');
-  for (const [index, robot] of ROBOTS.entries()) if (index > 0) cpp.push(`  if (companion == ${index}) return &${robot}_thumb;`);
+  for (const [index, robot] of ROBOTS.entries()) if (index > 0) {
+    if (EXTRA.has(robot)) cpp.push('#if defined(AIM_EXTRA_COMPANIONS)');
+    cpp.push(`  if (companion == ${index}) return &${robot}_thumb;`);
+    if (EXTRA.has(robot)) cpp.push('#endif');
+  }
   cpp.push('  return &nova_thumb;', '}', '}');
   cpp.splice(2, 0, '#include <cstring>');
   fs.writeFileSync(path.join(destination, 'nova_assets.h'), header.join('\n') + '\n');
