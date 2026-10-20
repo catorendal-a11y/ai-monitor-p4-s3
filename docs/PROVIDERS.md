@@ -84,4 +84,6 @@ Cursor's documented [Admin API](https://docs.cursor.com/en/account/teams/admin-a
 
 SQLite sources are queried read-only. Log adapters parse local records to extract usage; conversation content is never retained, logged or exported by the monitor. Reads, file counts and remembered IDs are bounded, so the display is an activity monitor rather than a complete historical ledger. First samples establish baselines. Missing or malformed sources cannot establish activity. Fresh source reports keep NOVA responsive; token registration can lag generation.
 
+**How often quota is read.** Provider quota is polled every `interval_s` seconds (default and maximum 240, minimum 15). While one of your AIs is registering token use and any quota window is at 30 % left or lower, the host polls about once a minute instead, and returns to the configured interval five minutes after the activity stops. The wait is only ever shortened, the 15 second polling cooldown still applies, and a shorter configured interval is never lengthened. Polling the account usage endpoints does not start model turns or use quota.
+
 Use firmware **v1.11.0+** for the additional provider/source flags. If the display has v1.10.x, use the menu's application update before starting those providers. The host rejects unsupported additional-provider firmware with an update message.

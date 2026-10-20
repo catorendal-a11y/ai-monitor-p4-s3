@@ -26,6 +26,7 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from token_activity import TokenReporter, TokenSampler
 from host_status import HostStatus, OPTIONS, FLAGS, validate_options
+from refresh_policy import AdaptiveRefresh
 from provider_catalog import selected_providers
 from board_profiles import configured_board, get_board, matches_info
 from codex_support import codex_command, codex_home, read_rate_limits
@@ -927,7 +928,12 @@ def wait_connected(panel, seconds, minimum_wait=0):
     deadline = time.monotonic() + seconds
     refresh_after = time.monotonic() + minimum_wait
     next_heartbeat = time.monotonic() + HEARTBEAT_SECONDS
+    policy = getattr(panel, "refresh_policy", None)
     while True:
+        if isinstance(policy, AdaptiveRefresh):
+            # Work can start mid-wait: a quota that is changing should not be shown from minutes ago.
+            # The polling cooldown still applies, and the wait is only ever shortened.
+            deadline = min(deadline, max(refresh_after, policy.deadline()))
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return
@@ -1013,6 +1019,7 @@ def _run_loop(cfg, interval, zai_key, views):
     from companion_service import CompanionService
     companions=CompanionService(HERE.parent)
     tokens.poll_seconds = cfg.get('token_poll_s', 2)
+    refresh = AdaptiveRefresh(interval, health, tokens)
     try:
         while True:
             watcher.check()
@@ -1034,6 +1041,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     tokens.configure(changed_views)
                     live_sampler.configure(changed_views)
                 retries.interval = interval
+                refresh.base = interval
                 tokens.poll_seconds = cfg.get('token_poll_s', 2)
                 health.retain_providers(changed_views)
                 if previous.get("zai_key") != zai_key:
@@ -1065,6 +1073,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     panel.fetcher = fetcher
                     panel.config_watcher = watcher
                     panel.token_reporter = tokens
+                    panel.refresh_policy = refresh
                     panel.live_sampler=live_sampler
                     health.data.pop('live',None)
                     panel.history = history
@@ -1093,6 +1102,7 @@ def _run_loop(cfg, interval, zai_key, views):
                     continue
             try:
                 cycle_started = time.monotonic()
+                refresh.cycle_started = cycle_started
                 panel.cycle_deadline = cycle_started + CYCLE_DEADLINE_SECONDS
                 request_id = panel.take_refresh_request()
                 if type(request_id) is not int:

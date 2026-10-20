@@ -303,6 +303,9 @@ class LoopTests(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 host._run_loop(host.DEFAULT_CONFIG, 240, "", ["codex"])
         wait.assert_called_once_with(panel, 200, minimum_wait=0)
+        # The panel carries the activity-aware policy, anchored to the start of this poll cycle.
+        self.assertIsInstance(panel.refresh_policy, host.AdaptiveRefresh)
+        self.assertEqual((panel.refresh_policy.base, panel.refresh_policy.cycle_started), (240, 100))
         panel.close.assert_called_once()
 
     def test_codex_is_sent_before_waiting_for_zai(self):
