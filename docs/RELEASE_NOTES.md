@@ -1,7 +1,11 @@
-# LimitBuddy v1.19.1-rc19
+# LimitBuddy v1.19.1-rc20
 
 ## New name, live quota in the terminal and a third companion
 
+- rc19 was not published: its Windows package job stopped safely when the rebuilt esptool
+  wheel no longer matched its pinned checksum, because build isolation fetched a newer
+  setuptools. The wheel is now built with hash-pinned setuptools 84.0.0 and reproduces the
+  pinned checksum. rc20 uses a new tag for the corrected build.
 - The project is now **LimitBuddy** (formerly AI Monitor P4). The repository moved to
   `catorendal-a11y/limitbuddy`; old links redirect. Installed paths, executables, the
   scheduled task and USB pairing labels keep their old identifiers, so existing
