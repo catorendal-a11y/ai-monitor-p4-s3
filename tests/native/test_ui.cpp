@@ -707,6 +707,7 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   sample.views[0].hasUsage = false; sample.views[0].rowCount = 0;
   const auto update_x = lv_obj_get_x(nova_ui::menuButton), update_y = lv_obj_get_y(nova_ui::menuButton);
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: running");
+  CHECK(!lv_obj_is_hidden(nova_ui::bubble) && !lv_obj_is_hidden(nova_ui::bubbleDots[0]) && lv_obj_is_hidden(nova_ui::bubbleGlyph));   // typing dots
   lv_obj_update_layout(nova_ui::screen);
   for (auto* label : {nova_ui::title, nova_ui::providers[0].session}) {
     lv_point_t size{};
@@ -717,18 +718,21 @@ static void test_reported_session_poses(const std::filesystem::path& screenshots
   screenshot(screenshots, "nova-session-working");
   agentSample.sessions[0] = agent::SessionCounts{0,1,0,0,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::attention);
+  CHECK(!lv_obj_is_hidden(nova_ui::bubble) && !strcmp(lv_label_get_text(nova_ui::bubbleGlyph), "WAIT"));
+  CHECK(lv_color_eq(lv_obj_get_style_border_color(nova_ui::bubble, LV_PART_MAIN), lv_color_hex(0xFFC857)));
   CHECK(std::string(lv_label_get_text(nova_ui::title)) == "Needs you");
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].status)) == "Activity only / tap for setup");
   CHECK(std::string(lv_label_get_text(nova_ui::providers[0].session)) == "Session: needs you");
   screenshot(screenshots, "nova-session-waiting");
   agentSample.sessions[0] = agent::SessionCounts{0,0,1,0,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::completed);
-  CHECK(!lv_obj_is_hidden(nova_ui::sparks[0]) && !lv_obj_is_hidden(nova_ui::sparks[5]));   // a burst starts with the new mood
+  CHECK(!lv_obj_is_hidden(nova_ui::shock));                                                // a shockwave leaves with the new mood
+  CHECK(!strcmp(lv_label_get_text(nova_ui::bubbleGlyph), "DONE"));
   screenshot(screenshots, "nova-session-complete");
   ui_nova_update();
-  CHECK(!lv_obj_is_hidden(nova_ui::sparks[0]));                                            // and is not restarted by every tick
-  fakeTick += 1300; agentSample.sessionActivityMs = fakeTick; ui_nova_update();
-  CHECK(nova_ui::mood == NovaMood::completed && lv_obj_is_hidden(nova_ui::sparks[0]));      // over after 1.2 s
+  CHECK(!lv_obj_is_hidden(nova_ui::shock));                                                // and is not restarted by every tick
+  fakeTick += 900; agentSample.sessionActivityMs = fakeTick; ui_nova_update();
+  CHECK(nova_ui::mood == NovaMood::completed && lv_obj_is_hidden(nova_ui::shock));          // over after 0.8 s
   agentSample.sessions[0] = agent::SessionCounts{0,0,0,1,4}; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::session_error); screenshot(screenshots, "nova-session-error");
   CHECK(lv_obj_get_x(nova_ui::menuButton) == update_x && lv_obj_get_y(nova_ui::menuButton) == update_y);
@@ -786,11 +790,24 @@ static void test_avatar_extras(const std::filesystem::path& screenshots) {
   set_sample(1, 1); keep_quota_fresh(); sample.hostPresent = true;
   ui_nova_show();
   const auto setUsed = [](float used) { sample.views[0].rows[0].usedPercent = used; keep_quota_fresh(); ui_nova_update(); };
+  nova_ui::auraLevel = 0; nova_ui::auraMs = fakeTick;   // earlier scenes leave an aura showing
   setUsed(5);
   CHECK(nova_ui::mood == NovaMood::critical && nova_ui::auraColor == 0xFF5252);
-  CHECK(lv_obj_get_style_bg_opa(nova_ui::aura[2], LV_PART_MAIN) == LV_OPA_30);              // the inner ring is the strongest
+  CHECK(lv_obj_get_style_border_opa(nova_ui::aura[2], LV_PART_MAIN) < LV_OPA_30);            // it fades in, not on
+  fakeTick += 600; setUsed(5);
+  CHECK(nova_ui::auraLevel == 255);
+  const auto inner = lv_obj_get_style_border_opa(nova_ui::aura[2], LV_PART_MAIN);
+  CHECK(inner >= LV_OPA_70 * 85 / 100 - 1 && inner <= LV_OPA_70);                           // full strength, slightly breathing
+  CHECK(lv_color_eq(lv_obj_get_style_border_color(nova_ui::aura[0], LV_PART_MAIN), lv_color_hex(0xFF5252)));
+  CHECK(lv_obj_get_style_bg_grad_color(nova_ui::stage, LV_PART_MAIN).red != lv_color_hex(ui_theme::surface).red ||
+        lv_obj_get_style_bg_grad_color(nova_ui::stage, LV_PART_MAIN).green != lv_color_hex(ui_theme::surface).green);   // the floor is tinted
+  CHECK(!lv_obj_is_hidden(nova_ui::bubble) && !strcmp(lv_label_get_text(nova_ui::bubbleGlyph), "FAULT"));
+  CHECK(lv_color_eq(lv_obj_get_style_border_color(nova_ui::bubble, LV_PART_MAIN), lv_color_hex(0xFF5252)));
   setUsed(20);
   CHECK(nova_ui::mood == NovaMood::low && nova_ui::auraColor == 0xFFC857);
+  CHECK(nova_ui::auraRgb != 0xFFC857 && nova_ui::auraRgb != 0xFF5252 + 1);                   // mid cross-fade: neither colour yet
+  for (int i = 0; i < 12; ++i) { fakeTick += 160; setUsed(20); }
+  CHECK(nova_ui::auraRgb == 0xFFC857);                                                      // and it arrives
 
   liveSample = live_agent::UsbLiveSnapshot{};
   liveSample.fresh = true; liveSample.epoch = 9; liveSample.receivedAt = fakeTick; liveSample.count = 3;
@@ -810,9 +827,19 @@ static void test_avatar_extras(const std::filesystem::path& screenshots) {
 
   setUsed(80);
   CHECK(nova_ui::auraColor == 0 || nova_ui::mood != NovaMood::low);
+  for (int i = 0; i < 6; ++i) { fakeTick += 160; setUsed(80); }
+  CHECK(nova_ui::auraLevel == 0 && lv_obj_get_style_border_opa(nova_ui::aura[2], LV_PART_MAIN) == LV_OPA_TRANSP);   // faded out
+  CHECK(lv_obj_is_hidden(nova_ui::bubble));                                                  // nothing to say
+  for (auto* corner : nova_ui::brackets) CHECK(!lv_obj_is_hidden(corner));                  // the frame is always there
+  CHECK(nova_ui::bracketColor == ui_theme::accent);                                         // and plain when nothing glows
+  CHECK(!lv_obj_is_hidden(nova_ui::pill));
+  lv_point_t hintSize{}; lv_text_get_size(&hintSize, lv_label_get_text(nova_ui::hint), &lv_font_montserrat_18, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+  CHECK(lv_obj_get_width(nova_ui::pill) >= hintSize.x + 20);                                 // the capsule always holds its text
+  check_inside(nova_ui::stage, nova_ui::pill);
   lv_obj_send_event(nova_ui::stage, LV_EVENT_CLICKED, nullptr);
   const auto greeting = [] { return std::string(nova_ui::kGreetings[(nova_ui::tapCount - 1) % 5]); };
   CHECK(nova_ui::tapped && lv_label_get_text(nova_ui::hint) == greeting());
+  CHECK(!lv_obj_is_hidden(nova_ui::shock));                                                  // a tap sends a ping ring
   fakeTick += 200; ui_nova_update(); CHECK(nova_ui::tapped);                                 // mid-hop
   fakeTick += 400; ui_nova_update(); CHECK(!nova_ui::tapped);                                // the hop is over after 480 ms
   const std::string first = greeting();
@@ -1705,10 +1732,11 @@ int main(int argc, char** argv) {
   nightSettings = {true, 0, 0, 20}; dimMinutes = 0; fakeTick += 60000; settle_backlight();
   sample.tokenActivityMs = fakeTick; sample.tokenIdleSeconds = 0; ui_nova_update();
   CHECK(nova_ui::mood == NovaMood::working);  // night brightness must not put an active robot to sleep
-  CHECK(lv_obj_is_hidden(nova_ui::zzz));
+  CHECK(lv_obj_is_hidden(nova_ui::standby));
   screenshot(screenshots, "nova-active-while-dimmed");
   sample.tokenIdleSeconds = 300; ui_nova_update(); CHECK(nova_ui::mood == NovaMood::resting);
-  CHECK(!lv_obj_is_hidden(nova_ui::zzz) && nova_ui::auraColor == 0);                        // asleep: a sleeping mark, no aura
+  CHECK(!lv_obj_is_hidden(nova_ui::standby) && nova_ui::auraColor == 0);                    // asleep: a standby tag, no aura
+  CHECK(lv_obj_is_hidden(nova_ui::bubble));
   CHECK(lv_obj_get_style_image_recolor_opa(nova_ui::figure, LV_PART_MAIN) == LV_OPA_30);
   screenshot(screenshots, "nova-resting");
   set_sample(2, 1);
@@ -1746,7 +1774,7 @@ int main(int argc, char** argv) {
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
   CHECK(lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_work || lv_image_get_src(nova_ui::figure) == &nova_assets::orbit_blink);
   screenshot(screenshots, "orbit-ocean");
-  CHECK((framebuffer[120 * 800 + 50] & 0xffffffu) == ui_theme::surface);
+  CHECK((framebuffer[93 * 800 + 50] & 0xffffffu) == ui_theme::surface);   // top of the stage; the floor takes a mood tint
   dashboard_show(); dashboard_update();
   CHECK(std::string(lv_label_get_text(nova_ui::companionLabel)) == "ORBIT");
   screenshot(screenshots, "dashboard-ocean");
