@@ -774,6 +774,41 @@ static void test_critical_alert_wakes_dimmed_screen() {
   idle_dim_touch(true); idle_dim_touch(false);
 }
 
+// An even-burn marker on the bars and a ring for the most urgent window on the NOVA screen.
+static void test_pace_marker_and_urgent_dial(const std::filesystem::path& screenshots) {
+  CHECK(window_progress(300, 150 * 60) == 0.5f && window_progress(300, 0) == 1.0f);
+  CHECK(window_progress(0, 10) < 0 && window_progress(300, 301 * 60) < 0);     // unknown or inconsistent: no marker
+
+  set_sample(1, 2); keep_quota_fresh();
+  auto& first = sample.views[0].rows[0];
+  first.usedPercent = 20; first.windowMinutes = 300; first.hasResetCountdown = true; first.resetSeconds = 75 * 60;
+  dashboard_show(); dashboard_update();
+  auto* pace = big[0].rows[0].pace;
+  CHECK(!lv_obj_is_hidden(pace));
+  // 75 % of a 5 h window has run, so an even burn would have 25 % left: a quarter along the bar.
+  CHECK(lv_obj_get_style_x(pace, LV_PART_MAIN) == lv_obj_get_style_x(big[0].rows[0].bar, LV_PART_MAIN) + 82 - 1);
+  CHECK(lv_obj_is_hidden(big[0].rows[1].pace));                                // that row has no countdown
+  lv_obj_set_hidden(quota_banner::banner, true);     // the alert banner is not what this picture is about
+  screenshot(screenshots, "dashboard-pace-marker");
+  first.hasResetCountdown = false; dashboard_update();
+  CHECK(lv_obj_is_hidden(pace));
+
+  ui_nova_show(); ui_nova_update();
+  CHECK(!lv_obj_is_hidden(nova_ui::dial) && lv_arc_get_value(nova_ui::dial) == 20);
+  CHECK(!strcmp(lv_label_get_text(nova_ui::dialValue), "20%") && !strcmp(lv_label_get_text(nova_ui::dialName), "CODEX"));
+  CHECK(lv_color_eq(lv_obj_get_style_arc_color(nova_ui::dial, LV_PART_INDICATOR), lv_color_hex(0xFFAA00)));   // low
+  CHECK(!strcmp(lv_label_get_text(nova_ui::dialWindow), "Session"));
+  check_inside(nova_ui::stage, nova_ui::dial); check_inside(nova_ui::stage, nova_ui::dialName); check_inside(nova_ui::stage, nova_ui::dialWindow);
+  check_readable_text(nova_ui::dialName); check_readable_text(nova_ui::dialWindow);
+  lv_obj_set_hidden(quota_banner::banner, true);     // the alert banner is not what this picture is about
+  screenshot(screenshots, "nova-urgent-dial");
+  first.usedPercent = 80; ui_nova_update();
+  CHECK(lv_color_eq(lv_obj_get_style_arc_color(nova_ui::dial, LV_PART_INDICATOR), lv_color_hex(ui_theme::accent)));
+  sample.hostPresent = false; ui_nova_update();
+  CHECK(lv_obj_is_hidden(nova_ui::dial));                                      // no host, no ring
+  dashboard_show();
+}
+
 // The header names the most urgent window over every AI, including cards on another page.
 static void test_header_headline(const std::filesystem::path& screenshots) {
   dashboard_show();
@@ -1717,6 +1752,7 @@ int main(int argc, char** argv) {
   test_stable_touch_targets(screenshots);
   test_reported_session_poses(screenshots);
   test_critical_alert_wakes_dimmed_screen();
+  test_pace_marker_and_urgent_dial(screenshots);
   test_header_headline(screenshots);
   test_status_line_is_readable(screenshots);
   test_agents_screen_summary_and_names(screenshots);

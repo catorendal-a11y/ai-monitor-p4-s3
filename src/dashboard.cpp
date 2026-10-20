@@ -121,6 +121,7 @@ struct RowWidgets {
   lv_obj_t* unit = nullptr;      // "LEFT"
   lv_obj_t* bar = nullptr;
   lv_obj_t* knob = nullptr;      // light dot at the bar end
+  lv_obj_t* pace = nullptr;      // where an even burn would be by now
   lv_obj_t* reset = nullptr;     // "Resets 23:30"
 };
 
@@ -250,6 +251,23 @@ static void set_bar_cached(lv_obj_t* bar, size_t slot, size_t row, float pct, ui
   }
 }
 
+// The marker shows where an even burn would stand at this point of the window. A fill that is
+// past it (toward the empty end for "left") means the quota is going faster than the window.
+static void set_pace(lv_obj_t* pace, lv_obj_t* bar, float progress, bool showsRemaining) {
+  if (!pace) return;
+  if (progress < 0.0f) {
+    if (!lv_obj_is_hidden(pace)) lv_obj_set_hidden(pace, true);
+    return;
+  }
+  const float position = showsRemaining ? 1.0f - progress : progress;
+  // Style positions are what was set; lv_obj_get_x() also folds in the parent's border.
+  const int32_t x = lv_obj_get_style_x(bar, LV_PART_MAIN) + static_cast<int32_t>(327.0f * position + 0.5f) - 1;
+  const int32_t y = lv_obj_get_style_y(bar, LV_PART_MAIN) - 4;
+  if (lv_obj_get_style_x(pace, LV_PART_MAIN) != x) lv_obj_set_x(pace, x);
+  if (lv_obj_get_style_y(pace, LV_PART_MAIN) != y) lv_obj_set_y(pace, y);
+  if (lv_obj_is_hidden(pace)) lv_obj_set_hidden(pace, false);
+}
+
 static void set_knob(lv_obj_t* knob, RowCaches& rc, float pct, uint32_t light) {
   if (!knob) return;
   if (!rc.knobColorKnown || rc.knobColor != light) {
@@ -364,6 +382,10 @@ static void build_row(CardWidgets& c, size_t r, lv_coord_t yTop, bool withDivide
     lv_obj_set_style_bg_opa(tick, LV_OPA_60, 0);
   }
   w.knob = make_dot(w.bar, 314, 2, 8, C_GREEN);  // child of the bar; x set per value
+  w.pace = make_line(c.card, 18, yTop + 58, 2, C_PCT);
+  lv_obj_set_height(w.pace, 20);
+  lv_obj_set_style_radius(w.pace, 1, 0);
+  lv_obj_set_hidden(w.pace, true);
   w.reset = make_label(c.card, 18, yTop + 82, 330, &lv_font_montserrat_18, C_RESET, LV_TEXT_ALIGN_LEFT, "");
   // One line with an ellipsis: a retained provider error must never end mid-word.
   lv_obj_set_height(w.reset, lv_font_get_line_height(&lv_font_montserrat_18));
@@ -699,6 +721,7 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
     char pctBuf[8];
     char unitBuf[12];
     char resetBuf[48];
+    float paceProgress = -1.0f;
     if (view && view->notice && !view->hasUsage && r == 0) {
       snprintf(winBuf, sizeof(winBuf), "NOTICE");
       snprintf(nameBuf2, sizeof(nameBuf2), "%.47s", view->message);
@@ -766,6 +789,8 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
         rc.percentColor = percentColor;
         lv_obj_set_style_text_color(w.pct, lv_color_hex(percentColor), 0);
       }
+      if (fresh && hostConnected && !view->notice && !view->fetching && row.hasResetCountdown)
+        paceProgress = window_progress(row.windowMinutes, reset_remaining(row, view->quotaReceivedMs, now));
       set_bar_cached(w.bar, slot, r, row.usedPercent, quotaColor);
       if (w.knob) set_knob(w.knob, rc, row.usedPercent, quotaColor == base ? light : quotaColor);
     }
@@ -774,6 +799,7 @@ static void render_card(CardWidgets& c, CardCaches& cache, const aim::ViewData* 
     set_label_cached(w.pct, rc.pct, sizeof(rc.pct), pctBuf);
     if (w.unit) set_label_cached(w.unit, rc.unit, sizeof(rc.unit), unitBuf);
     set_label_cached(w.reset, rc.reset, sizeof(rc.reset), resetBuf);
+    set_pace(w.pace, w.bar, paceProgress, view && view->showsRemaining);
   }
 }
 

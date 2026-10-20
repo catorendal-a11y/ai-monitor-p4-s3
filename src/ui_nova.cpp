@@ -18,6 +18,7 @@
 #endif
 #include "ui/quota_alert.h"
 #include "ui/quota_window.h"
+#include "ui/quota_headline.h"
 #include "ui/theme.h"
 #include "ui/interaction.h"
 #include "ui/navigation.h"
@@ -31,6 +32,9 @@ static lv_obj_t *screen = nullptr, *dashboard = nullptr, *stage = nullptr, *figu
 static lv_obj_t *title = nullptr, *subtitle = nullptr, *hint = nullptr, *clock = nullptr, *link = nullptr;
 static lv_obj_t* tracking = nullptr;
 static lv_obj_t* companionLabel = nullptr;
+// The most urgent quota window as a ring, readable from across the desk.
+static lv_obj_t *dial = nullptr, *dialValue = nullptr, *dialName = nullptr, *dialWindow = nullptr;
+static uint32_t dialColor = UINT32_MAX;
 static lv_obj_t *menuButton = nullptr, *nextButton = nullptr, *pageLabel = nullptr;
 static lv_obj_t *refreshButton = nullptr, *refreshLabel = nullptr;
 struct ProviderCard {
@@ -145,6 +149,20 @@ void init() {
   cacheTelemetry.lastSwitchUs=micros()-firstFrameStarted;
   cacheTelemetry.maxSwitchUs=cacheTelemetry.lastSwitchUs;
 #endif
+  dial = lv_arc_create(stage); lv_obj_set_size(dial, 64, 64); lv_obj_set_pos(dial, 250, 6);
+  lv_arc_set_rotation(dial, 135); lv_arc_set_bg_angles(dial, 0, 270); lv_arc_set_range(dial, 0, 100); lv_arc_set_value(dial, 0);
+  lv_obj_remove_style(dial, nullptr, LV_PART_KNOB); lv_obj_set_clickable(dial, false);
+  lv_obj_set_style_arc_width(dial, 7, LV_PART_MAIN); lv_obj_set_style_arc_width(dial, 7, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_color(dial, lv_color_hex(ui_theme::muted), LV_PART_MAIN); lv_obj_set_style_arc_opa(dial, LV_OPA_30, LV_PART_MAIN);
+  lv_obj_set_style_arc_rounded(dial, true, LV_PART_MAIN); lv_obj_set_style_arc_rounded(dial, true, LV_PART_INDICATOR);
+  dialValue = label(stage, 250, 26, 64, "--", &lv_font_montserrat_18);
+  lv_obj_set_style_text_align(dialValue, LV_TEXT_ALIGN_CENTER, 0);
+  // Which window the ring is about sits beside it, clear of the robot's antenna and head.
+  dialName = label(stage, 172, 15, 72, "", &lv_font_montserrat_14);
+  lv_obj_set_style_text_align(dialName, LV_TEXT_ALIGN_RIGHT, 0);
+  dialWindow = label(stage, 172, 33, 72, "", &lv_font_montserrat_14, ui_theme::muted);
+  lv_obj_set_style_text_align(dialWindow, LV_TEXT_ALIGN_RIGHT, 0);
+  lv_obj_set_hidden(dial, true); lv_obj_set_hidden(dialValue, true); lv_obj_set_hidden(dialName, true); lv_obj_set_hidden(dialWindow, true);
   hint = label(stage, 12, 287, 296, "Tap to say hi", &lv_font_montserrat_18, ui_theme::muted);
   lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);
   label(screen, 364, 94, 412, "RIGHT NOW", &lv_font_montserrat_18, ui_theme::accent);
@@ -192,6 +210,21 @@ void update() {
   const auto companion = app_settings::appearance().companion;
   const auto* external=companions::runtime::current();
   text(companionLabel, external?external->name:app_settings::companion_name(companion));
+  const auto urgent = quota_headline(snapshot, now);
+  lv_obj_set_hidden(dial, !urgent.valid); lv_obj_set_hidden(dialValue, !urgent.valid);
+  lv_obj_set_hidden(dialName, !urgent.valid); lv_obj_set_hidden(dialWindow, !urgent.valid);
+  if (urgent.valid) {
+    const int32_t level = urgent.remaining < 0.0f ? 0 : urgent.remaining > 100.0f ? 100 : static_cast<int32_t>(urgent.remaining + 0.5f);
+    if (lv_arc_get_value(dial) != level) lv_arc_set_value(dial, level);
+    const uint32_t color = urgent.level == 2 ? 0xFF5252 : urgent.level == 1 ? 0xFFAA00 : ui_theme::accent;
+    if (dialColor != color) {
+      dialColor = color;
+      lv_obj_set_style_arc_color(dial, lv_color_hex(color), LV_PART_INDICATOR);
+      lv_obj_set_style_text_color(dialValue, lv_color_hex(color), 0);
+    }
+    char percent[8]; snprintf(percent, sizeof(percent), "%d%%", static_cast<int>(level));
+    text(dialValue, percent); text(dialName, urgent.provider); text(dialWindow, urgent.window);
+  }
   const bool resting = strcmp(idle_dim_mode(), "NIGHT") == 0 || strcmp(idle_dim_mode(), "IDLE") == 0;
   const auto live=live_agent::read_usb();const auto agentCounts=agent::read();
   mood = state.evaluate(snapshot, now, resting, [](const char* provider, const aim::Row& row) {

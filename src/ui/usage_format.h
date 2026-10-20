@@ -21,6 +21,15 @@ inline uint32_t reset_remaining(const aim::Row& row, uint32_t receivedMs, uint32
   return seconds_until(row.resetSeconds, receivedMs, now);
 }
 
+// How far a quota window has run (0 = just started, 1 = about to reset), from its length and the
+// time left to the reset. -1 when either is unknown or inconsistent, so no marker is drawn.
+inline float window_progress(uint32_t windowMinutes, uint32_t secondsLeft) {
+  if (windowMinutes == 0) return -1.0f;
+  const float length = static_cast<float>(windowMinutes) * 60.0f;
+  if (static_cast<float>(secondsLeft) > length) return -1.0f;
+  return 1.0f - static_cast<float>(secondsLeft) / length;
+}
+
 inline void format_countdown(uint32_t seconds, char* out, size_t capacity) {
   const uint32_t minutes = seconds / 60u + (seconds % 60u != 0);
   if (seconds == 0) snprintf(out, capacity, "Reset due");
