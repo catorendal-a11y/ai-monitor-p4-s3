@@ -159,6 +159,15 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
 5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it.
 
+**Upgrading from an earlier release?** Each release lives in its own folder, and your settings stay in the old one until you move them:
+
+1. Extract the new ZIP into a new permanent folder (for example `NOVA Terminal\app-rc19`) and double-click its **Install-Nova.cmd**. `nova` now opens the new version.
+2. In the **old** version, use **Settings > Stop host**.
+3. Copy `tools\aim_host.json` (board, port, providers and keys) and, if you use history, the `tools\activity` folder from the old folder into the new one.
+4. Run `nova`, check **Settings**, then **Settings > Start host**.
+5. Update the display from the new version: **Device > Firmware > Application update** keeps display settings.
+6. If you linked provider events or the Claude quota bridge, re-link them from **Agents**. Keep the old folder until everything works.
+
 **Already using P4 firmware v1.12.0 or later?** The new host recognizes its existing identity. Update the application firmware for the new on-device quota selector and larger alerts; this retains display settings. A new S3 board requires its own first installation.
 
 **[Windows x64 terminal ZIP](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc18/nova-v1.19.1-rc18-windows-x64-terminal.zip)** · [SHA-256 checksum](https://github.com/catorendal-a11y/limitbuddy/releases/download/v1.19.1-rc18/SHA256SUMS.txt) · [Installation and migration guide](docs/TERMINAL.md)

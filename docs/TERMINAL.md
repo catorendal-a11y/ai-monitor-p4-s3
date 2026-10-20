@@ -57,7 +57,8 @@ explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experim
 ## Upgrade and migrate
 
 Extract a new release to a new permanent folder and run `Install-Nova.cmd`, then stop the old
-host before moving private settings/history. Keep the original folder until the new host,
+host before moving private settings/history: copy `tools\aim_host.json` (settings and keys) and,
+when history is enabled, the `tools\activity` folder into the new folder's `tools`. Keep the original folder until the new host,
 USB connection and observational hooks have been checked. Re-run `Install-Nova.cmd` from the new
 folder to retarget the owned command. Re-link only previously opted-in provider integrations
 from Agents; provider selection alone is not permission to install hooks. An old EXE installation
