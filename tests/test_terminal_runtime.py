@@ -62,6 +62,31 @@ class BundledRuntimeTests(unittest.TestCase):
             with zipfile.ZipFile(archive,'w') as bundle:bundle.writestr(item,b'elsewhere')
             with self.assertRaises(ValueError):extract_python(archive,root/'bad',hashlib.sha256(archive.read_bytes()).hexdigest())
 
+    def test_esptool_wheel_is_built_with_the_hash_pinned_setuptools(self):
+        # A new setuptools release changes the wheel bytes; isolation would fetch the latest one.
+        import bundle_terminal_runtime as build
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            scratch=Path(directory)/'scratch';wheels=scratch/'wheels'
+            (scratch/'sources').mkdir(parents=True);(scratch/'sources/esptool-5.4.0.tar.gz').write_bytes(b'source')
+            def fake_run(command,**kwargs):
+                if 'wheel' in command:
+                    wheels.mkdir(parents=True,exist_ok=True);(wheels/'esptool-5.4.0-py3-none-any.whl').write_bytes(b'wheel')
+                return subprocess.CompletedProcess(command,0)
+            digests={b'source':build.ESPTOOL_SOURCE_SHA256,b'wheel':build.ESPTOOL_WHEEL_SHA256}
+            with patch.object(build.subprocess,'run',side_effect=fake_run) as run,\
+                 patch.object(build,'_sha256',side_effect=lambda path:digests[Path(path).read_bytes()]):
+                build.prepare_wheelhouse(scratch,wheels)
+            commands=[call.args[0] for call in run.call_args_list]
+            setup=next(command for command in commands if 'install' in command)
+            self.assertIn('--require-hashes',setup)
+            requirement=Path(setup[setup.index('-r')+1]).read_text()
+            self.assertIn('setuptools==84.0.0',requirement)
+            self.assertIn('--hash=sha256:'+build.BUILD_SETUPTOOLS_SHA256,requirement)
+            wheel=next(command for command in commands if 'wheel' in command)
+            self.assertIn('--no-build-isolation',wheel)
+            self.assertEqual(wheel[0],str(build.build_python(scratch)))
+
     def test_bundler_resolves_pinned_windows_wheels_and_records_original_licenses(self):
         import io
         from unittest.mock import patch

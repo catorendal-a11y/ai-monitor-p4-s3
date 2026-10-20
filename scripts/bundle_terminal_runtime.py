@@ -18,6 +18,10 @@ PYTHON_URL='https://www.python.org/ftp/python/3.13.16/python-3.13.16-embed-amd64
 PYTHON_SHA256='97dae5274cc54867065e8d5a3226e48c35017ed332a0fdb0e27d5b5821961297'
 ESPTOOL_SOURCE_SHA256='fd756598db0a26c9975fa18511b08687c54bf2ce7322ede80cf1f5117dad1f50'
 ESPTOOL_WHEEL_SHA256='a432dc49de9a5bc38306344bb365ae58d59618e6d4e08b2c837e05d341faad09'
+# esptool ships only an sdist. Its wheel bytes depend on the setuptools version, so the
+# build backend is hash-pinned too instead of letting build isolation fetch the latest one.
+BUILD_SETUPTOOLS='setuptools==84.0.0'
+BUILD_SETUPTOOLS_SHA256='51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670'
 HASHED_REQUIREMENTS=ROOT/'scripts/requirements-runtime-win313-hashed.txt'
 
 
@@ -37,6 +41,23 @@ def _sha256(path):
     with Path(path).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
+def build_python(scratch):
+    folder=scratch/('esptool-build-'+BUILD_SETUPTOOLS.replace('==','-'))
+    return folder/('Scripts/python.exe' if os.name=='nt' else 'bin/python')
+
+
+def prepare_build_environment(scratch):
+    """A dedicated environment holding only the hash-checked wheel build backend."""
+    python=build_python(scratch)
+    if not python.exists():
+        subprocess.run([sys.executable,'-m','venv',str(python.parents[1])],check=True)
+    requirements=scratch/'esptool-build-requirements.txt'
+    requirements.write_text(BUILD_SETUPTOOLS+' --hash=sha256:'+BUILD_SETUPTOOLS_SHA256+'\n',encoding='ascii')
+    subprocess.run([str(python),'-m','pip','install','--disable-pip-version-check','--no-deps',
+        '--require-hashes','-r',str(requirements)],check=True)
+    return python
+
+
 def prepare_wheelhouse(scratch,wheels):
     """Build one reproducible pure-Python wheel, then hash-check every Windows wheel."""
     wheels.mkdir(parents=True,exist_ok=True)
@@ -49,7 +70,8 @@ def prepare_wheelhouse(scratch,wheels):
     wheel=wheels/'esptool-5.4.0-py3-none-any.whl'
     if not wheel.exists():
         environment=dict(os.environ,SOURCE_DATE_EPOCH='1767225600')
-        subprocess.run([sys.executable,'-m','pip','wheel','--no-cache-dir','--no-deps',
+        python=prepare_build_environment(scratch)
+        subprocess.run([str(python),'-m','pip','wheel','--no-cache-dir','--no-deps','--no-build-isolation',
             '--wheel-dir',str(wheels),str(source)],check=True,env=environment)
     if _sha256(wheel)!=ESPTOOL_WHEEL_SHA256:raise ValueError('esptool wheel checksum mismatch')
     subprocess.run([sys.executable,'-m','pip','download','--dest',str(wheels),
