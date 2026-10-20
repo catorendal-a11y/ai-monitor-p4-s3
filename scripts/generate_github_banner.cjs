@@ -39,7 +39,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
  </g>
  <text x="64" y="453" font-size="20" fill="#f1fff7">Session and weekly quota at a glance.</text>
  <text x="64" y="486" font-size="18" fill="#90b7aa">USB only. Keys stay on your PC.</text>
- <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">3 companions · 4 themes · ESP32-P4 / S3 touchscreen</text>
+ <text x="64" y="542" font-size="16" font-weight="600" fill="#9af3bb">5 companions · 4 themes · ESP32-P4 / S3 touchscreen</text>
  <text x="64" y="603" font-size="14" fill="#87a89e">github.com/catorendal-a11y/limitbuddy</text>
 </g>
 <rect x="628" y="125" width="594" height="366" rx="21" fill="#03111b" stroke="#386272" stroke-width="2" filter="url(#shadow)"/>

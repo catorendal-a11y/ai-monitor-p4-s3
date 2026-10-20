@@ -10,7 +10,7 @@ local-day history, companion packs, private diagnostics and
 [real USB device-screen capture](docs/DEVICE_MIRROR.md). This is a prerelease;
 physical permission control remains disabled pending hardware/provider validation.
 
-![LimitBuddy: ESP32-P4 touchscreen with NOVA and ORBIT robot companions, actual UI previews and the LimitBuddy terminal](docs/media/github-preview.png)
+![LimitBuddy: ESP32-P4 touchscreen with the ORBIT and CLAUDE companions, actual UI previews and the LimitBuddy terminal](docs/media/github-preview.png)
 
 The [LimitBuddy terminal application](docs/TERMINAL.md) is now the PC app. Download one
 Windows x64 terminal ZIP, extract it into a permanent writable folder, and double-click
@@ -29,6 +29,8 @@ controls, **?** opens help and **Q** quits. Use a 120 × 30 character window or 
 Use `limitbuddy --version` or `limitbuddy --help` for command information.
 
 ![Actual terminal widgets rendered with synthetic sample data](docs/media/terminal-preview.png)
+
+![The Agents page: one card per session, in the same colour as on the display](docs/media/terminal-agents.png)
 
 <p align="center">
   <a href="https://github.com/catorendal-a11y/limitbuddy/releases/tag/v1.19.1-rc24"><img alt="Latest published release" src="https://img.shields.io/github/v/release/catorendal-a11y/limitbuddy?include_prereleases=true&amp;style=flat-square&amp;label=version&amp;color=35d07f"></a>
@@ -56,7 +58,7 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
   <a href="docs/PROVIDERS.md#external-numeric-bridge"><img alt="OpenCode automatic local token activity" src="https://img.shields.io/badge/OpenCode-local%20activity-8b9ba8?style=flat-square"></a>
 </p>
 <p align="center">
-  <a href="#make-it-yours"><img alt="NOVA, ORBIT and CLAUDE companions" src="https://img.shields.io/badge/companions-5%20to%20choose%20from-35d07f?style=flat-square"></a>
+  <a href="#make-it-yours"><img alt="Five companions: NOVA, ORBIT, CLAUDE, WRAITH and GLITCH" src="https://img.shields.io/badge/companions-5%20to%20choose%20from-35d07f?style=flat-square"></a>
   <a href="#make-it-yours"><img alt="Four saved color themes" src="https://img.shields.io/badge/themes-4%20saved%20palettes-c49aff?style=flat-square"></a>
   <a href="docs/QUICK_START.md#everyday-use"><img alt="Per-provider quota selection saved on display" src="https://img.shields.io/badge/quota%20windows-per%20AI%20%2B%20saved-54c4f2?style=flat-square"></a>
   <a href="docs/QUICK_START.md"><img alt="Larger quota notifications" src="https://img.shields.io/badge/alerts-large%20text%20%2B%20tap%20targets-ffb96a?style=flat-square"></a>
@@ -81,19 +83,25 @@ Use `limitbuddy --version` or `limitbuddy --help` for command information.
 
 **Why put AI activity on your desk?** Keep supported quota windows visible on a dedicated display, and see registered work without opening another app. The PC companion connects to your selected P4 or S3 display over USB. Choose the providers you use, pick your robot and colors, and keep your main screen for your work.
 
-**Two board choices · Three animated companions · Four color themes · No AI preselected · LimitBuddy terminal setup**
+**Two board choices · Five animated companions · Four color themes · No AI preselected · LimitBuddy terminal setup**
 
 ## Watch the two-minute overview
 
 [![Watch LimitBuddy: NOVA and ORBIT on an ESP32 touchscreen](docs/media/youtube-thumbnail.png)](https://www.youtube.com/watch?v=1JR9_E1lWDg)
 
-**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the LimitBuddy terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
+**[Watch on YouTube](https://www.youtube.com/watch?v=1JR9_E1lWDg)** (recorded with the earlier, rounder companions) — Meet NOVA and ORBIT, see the actual display UI, and learn how USB, provider setup, quota windows and themes fit together. The video includes the retired graphical PC app as historical footage; current Windows releases use the LimitBuddy terminal. English narration, timed subtitles and chapters are included. UI previews use synthetic data; S3 remains experimental.
 
 ## Meet your desk companion
 
 | NOVA | ORBIT with the Ocean theme | CLAUDE with the Amethyst theme |
 | --- | --- | --- |
-| ![NOVA showing AI activity and usage](docs/nova-preview.png) | ![ORBIT on the Ocean companion screen](docs/ui/orbit-ocean.png) | ![CLAUDE pixel companion on the Amethyst theme](docs/ui/claude-amethyst.png) |
+| ![NOVA, a sentinel with slanted light slits, on the Forest theme](docs/ui/nova-working.png) | ![ORBIT, a faceted sensor drone, on the Ocean theme](docs/ui/orbit-ocean.png) | ![CLAUDE, the pixel critter with a dark visor, on the Amethyst theme](docs/ui/claude-amethyst.png) |
+
+| WRAITH (P4 only) | GLITCH (P4 only) | Choosing a companion |
+| --- | --- | --- |
+| ![WRAITH, a hooded figure with blade eyes and a chest rune](docs/ui/nova-wraith.png) | ![GLITCH, a CRT-headed terminal with block-cursor eyes](docs/ui/nova-glitch.png) | ![Companion and theme settings with five companions on two rows](docs/ui/settings-appearance-glitch.png) |
+
+The companions are sharp and a little menacing on purpose, not mascots. WRAITH and GLITCH are compiled into the P4 firmware only: the S3 image has no flash left for more frames and shows NOVA if one of them is stored. The mood of the figure follows your sessions and quota: a soft radar ring in the mood colour, a status tag (RUN / WAIT / FAULT / DONE), one chip per live session in its colour, a ring for the tightest quota window, and a standby tag when it rests.
 
 These previews are rendered from the actual LVGL interface using synthetic data. They are UI renders, not photographs of the display.
 
@@ -239,6 +247,14 @@ On the display, open **SET > APPEARANCE**. Choose **NOVA** or **ORBIT**, then **
 | ![ORBIT companion in the Amethyst theme](docs/ui/orbit-amethyst.png) | ![NOVA companion in the Ember theme](docs/ui/nova-ember.png) |
 
 [View the provider details screen](docs/ui/details-ocean.png).
+
+**Read the display at a glance**
+
+| Needs you | Even-burn marker | Tightest window | History |
+| --- | --- | --- | --- |
+| ![NOVA with a WAIT tag while a session needs you](docs/ui/nova-session-waiting.png) | ![A white marker shows where an even burn would be by now](docs/ui/dashboard-pace-marker.png) | ![A ring shows the tightest quota window](docs/ui/nova-urgent-dial.png) | ![Seven-day history chart with weekday names](docs/ui/history-today-7d.png) |
+
+The white marker on a quota bar is where an even burn would stand at this point of the window: a "left" fill shorter than the marker means the quota is going faster than its window. Cards with a low or critical window get an amber or red edge. [What each mark means](docs/QUICK_START.md#reading-the-display).
 
 The display also includes reset countdowns, manual refresh, low/critical quota warnings, session history, brightness presets, gradual idle dimming and scheduled night brightness. P4 dims its LED backlight with PWM; S3 dims the rendered image and switches LEDs off only at zero. See [board differences](docs/BOARDS.md#brightness-and-performance).
 
