@@ -30,6 +30,15 @@ exit 0
         raise RuntimeError('Could not verify removal of this installation startup task. Retry before uninstalling.')
 
 
+def remove_startup_entry(root):
+    """Remove the Start at sign-in entry, but only when it starts this installation."""
+    from autostart import AutostartError, disable
+    try:
+        disable(root)
+    except AutostartError:
+        raise RuntimeError('Could not verify removal of this installation startup entry. Retry before uninstalling.') from None
+
+
 def remove_integrations(root, home=None):
     """Reuse exact generated-hook ownership checks; no trust/config resets."""
     import provider_setup as providers
@@ -57,6 +66,7 @@ def prepare(root, *, uninstall=False, home=None):
     if owned_hosts(root): raise RuntimeError('This installation host is still running. Retry after it stops.')
     if uninstall:
         remove_startup_task(root)
+        remove_startup_entry(root)
         remove_integrations(root,home=home)
     # The startup task could have run while cleanup was in progress.
     if owned_hosts(root): raise RuntimeError('This installation host restarted. Stop it and retry.')

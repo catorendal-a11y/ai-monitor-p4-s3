@@ -157,14 +157,14 @@ OpenCode reads local numeric usage automatically. Copilot, Cursor and Antigravit
 2. **Install the command once.** Double-click **Install-LimitBuddy.cmd**. It checks the bundled runtime and registers `limitbuddy` for your user (the older `nova` command keeps working as an alias). Open a new terminal and type `limitbuddy`. No separate Python, package downloads or administrator rights are needed.
 3. **Choose your board and AI tools.** In **Settings > Edit settings**, choose P4 or S3, providers and USB port, then save. With multiple USB boards connected, choose the explicit COM port instead of `auto`. No AI is preselected. **Agents** offers provider setup and explicit observational links.
 4. **Prepare the display.** On a new board, open **Device > Firmware**, select **First installation**, review the board/port and type `FLASH`. This resets display settings. Existing LimitBuddy boards can use the application update to preserve settings. Nothing is flashed automatically.
-5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it.
+5. **Start the companion.** Use **Settings > Start host**. The host can keep running after closing the terminal; the saved close preference controls this. Sign-out or shutting down the PC stops it, unless you switch on **Start at Windows sign-in** in **Settings > Edit settings**: the display then comes back by itself after every restart (a per-user Startup entry; it needs no administrator rights and can also be turned off in Windows Settings > Apps > Startup).
 
 **Upgrading from an earlier release?** Each release lives in its own folder, and your settings stay in the old one until you move them:
 
 1. Extract the new ZIP into a new permanent folder (for example `LimitBuddy\app-rc19`) and double-click its **Install-LimitBuddy.cmd**. `limitbuddy` now opens the new version.
 2. In the **old** version, use **Settings > Stop host**.
 3. Copy `tools\aim_host.json` (board, port, providers and keys) and, if you use history, the `tools\activity` folder from the old folder into the new one.
-4. Run `limitbuddy`, check **Settings**, then **Settings > Start host**.
+4. Run `limitbuddy`, check **Settings**, then **Settings > Start host**. If you use **Start at Windows sign-in**, open **Edit settings** and press **Save** once so the Startup entry points at the new folder.
 5. Update the display from the new version: **Device > Firmware > Application update** keeps display settings.
 6. If you linked provider events or the Claude quota bridge, re-link them from **Agents**. Keep the old folder until everything works.
 

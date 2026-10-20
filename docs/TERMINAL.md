@@ -54,13 +54,25 @@ confirmation. First installation resets display settings. Source-only Git downlo
 no firmware: use the terminal release ZIP with both images, or build and collect them as
 explained in DEVELOPMENT.md. Physical permissions remain disabled; S3 is experimental.
 
+## Start at Windows sign-in
+
+Off by default. Switch it on in Settings > Edit settings: LimitBuddy adds one value named
+`LimitBuddy` to the current user's Run key (Windows Settings > Apps > Startup lists it and can
+disable it), pointing at this folder's windowless Python and `tools\aim_control.py --start-host`.
+No administrator rights, scheduled task or service is involved. Turning the setting off removes
+the value, but only when it starts this installation. If another program already uses the name
+`LimitBuddy`, Save stops with a message and changes nothing. A host that fails to start at sign-in
+(for example an unplugged display) simply waits for USB like a manually started one.
+
 ## Upgrade and migrate
 
 Extract a new release to a new permanent folder and run `Install-LimitBuddy.cmd`, then stop the old
 host before moving private settings/history: copy `tools\aim_host.json` (settings and keys) and,
 when history is enabled, the `tools\activity` folder into the new folder's `tools`. Keep the original folder until the new host,
 USB connection and observational hooks have been checked. Re-run `Install-LimitBuddy.cmd` from the new
-folder to retarget the owned command. Re-link only previously opted-in provider integrations
+folder to retarget the owned command. If **Start at Windows sign-in** is on, open Settings > Edit settings
+in the new version and press Save once: that rewrites the Startup entry so it starts the new folder.
+Re-link only previously opted-in provider integrations
 from Agents; provider selection alone is not permission to install hooks. An old EXE installation
 must be migrated before uninstalling it because its host/hooks use the old runtime paths.
 
@@ -72,8 +84,9 @@ From the installed folder:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Install-LimitBuddy.ps1 -Uninstall
 ```
 
-This removes only the owned shim and its PATH entry. It retains settings, history and the
-folder, and does not stop the host. Stop the host and unlink this installation's integrations
+This removes only the owned shim and its PATH entry, plus the **Start at Windows sign-in**
+Startup entry when it starts this folder (an entry for another folder or another program is kept).
+It retains settings, history and the folder, and does not stop the host. Stop the host and unlink this installation's integrations
 before deleting its folder. Other users' PATH and unrelated `limitbuddy` commands are preserved.
 
 ## Development and Linux/macOS

@@ -11,6 +11,7 @@ import aim_control as control
 from board_profiles import get_board
 from host_security import safe_text, serial_port
 from provider_catalog import selected_providers
+import autostart
 from host_status import validate_options, read_status
 
 
@@ -81,6 +82,12 @@ def save_settings(root: Path, board: str, providers: list[str], port: str,
             updated['zai_key'] = control.host.credential(key)
         except ValueError:
             raise control.SetupError('Use a single printable API key. Nothing was saved.') from None
+    try:
+        # Windows startup is changed last, right before the config is written, so a refused
+        # entry (another program's) or an invalid key above never leaves a half-applied save.
+        autostart.apply(root, updated.get('start_host_at_login') is True)
+    except autostart.AutostartError as error:
+        raise control.SetupError(str(error) + ' Nothing was saved.') from None
     control.save_config(updated, root)
     return updated
 

@@ -51,7 +51,8 @@ def read_dashboard(root,now=None):
     providers=config['providers'];enabled=config.get('usage_history',False)
     result['history_enabled']=enabled
     result['settings']={key:config.get(key) for key in ('board','port','interval_s','token_poll_s','usage_history')}
-    result['settings'].update(keep_host_on_close=config.get('keep_host_on_close',True),start_host_on_open=config.get('start_host_on_open',False))
+    result['settings'].update(keep_host_on_close=config.get('keep_host_on_close',True),start_host_on_open=config.get('start_host_on_open',False),
+                              start_host_at_login=config.get('start_host_at_login',False))
     processes=owned_hosts(root)
     result['running']=bool(processes)
     health=read_status(root,{p.pid for p in processes}) or {}

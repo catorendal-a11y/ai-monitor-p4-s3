@@ -1,6 +1,8 @@
 param(
     [string]$CommandDirectory = (Join-Path $env:LOCALAPPDATA 'Programs\NOVA Terminal\bin'),
     [ValidateSet('User','Process')][string]$EnvironmentScope = 'User',
+    # Windows Run value written by the Start at sign-in setting; tests use a throwaway name.
+    [string]$RunValueName = 'LimitBuddy',
     [switch]$RegisterOnly,
     [switch]$Uninstall
 )
@@ -57,6 +59,15 @@ if ($Uninstall) {
         $taskForeign = @($taskFiles | Where-Object { Test-Path -LiteralPath $_ })
         if ($taskForeign.Count -eq 0) { Update-TerminalPath $true }
         Write-Output 'Removed this installation''s limitbuddy and nova commands.'
+    }
+    # Remove the Start at sign-in entry too, but only when it starts this folder: a leftover entry
+    # would try to launch a deleted interpreter at every sign-in.
+    $taskRunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
+    $taskRun = (Get-ItemProperty -LiteralPath $taskRunKey -Name $RunValueName -ErrorAction SilentlyContinue).$RunValueName
+    $taskOwnScript = '"' + (Join-Path $taskRoot 'tools\aim_control.py') + '" --start-host'
+    if (($taskRun -is [string]) -and $taskRun.EndsWith($taskOwnScript,[StringComparison]::OrdinalIgnoreCase)) {
+        Remove-ItemProperty -LiteralPath $taskRunKey -Name $RunValueName
+        Write-Output 'Removed this installation''s Start at sign-in entry.'
     }
     exit 0
 }

@@ -67,6 +67,9 @@ class ActionForm(ModalScreen):
         self.scrub();self.dismiss(values)
 
 
+FLAG_LABELS={'start_host_at_login':'Start at Windows sign-in (adds a Startup entry for this user)'}
+
+
 def settings_form(settings):
     fields=[('board','Display board','select',settings.get('board'),[(b.name,b.id) for b in BOARDS.values()]),
             ('port','USB port (auto or explicit COM port)','text',settings.get('port','auto'),None),
@@ -75,7 +78,7 @@ def settings_form(settings):
     fields += [('key','Optional Z.AI key (empty keeps saved key)','secret','',None),
                ('clear_key','Clear saved Z.AI key','bool',False,None)]
     fields += [('option-'+key,key.replace('_',' ').title(),'text',settings.get(key,limits[2]),None) for key,limits in OPTIONS.items()]
-    fields += [('option-'+key,key.replace('_',' ').title()+' (desktop preference)' if key in ('start_host_on_open','keep_host_on_close','minimize_to_tray','close_to_tray') else key.replace('_',' ').title(),
+    fields += [('option-'+key,FLAG_LABELS.get(key) or (key.replace('_',' ').title()+' (desktop preference)' if key in ('start_host_on_open','keep_host_on_close','minimize_to_tray','close_to_tray') else key.replace('_',' ').title()),
                 'bool',settings.get(key,default),None) for key,default in FLAGS.items() if key!='usb_permissions']
     return ActionForm('SETTINGS / BOARD / PROVIDERS',fields,
         'Save applies the same validation and protected storage as the desktop app. Cancel preserves everything. Physical AI approval remains disabled.',
