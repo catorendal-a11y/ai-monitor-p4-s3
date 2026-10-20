@@ -1,3 +1,23 @@
+# LimitBuddy v1.19.1-rc21
+
+## The display comes back after a restart, and quota stays current while you work
+
+- **Start at Windows sign-in** (off by default): Settings > Edit settings adds one per-user
+  Startup entry, so the display no longer shows NO HOST after every restart until a terminal
+  is opened. It needs no administrator rights, appears under Windows Settings > Apps > Startup,
+  and is only ever replaced or removed when it has exactly the shape LimitBuddy writes. Another
+  program's entry with the same name makes Save stop and change nothing. After upgrading to a new
+  folder, press Save once in Settings to point the entry at it. Uninstall removes the entry
+  when it starts the removed folder.
+- Quota is polled about once a minute (instead of every 4 minutes) while an AI registers token
+  use and any quota window is at 30 % left or lower, then returns to the configured interval five
+  minutes after the activity stops. The wait is only shortened: the 15 second polling cooldown
+  and a shorter configured interval are respected.
+- The history database now runs in WAL mode, so the terminal's reads and the host's writes no
+  longer block each other (the "database is locked" failure seen in CI). An existing database
+  switches the next time the host writes. Clear history also truncates the write-ahead log, so
+  deleted rows do not stay readable in `history.db-wal`.
+
 # LimitBuddy v1.19.1-rc20
 
 ## New name, live quota in the terminal and a third companion
