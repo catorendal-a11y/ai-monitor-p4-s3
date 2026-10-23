@@ -10,4 +10,4 @@ mdit-py-plugins==0.6.1
 platformdirs==4.13.3
 pygments==2.21.0
 typing-extensions==4.16.0
-esptool==5.4.0
+esptool==5.6.0
