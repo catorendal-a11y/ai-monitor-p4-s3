@@ -23,4 +23,4 @@ rich-click==1.9.9
 textual==8.2.8
 tibs==2.0.2
 typing_extensions==4.16.0
-websockets==17.2
+websockets==17.3
